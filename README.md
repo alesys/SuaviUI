@@ -66,6 +66,7 @@ Pull requests welcome! Just make sure your code doesn't summon demons. We've had
 ## Credits
 
 - **You** - For having excellent taste in addons
+- **Vella** - For tanking Smolderon to my face
 - **Coffee** - The real MVP
 - **Stack Overflow** - You know why
 - **Blizzard** - For making a UI bad enough to inspire this project
