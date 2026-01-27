@@ -14040,7 +14040,7 @@ local function CreateCreditsPage(parent)
     y = y - thanksHeader.gap
 
     local thanks = {
-        { name = "Vella", desc = "For being amazing" },
+        { name = "Vella", desc = "For tanking Smolderon to my face" },
         { name = "Pataz", desc = "For the support" },
         { name = "Ñora", desc = "Paid for the original addon" },
         { name = "Quazii", desc = "Original inspiration" },
