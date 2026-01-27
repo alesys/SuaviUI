@@ -127,7 +127,7 @@ function SUICore:ExportProfileToString()
         return "Failed to encode profile."
     end
 
-    return "QUI1:" .. encoded
+    return "SUI1:" .. encoded
 end
 
 function SUICore:ImportProfileFromString(str)
@@ -142,8 +142,8 @@ function SUICore:ImportProfileFromString(str)
     end
 
     str = str:gsub("%s+", "")
-    str = str:gsub("^QUI1:", "")  -- SuaviUI prefix
-    str = str:gsub("^QUI1:", "")  -- Strip QUI1 prefix
+    str = str:gsub("^SUI1:", "")  -- SuaviUI prefix
+    str = str:gsub("^QUI1:", "")  -- Backwards compatibility with old QUI prefix
     str = str:gsub("^CDM1:", "")  -- Backwards compatibility
 
     local compressed = LibDeflate:DecodeForPrint(str)
