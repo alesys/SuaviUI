@@ -67,6 +67,20 @@ Pull requests welcome! Just make sure your code doesn't summon demons. We've had
 
 - **You** - For having excellent taste in addons
 - **Vella** - For tanking Smolderon to my face
+- **Pataz** - For the support
+- **Ñora** - Paid for the original addon
+- **Quazii** - Original inspiration
+- **ElvUI** - UI framework inspiration
+- **Claudia** - AI-powered development assistant
+- **Ace3 Libraries** - AceAddon, AceDB, AceConsole, AceEvent, AceLocale, AceSerializer, AceComm
+- **LibSharedMedia-3.0** - Shared media resources
+- **LibDeflate** - Data compression for import/export
+- **LibSerialize** - Table serialization
+- **LibCustomGlow-1.0** - Glow effects for cooldown tracking
+- **LibKeyBound-1.0** - Keybind management
+- **LibDualSpec-1.0** - Spec-based profile switching
+- **LibOpenRaid** - Raid utility functions
+- **The WoW Community** - For inspiration and feedback
 - **Coffee** - The real MVP
 - **Stack Overflow** - You know why
 - **Blizzard** - For making a UI bad enough to inspire this project
