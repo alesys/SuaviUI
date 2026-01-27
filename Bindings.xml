@@ -1,0 +1,7 @@
+<Bindings>
+  <Binding name="SUAVIUI_TOGGLE_OPTIONS" category="SuaviUI">
+    if SuaviUI and SuaviUI.GUI then
+      SuaviUI.GUI:Toggle()
+    end
+  </Binding>
+</Bindings>
