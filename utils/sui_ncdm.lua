@@ -994,6 +994,12 @@ local function HookViewer(viewerName, trackerKey)
     local idleInterval = 0.5     -- 500ms out of combat (events handle immediate needs)
 
     updateFrame:SetScript("OnUpdate", function(self, elapsed)
+        -- Completely suspend updates while frame is being dragged/edited
+        -- This prevents any frame manipulation during Blizzard EditMode operations
+        if viewer.isDragging or viewer.isEditing then
+            return
+        end
+
         viewer.__ncdmElapsed = (viewer.__ncdmElapsed or 0) + elapsed
 
         -- Adaptive throttle - slower polling since events handle immediate updates
