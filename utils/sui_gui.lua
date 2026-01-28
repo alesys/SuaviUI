@@ -3350,125 +3350,6 @@ function GUI:CreateMainFrame()
     version:SetText("v" .. ADDON_VERSION)
     version:SetPoint("LEFT", title, "RIGHT", 8, 0)
 
-    -- Panel Scale (compact inline: label + editbox + slider)
-    -- Uses OnMouseUp pattern to avoid jittery scaling during drag
-    local scaleContainer = CreateFrame("Frame", nil, frame)
-    scaleContainer:SetSize(160, 20)
-    scaleContainer:SetPoint("CENTER", frame, "TOP", 0, -15)
-
-    local scaleLabel = scaleContainer:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(scaleLabel, 10, "", C.textMuted)
-    scaleLabel:SetText("Panel Scale:")
-    scaleLabel:SetPoint("LEFT", scaleContainer, "LEFT", 0, 0)
-
-    -- Editable input field for manual entry
-    local scaleEditBox = CreateFrame("EditBox", nil, scaleContainer, "BackdropTemplate")
-    scaleEditBox:SetSize(38, 16)
-    scaleEditBox:SetPoint("LEFT", scaleLabel, "RIGHT", 5, 0)
-    scaleEditBox:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    scaleEditBox:SetBackdropColor(0.08, 0.08, 0.08, 1)
-    scaleEditBox:SetBackdropBorderColor(0.25, 0.25, 0.25, 1)
-    scaleEditBox:SetFont(GetFontPath(), 10, "")
-    scaleEditBox:SetTextColor(unpack(C.text))
-    scaleEditBox:SetJustifyH("CENTER")
-    scaleEditBox:SetAutoFocus(false)
-    scaleEditBox:SetMaxLetters(4)
-
-    local scaleSlider = CreateFrame("Slider", nil, scaleContainer, "BackdropTemplate")
-    scaleSlider:SetSize(70, 12)
-    scaleSlider:SetPoint("LEFT", scaleEditBox, "RIGHT", 5, 0)
-    scaleSlider:SetOrientation("HORIZONTAL")
-    scaleSlider:SetMinMaxValues(0.8, 1.5)
-    scaleSlider:SetValueStep(0.05)
-    scaleSlider:SetObeyStepOnDrag(true)
-    scaleSlider:EnableMouse(true)
-    scaleSlider:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8x8"})
-    scaleSlider:SetBackdropColor(0.22, 0.22, 0.22, 0.9)
-    local thumb = scaleSlider:CreateTexture(nil, "OVERLAY")
-    thumb:SetSize(8, 14)
-    thumb:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 1)
-    scaleSlider:SetThumbTexture(thumb)
-
-    -- Helper to apply scale (used on release and manual entry)
-    local function ApplyScale(value)
-        value = math.max(0.8, math.min(1.5, value))
-        value = math.floor(value * 20 + 0.5) / 20  -- Round to 0.05
-        frame:SetScale(value)
-        if SUI.SUICore and SUI.SUICore.db then
-            SUI.SUICore.db.profile.configPanelScale = value
-        end
-        return value
-    end
-
-    -- Initialize scale from saved value
-    local savedScale = SUI.SUICore and SUI.SUICore.db and SUI.SUICore.db.profile.configPanelScale or 1.0
-    scaleSlider:SetValue(savedScale)
-    scaleEditBox:SetText(string.format("%.2f", savedScale))
-    frame:SetScale(savedScale)
-
-    -- Track if we're dragging to defer SetScale until release
-    local isDragging = false
-
-    -- OnValueChanged: Update editbox text only, defer SetScale during drag
-    scaleSlider:SetScript("OnValueChanged", function(self, value)
-        value = math.floor(value * 20 + 0.5) / 20  -- Round to 0.05
-        scaleEditBox:SetText(string.format("%.2f", value))
-        -- Only apply immediately if NOT dragging (e.g., clicking on track)
-        if not isDragging then
-            ApplyScale(value)
-        end
-    end)
-
-    -- OnMouseDown: Start tracking drag
-    scaleSlider:SetScript("OnMouseDown", function(self, button)
-        if button == "LeftButton" then
-            isDragging = true
-        end
-    end)
-
-    -- OnMouseUp: Apply scale smoothly when user releases
-    scaleSlider:SetScript("OnMouseUp", function(self, button)
-        if button == "LeftButton" and isDragging then
-            isDragging = false
-            local value = self:GetValue()
-            ApplyScale(value)
-        end
-    end)
-
-    -- EditBox: Manual entry support
-    scaleEditBox:SetScript("OnEnterPressed", function(self)
-        local val = tonumber(self:GetText())
-        if val then
-            val = ApplyScale(val)
-            scaleSlider:SetValue(val)
-            self:SetText(string.format("%.2f", val))
-        end
-        self:ClearFocus()
-    end)
-
-    scaleEditBox:SetScript("OnEscapePressed", function(self)
-        self:SetText(string.format("%.2f", scaleSlider:GetValue()))
-        self:ClearFocus()
-    end)
-
-    -- Hover effect for editbox
-    scaleEditBox:SetScript("OnEditFocusGained", function(self)
-        pcall(self.SetBackdropBorderColor, self, unpack(C.accent))
-    end)
-
-    scaleEditBox:SetScript("OnEditFocusLost", function(self)
-        pcall(self.SetBackdropBorderColor, self, 0.25, 0.25, 0.25, 1)
-        -- Validate and revert if invalid
-        local val = tonumber(self:GetText())
-        if not val then
-            self:SetText(string.format("%.2f", scaleSlider:GetValue()))
-        end
-    end)
-
     -- Close button (X)
     local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -3, -3)
@@ -3534,8 +3415,8 @@ function GUI:CreateMainFrame()
     
     -- Separator line above bottom panel
     local bottomSep = frame:CreateTexture(nil, "ARTWORK")
-    bottomSep:SetPoint("BOTTOMLEFT", 0, 50)
-    bottomSep:SetPoint("BOTTOMRIGHT", 0, 50)
+    bottomSep:SetPoint("BOTTOMLEFT", 10, 50)
+    bottomSep:SetPoint("BOTTOMRIGHT", -10, 50)
     bottomSep:SetHeight(1)
     bottomSep:SetColorTexture(unpack(C.border))
     
@@ -3594,9 +3475,119 @@ function GUI:CreateMainFrame()
     end)
     editModeBtn:SetPoint("LEFT", cdmBtn, "RIGHT", 10, 0)
     
-    ---------------------------------------------------------------------------
-    -- RESIZE HANDLE (Bottom-right corner, horizontal and vertical)
-    ---------------------------------------------------------------------------
+    -- Panel Scale controls (right side of bottom panel)
+    -- Helper to apply scale (used on release and manual entry)
+    local function ApplyScale(value)
+        value = math.max(0.8, math.min(1.5, value))
+        value = math.floor(value * 20 + 0.5) / 20  -- Round to 0.05
+        frame:SetScale(value)
+        if SUI.SUICore and SUI.SUICore.db then
+            SUI.SUICore.db.profile.configPanelScale = value
+        end
+        return value
+    end
+
+    local scaleLabel = bottomPanel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    SetFont(scaleLabel, 10, "", C.textMuted)
+    scaleLabel:SetText("Scale:")
+    scaleLabel:SetPoint("BOTTOMRIGHT", bottomPanel, "BOTTOMRIGHT", -120, 6)
+
+    -- Editable input field for manual entry
+    local scaleEditBox = CreateFrame("EditBox", nil, bottomPanel, "BackdropTemplate")
+    scaleEditBox:SetSize(35, 20)
+    scaleEditBox:SetPoint("BOTTOMRIGHT", bottomPanel, "BOTTOMRIGHT", -80, 6)
+    scaleEditBox:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    scaleEditBox:SetBackdropColor(0.08, 0.08, 0.08, 1)
+    scaleEditBox:SetBackdropBorderColor(0.25, 0.25, 0.25, 1)
+    scaleEditBox:SetFont(GetFontPath(), 10, "")
+    scaleEditBox:SetTextColor(unpack(C.text))
+    scaleEditBox:SetJustifyH("CENTER")
+    scaleEditBox:SetAutoFocus(false)
+    scaleEditBox:SetMaxLetters(4)
+
+    local scaleSlider = CreateFrame("Slider", nil, bottomPanel, "BackdropTemplate")
+    scaleSlider:SetSize(55, 12)
+    scaleSlider:SetPoint("BOTTOMRIGHT", bottomPanel, "BOTTOMRIGHT", -15, 6)
+    scaleSlider:SetOrientation("HORIZONTAL")
+    scaleSlider:SetMinMaxValues(0.8, 1.5)
+    scaleSlider:SetValueStep(0.05)
+    scaleSlider:SetObeyStepOnDrag(true)
+    scaleSlider:EnableMouse(true)
+    scaleSlider:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8x8"})
+    scaleSlider:SetBackdropColor(0.22, 0.22, 0.22, 0.9)
+    local thumb = scaleSlider:CreateTexture(nil, "OVERLAY")
+    thumb:SetSize(8, 14)
+    thumb:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 1)
+    scaleSlider:SetThumbTexture(thumb)
+
+    -- Initialize scale from saved value
+    local savedScale = SUI.SUICore and SUI.SUICore.db and SUI.SUICore.db.profile.configPanelScale or 1.0
+    scaleSlider:SetValue(savedScale)
+    scaleEditBox:SetText(string.format("%.2f", savedScale))
+    frame:SetScale(savedScale)
+
+    -- Track if we're dragging to defer SetScale until release
+    local isDragging = false
+
+    -- OnValueChanged: Update editbox text only, defer SetScale during drag
+    scaleSlider:SetScript("OnValueChanged", function(self, value)
+        value = math.floor(value * 20 + 0.5) / 20  -- Round to 0.05
+        scaleEditBox:SetText(string.format("%.2f", value))
+        -- Only apply immediately if NOT dragging (e.g., clicking on track)
+        if not isDragging then
+            ApplyScale(value)
+        end
+    end)
+
+    -- OnMouseDown: Start tracking drag
+    scaleSlider:SetScript("OnMouseDown", function(self, button)
+        if button == "LeftButton" then
+            isDragging = true
+        end
+    end)
+
+    -- OnMouseUp: Apply scale smoothly when user releases
+    scaleSlider:SetScript("OnMouseUp", function(self, button)
+        if button == "LeftButton" and isDragging then
+            isDragging = false
+            local value = self:GetValue()
+            ApplyScale(value)
+        end
+    end)
+
+    -- EditBox: Manual entry support
+    scaleEditBox:SetScript("OnEnterPressed", function(self)
+        local val = tonumber(self:GetText())
+        if val then
+            val = ApplyScale(val)
+            scaleSlider:SetValue(val)
+            self:SetText(string.format("%.2f", val))
+        end
+        self:ClearFocus()
+    end)
+
+    scaleEditBox:SetScript("OnEscapePressed", function(self)
+        self:SetText(string.format("%.2f", scaleSlider:GetValue()))
+        self:ClearFocus()
+    end)
+
+    -- Hover effect for editbox
+    scaleEditBox:SetScript("OnEditFocusGained", function(self)
+        pcall(self.SetBackdropBorderColor, self, unpack(C.accent))
+    end)
+
+    scaleEditBox:SetScript("OnEditFocusLost", function(self)
+        pcall(self.SetBackdropBorderColor, self, 0.25, 0.25, 0.25, 1)
+        -- Validate and revert if invalid
+        local val = tonumber(self:GetText())
+        if not val then
+            self:SetText(string.format("%.2f", scaleSlider:GetValue()))
+        end
+    end)
     local MIN_HEIGHT = 400
     local MAX_HEIGHT = 1200
     local MIN_WIDTH = 600
