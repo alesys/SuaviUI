@@ -945,6 +945,35 @@ local function HookViewer(viewerName, trackerKey)
 
     NCDM.hooked[trackerKey] = true
 
+    -- Hook GetScaledRect to provide fallback values during EditMode drag
+    -- Blizzard's EditMode has a bug where it doesn't handle nil returns from GetScaledRect
+    -- This causes "attempt to perform arithmetic on local 'left' (a nil value)" errors
+    if not viewer._SUI_GetScaledRectHooked then
+        viewer._SUI_GetScaledRectHooked = true
+        local originalGetScaledRect = viewer.GetScaledRect
+        viewer.GetScaledRect = function(self)
+            local left, bottom, width, height = originalGetScaledRect(self)
+            if left then
+                -- Store last valid rect for fallback
+                self._SUI_lastRect = {left, bottom, width, height}
+                return left, bottom, width, height
+            end
+            -- During drag, anchors are cleared - use stored values or calculate from dimensions
+            if self._SUI_lastRect then
+                return unpack(self._SUI_lastRect)
+            end
+            -- Last resort: calculate from our stored dimensions
+            local w = self.__cdmIconWidth or self:GetWidth() or 200
+            local h = self.__cdmTotalHeight or self:GetHeight() or 50
+            local cx, cy = self:GetCenter()
+            if cx and cy then
+                return cx - w/2, cy - h/2, w, h
+            end
+            -- Absolute fallback (should never reach here)
+            return 0, 0, w, h
+        end
+    end
+
     -- Step 1 & 3: OnShow hook - enable polling and single deferred layout
     viewer:HookScript("OnShow", function(self)
         -- Enable polling when viewer becomes visible
