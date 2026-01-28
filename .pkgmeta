@@ -1,0 +1,13 @@
+package-as: SuaviUI
+
+enable-nolib-creation: no
+
+ignore:
+    - .git
+    - .github
+    - .gitignore
+    - .copilot-instructions.md
+    - docs
+    - README.md
+    - .pkgmeta
+    - .wowup_ignore
