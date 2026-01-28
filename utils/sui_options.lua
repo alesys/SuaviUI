@@ -13524,7 +13524,7 @@ local function CreateCreditsPage(parent)
     local thanks = {
         { name = "Vella", desc = "For tanking Smolderon to my face" },
         { name = "Pataz", desc = "For the support" },
-        { name = "Ã‘ora", desc = "Paid for the original addon" },
+        { name = "Ñora", desc = "Paid for the original addon" },
         { name = "Quazii", desc = "Original inspiration" },
         { name = "ElvUI", desc = "UI framework inspiration" },
         { name = "Claudia", desc = "AI-powered development assistant" },
