@@ -985,12 +985,13 @@ function SUICore:UpdatePowerBar()
     local orientation = cfg.orientation or "AUTO"
     local isVertical = (orientation == "VERTICAL")
 
-    -- For AUTO, check if locked to a CDM viewer and inherit its orientation
+    -- For AUTO, check widthSync target and inherit its orientation
     if orientation == "AUTO" then
-        if cfg.lockedToEssential then
+        local syncTarget = cfg.widthSync or "none"
+        if syncTarget == "essential" then
             local viewer = _G.EssentialCooldownViewer
             isVertical = viewer and viewer.__cdmLayoutDirection == "VERTICAL"
-        elseif cfg.lockedToUtility then
+        elseif syncTarget == "utility" then
             local viewer = _G.UtilityCooldownViewer
             isVertical = viewer and viewer.__cdmLayoutDirection == "VERTICAL"
         end
@@ -1160,9 +1161,9 @@ function SUICore:UpdatePowerBar()
 
     bar:Show()
 
-    -- Propagate to Secondary bar if it's locked to Primary
+    -- Propagate to Secondary bar if it's synced to Primary
     local secondaryCfg = self.db.profile.secondaryPowerBar
-    if secondaryCfg and secondaryCfg.lockedToPrimary then
+    if secondaryCfg and (secondaryCfg.widthSync == "primary" or secondaryCfg.alignTo == "primary") then
         self:UpdateSecondaryPowerBar()
     end
 end
@@ -1187,10 +1188,11 @@ function SUICore:UpdatePowerBarTicks(bar, resource, max)
     local orientation = cfg.orientation or "AUTO"
     local isVertical = (orientation == "VERTICAL")
     if orientation == "AUTO" then
-        if cfg.lockedToEssential then
+        local syncTarget = cfg.widthSync or "none"
+        if syncTarget == "essential" then
             local viewer = _G.EssentialCooldownViewer
             isVertical = viewer and viewer.__cdmLayoutDirection == "VERTICAL"
-        elseif cfg.lockedToUtility then
+        elseif syncTarget == "utility" then
             local viewer = _G.UtilityCooldownViewer
             isVertical = viewer and viewer.__cdmLayoutDirection == "VERTICAL"
         end
@@ -1236,7 +1238,8 @@ _G.SuaviUI_UpdateLockedPowerBar = function()
     if not SUICore or not SUICore.db then return end
 
     local cfg = SUICore.db.profile.powerBar
-    if not cfg.enabled or not cfg.lockedToEssential then return end
+    if not cfg.enabled then return end
+    if cfg.widthSync ~= "essential" and cfg.alignTo ~= "essential" then return end
 
     local essentialViewer = _G.EssentialCooldownViewer
     if not essentialViewer or not essentialViewer:IsShown() then return end
@@ -1318,7 +1321,8 @@ _G.SuaviUI_UpdateLockedPowerBarToUtility = function()
     if not SUICore or not SUICore.db then return end
 
     local cfg = SUICore.db.profile.powerBar
-    if not cfg.enabled or not cfg.lockedToUtility then return end
+    if not cfg.enabled then return end
+    if cfg.widthSync ~= "utility" and cfg.alignTo ~= "utility" then return end
 
     local utilityViewer = _G.UtilityCooldownViewer
     if not utilityViewer or not utilityViewer:IsShown() then return end
@@ -1409,7 +1413,8 @@ _G.SuaviUI_UpdateLockedSecondaryPowerBar = function()
     if not SUICore or not SUICore.db then return end
 
     local cfg = SUICore.db.profile.secondaryPowerBar
-    if not cfg.enabled or not cfg.lockedToEssential then return end
+    if not cfg.enabled then return end
+    if cfg.widthSync ~= "essential" and cfg.alignTo ~= "essential" then return end
 
     local essentialViewer = _G.EssentialCooldownViewer
     if not essentialViewer or not essentialViewer:IsShown() then return end
@@ -1498,7 +1503,8 @@ _G.SuaviUI_UpdateLockedSecondaryPowerBarToUtility = function()
     if not SUICore or not SUICore.db then return end
 
     local cfg = SUICore.db.profile.secondaryPowerBar
-    if not cfg.enabled or not cfg.lockedToUtility then return end
+    if not cfg.enabled then return end
+    if cfg.widthSync ~= "utility" and cfg.alignTo ~= "utility" then return end
 
     local utilityViewer = _G.UtilityCooldownViewer
     if not utilityViewer or not utilityViewer:IsShown() then return end
@@ -1957,19 +1963,19 @@ function SUICore:UpdateSecondaryPowerBarTicks(bar, resource, max)
     local orientation = cfg.orientation or "AUTO"
     local isVertical = (orientation == "VERTICAL")
     if orientation == "AUTO" then
-        if cfg.lockedToEssential then
+        if cfg.widthSync == "essential" or cfg.alignTo == "essential" then
             local viewer = _G.EssentialCooldownViewer
             isVertical = viewer and viewer.__cdmLayoutDirection == "VERTICAL"
-        elseif cfg.lockedToUtility then
+        elseif cfg.widthSync == "utility" or cfg.alignTo == "utility" then
             local viewer = _G.UtilityCooldownViewer
             isVertical = viewer and viewer.__cdmLayoutDirection == "VERTICAL"
-        elseif cfg.lockedToPrimary then
+        elseif cfg.widthSync == "primary" or cfg.alignTo == "primary" then
             local primaryCfg = self.db.profile.powerBar
             if primaryCfg then
-                if primaryCfg.lockedToEssential then
+                if primaryCfg.widthSync == "essential" or primaryCfg.alignTo == "essential" then
                     local viewer = _G.EssentialCooldownViewer
                     isVertical = viewer and viewer.__cdmLayoutDirection == "VERTICAL"
-                elseif primaryCfg.lockedToUtility then
+                elseif primaryCfg.widthSync == "utility" or primaryCfg.alignTo == "utility" then
                     local viewer = _G.UtilityCooldownViewer
                     isVertical = viewer and viewer.__cdmLayoutDirection == "VERTICAL"
                 end
@@ -2045,22 +2051,22 @@ function SUICore:UpdateSecondaryPowerBar()
     local orientation = cfg.orientation or "AUTO"
     local isVertical = (orientation == "VERTICAL")
 
-    -- For AUTO, check if locked to a CDM viewer and inherit its orientation
+    -- For AUTO, check if synced to a CDM viewer and inherit its orientation
     if orientation == "AUTO" then
-        if cfg.lockedToEssential then
+        if cfg.widthSync == "essential" or cfg.alignTo == "essential" then
             local viewer = _G.EssentialCooldownViewer
             isVertical = viewer and viewer.__cdmLayoutDirection == "VERTICAL"
-        elseif cfg.lockedToUtility then
+        elseif cfg.widthSync == "utility" or cfg.alignTo == "utility" then
             local viewer = _G.UtilityCooldownViewer
             isVertical = viewer and viewer.__cdmLayoutDirection == "VERTICAL"
-        elseif cfg.lockedToPrimary then
-            -- Inherit from Primary bar's locked CDM
+        elseif cfg.widthSync == "primary" or cfg.alignTo == "primary" then
+            -- Inherit from Primary bar's synced CDM
             local primaryCfg = self.db.profile.powerBar
             if primaryCfg then
-                if primaryCfg.lockedToEssential then
+                if primaryCfg.widthSync == "essential" or primaryCfg.alignTo == "essential" then
                     local viewer = _G.EssentialCooldownViewer
                     isVertical = viewer and viewer.__cdmLayoutDirection == "VERTICAL"
-                elseif primaryCfg.lockedToUtility then
+                elseif primaryCfg.widthSync == "utility" or primaryCfg.alignTo == "utility" then
                     local viewer = _G.UtilityCooldownViewer
                     isVertical = viewer and viewer.__cdmLayoutDirection == "VERTICAL"
                 end
@@ -2072,12 +2078,12 @@ function SUICore:UpdateSecondaryPowerBar()
     bar.StatusBar:SetOrientation(isVertical and "VERTICAL" or "HORIZONTAL")
 
     -- =====================================================
-    -- LOCKED TO PRIMARY MODE (highest priority positioning)
+    -- SYNCED TO PRIMARY MODE (highest priority positioning)
     -- =====================================================
     local width
-    local lockedToPrimaryHandled = false
+    local syncedToPrimaryHandled = false
 
-    if cfg.lockedToPrimary then
+    if cfg.widthSync == "primary" or cfg.alignTo == "primary" then
         local primaryBar = self.powerBar
         local primaryCfg = self.db.profile.powerBar
 
@@ -2132,27 +2138,27 @@ function SUICore:UpdateSecondaryPowerBar()
                 -- Position the bar (add user adjustment on top of calculated base position)
                 local finalX = offsetX + (cfg.offsetX or 0)
                 local finalY = offsetY + (cfg.offsetY or 0)
-                if bar._cachedX ~= finalX or bar._cachedY ~= finalY or bar._cachedAutoMode ~= "lockedToPrimary" then
+                if bar._cachedX ~= finalX or bar._cachedY ~= finalY or bar._cachedAutoMode ~= "syncedToPrimary" then
                     bar:ClearAllPoints()
                     bar:SetPoint("CENTER", UIParent, "CENTER", finalX, finalY)
                     bar._cachedX = finalX
                     bar._cachedY = finalY
                     bar._cachedAnchor = nil
-                    bar._cachedAutoMode = "lockedToPrimary"
+                    bar._cachedAutoMode = "syncedToPrimary"
                     -- Notify unit frames that may be anchored to this power bar
                     if _G.SuaviUI_UpdateAnchoredUnitFrames then
                         _G.SuaviUI_UpdateAnchoredUnitFrames()
                     end
                 end
 
-                lockedToPrimaryHandled = true
+                syncedToPrimaryHandled = true
             else
                 -- Primary bar not yet laid out (GetCenter returns nil on first frame)
                 -- Defer update to allow layout to complete
-                if not bar._lockedToPrimaryDeferred then
-                    bar._lockedToPrimaryDeferred = true
+                if not bar._syncedToPrimaryDeferred then
+                    bar._syncedToPrimaryDeferred = true
                     C_Timer.After(0.1, function()
-                        bar._lockedToPrimaryDeferred = nil
+                        bar._syncedToPrimaryDeferred = nil
                         self:UpdateSecondaryPowerBar()
                     end)
                 end
@@ -2196,20 +2202,20 @@ function SUICore:UpdateSecondaryPowerBar()
                 -- Add user adjustment on top of calculated base position
                 local finalX = offsetX + (cfg.offsetX or 0)
                 local finalY = offsetY + (cfg.offsetY or 0)
-                if bar._cachedX ~= finalX or bar._cachedY ~= finalY or bar._cachedAutoMode ~= "lockedToPrimaryCached" then
+                if bar._cachedX ~= finalX or bar._cachedY ~= finalY or bar._cachedAutoMode ~= "syncedToPrimaryCached" then
                     bar:ClearAllPoints()
                     bar:SetPoint("CENTER", UIParent, "CENTER", finalX, finalY)
                     bar._cachedX = finalX
                     bar._cachedY = finalY
                     bar._cachedAnchor = nil
-                    bar._cachedAutoMode = "lockedToPrimaryCached"
+                    bar._cachedAutoMode = "syncedToPrimaryCached"
                     -- Notify unit frames that may be anchored to this power bar
                     if _G.SuaviUI_UpdateAnchoredUnitFrames then
                         _G.SuaviUI_UpdateAnchoredUnitFrames()
                     end
                 end
 
-                lockedToPrimaryHandled = true
+                syncedToPrimaryHandled = true
             end
         else
             -- Primary is hidden and Secondary is NOT Standalone - hide Secondary
@@ -2221,14 +2227,16 @@ function SUICore:UpdateSecondaryPowerBar()
     -- =====================================================
     -- LEGACY POSITIONING (autoAttach or manual)
     -- =====================================================
-    if not lockedToPrimaryHandled then
+    if not syncedToPrimaryHandled then
         -- Get anchor frame (needed for autoAttach positioning)
         local anchorName = cfg.autoAttach and "EssentialCooldownViewer" or cfg.attachTo
         local anchor = _G[anchorName]
 
         -- In standalone mode, don't hide when anchor is hidden (bar is independent)
         -- Otherwise, hide if anchor doesn't exist or isn't shown
-        if not cfg.standaloneMode and not cfg.lockedToEssential and not cfg.lockedToUtility then
+        local syncedToEssential = cfg.widthSync == "essential" or cfg.alignTo == "essential"
+        local syncedToUtility = cfg.widthSync == "utility" or cfg.alignTo == "utility"
+        if not cfg.standaloneMode and not syncedToEssential and not syncedToUtility then
             if not anchor or not anchor:IsShown() then
                 bar:Hide()
                 return
@@ -2314,9 +2322,10 @@ function SUICore:UpdateSecondaryPowerBar()
             end
 
             -- Only reposition when offsets actually changed (prevents flicker)
-            -- In locked modes, add lockedBase + user adjustment; otherwise just use offset as absolute
-            local baseX = (cfg.lockedToEssential or cfg.lockedToUtility) and (cfg.lockedBaseX or 0) or 0
-            local baseY = (cfg.lockedToEssential or cfg.lockedToUtility) and (cfg.lockedBaseY or 0) or 0
+            -- In synced modes, add syncedBase + user adjustment; otherwise just use offset as absolute
+            local isSyncedToCDM = (cfg.widthSync == "essential" or cfg.widthSync == "utility" or cfg.alignTo == "essential" or cfg.alignTo == "utility")
+            local baseX = isSyncedToCDM and (cfg.lockedBaseX or 0) or 0
+            local baseY = isSyncedToCDM and (cfg.lockedBaseY or 0) or 0
             local wantedX = cfg.useRawPixels and (baseX + (cfg.offsetX or 0)) or Scale(baseX + (cfg.offsetX or 0))
             local wantedY = cfg.useRawPixels and (baseY + (cfg.offsetY or 0)) or Scale(baseY + (cfg.offsetY or 0))
             if bar._cachedX ~= wantedX or bar._cachedY ~= wantedY or bar._cachedAutoMode ~= false then

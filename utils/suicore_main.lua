@@ -882,8 +882,8 @@ local defaults = {
             showTicks         = false,    -- Show tick marks for segmented resources (Holy Power, Chi, etc.)
             tickThickness     = 2,        -- Thickness of tick marks in pixels
             tickColor         = { 0, 0, 0, 1 },  -- Color of tick marks (default black)
-            lockedToEssential = false,  -- Auto-resize width when Essential CDM changes
-            lockedToUtility   = false,  -- Auto-resize width when Utility CDM changes
+            alignTo           = "none",   -- Position preset: "none", "essential", "utility"
+            widthSync         = "none",   -- Auto-sync width: "none", "essential", "utility"
             snapGap           = 5,      -- Gap when snapped to CDM
             orientation       = "HORIZONTAL",  -- Bar orientation
         },
@@ -957,9 +957,8 @@ local defaults = {
             showTicks     = true,     -- Show tick marks for segmented resources (Holy Power, Chi, etc.)
             tickThickness = 2,        -- Thickness of tick marks in pixels
             tickColor     = { 0, 0, 0, 1 },  -- Color of tick marks (default black)
-            lockedToEssential = false,  -- Auto-resize width when Essential CDM changes
-            lockedToUtility   = false,  -- Auto-resize width when Utility CDM changes
-            lockedToPrimary   = true,   -- Position above + match Primary bar width
+            alignTo           = "primary",  -- Position preset: "none", "essential", "utility", "primary"
+            widthSync         = "primary",  -- Auto-sync width: "none", "essential", "utility", "primary"
             snapGap       = 5,        -- Gap when snapped
             orientation   = "AUTO",   -- Bar orientation
             showFragmentedPowerBarText = false,  -- Show text on fragmented power bars
@@ -991,9 +990,8 @@ local defaults = {
             showTicks         = false,
             tickThickness     = 2,
             tickColor         = { 0, 0, 0, 1 },
-            lockedToEssential = false,
-            lockedToUtility   = false,
-            lockedToSecondary = true,    -- Position relative to secondary bar
+            alignTo           = "secondary",  -- Position preset: "none", "essential", "utility", "primary", "secondary"
+            widthSync         = "secondary",  -- Auto-sync width: "none", "essential", "utility", "primary", "secondary"
             snapGap           = 5,
             orientation       = "HORIZONTAL",
         },
@@ -3046,6 +3044,36 @@ function SUICore:OnInitialize()
         profile.suiDatatexts = profile.quiDatatexts
         profile.quiDatatexts = nil
     end
+
+    -- Migrate power bar lock flags to new alignTo/widthSync string system
+    -- Old: lockedToEssential=true, lockedToUtility=false → New: widthSync="essential"
+    local function migratePowerBarLockFlags(barConfig)
+        if not barConfig then return end
+        -- Only migrate if old flags exist and new fields don't
+        if barConfig.widthSync == nil or barConfig.widthSync == "none" then
+            if barConfig.lockedToEssential then
+                barConfig.widthSync = "essential"
+                barConfig.alignTo = "essential"
+            elseif barConfig.lockedToUtility then
+                barConfig.widthSync = "utility"
+                barConfig.alignTo = "utility"
+            elseif barConfig.lockedToPrimary then
+                barConfig.widthSync = "primary"
+                barConfig.alignTo = "primary"
+            elseif barConfig.lockedToSecondary then
+                barConfig.widthSync = "secondary"
+                barConfig.alignTo = "secondary"
+            end
+        end
+        -- Clean up old boolean flags
+        barConfig.lockedToEssential = nil
+        barConfig.lockedToUtility = nil
+        barConfig.lockedToPrimary = nil
+        barConfig.lockedToSecondary = nil
+    end
+    migratePowerBarLockFlags(profile.powerBar)
+    migratePowerBarLockFlags(profile.secondaryPowerBar)
+    migratePowerBarLockFlags(profile.tertiaryPowerBar)
 
     -- Initialize preserved scale - will be properly set in OnEnable after UI scale is applied
     self._preservedUIScale = nil
