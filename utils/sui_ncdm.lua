@@ -870,6 +870,12 @@ local function LayoutViewer(viewerName, trackerKey)
     NCDM.applying[trackerKey] = false
     viewer.__cdmLayoutRunning = nil
 
+    -- Fire custom event for anchored frames (power bars, castbars, unit frames) to listen to
+    local eventName = (trackerKey == "essential") and "SuaviUI_EssentialCooldownsUpdated" or "SuaviUI_UtilityCooldownsUpdated"
+    if _G.SuaviUI_EventFrame then
+        _G.SuaviUI_EventFrame:Fire(eventName, viewerName)
+    end
+
     -- If Essential just finished layout and anchor mode is on, reposition Utility
     if trackerKey == "essential" then
         local db = GetDB()

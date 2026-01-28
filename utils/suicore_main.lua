@@ -3101,6 +3101,40 @@ function SUICore:OnInitialize()
     C_Timer.After(0.1, function()
         self:CreateMinimapButton()
     end)
+
+    -- Create global event frame for custom SuaviUI events
+    -- Used for cooldown frame updates, resource bar syncing, etc.
+    if not _G.SuaviUI_EventFrame then
+        local eventFrame = CreateFrame("Frame")
+        _G.SuaviUI_EventFrame = eventFrame
+        eventFrame.listeners = {}  -- { eventName = { callback1, callback2, ... } }
+
+        function eventFrame:RegisterListener(eventName, callback)
+            if not self.listeners[eventName] then
+                self.listeners[eventName] = {}
+            end
+            table.insert(self.listeners[eventName], callback)
+        end
+
+        function eventFrame:UnregisterListener(eventName, callback)
+            if self.listeners[eventName] then
+                for i, cb in ipairs(self.listeners[eventName]) do
+                    if cb == callback then
+                        table.remove(self.listeners[eventName], i)
+                        break
+                    end
+                end
+            end
+        end
+
+        function eventFrame:Fire(eventName, ...)
+            if self.listeners[eventName] then
+                for _, callback in ipairs(self.listeners[eventName]) do
+                    pcall(callback, eventName, ...)
+                end
+            end
+        end
+    end
 end
 
 function SUICore:OnProfileChanged(event, db, profileKey)

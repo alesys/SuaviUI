@@ -2829,6 +2829,32 @@ function SUICore:OnEnable()
         oldOnEnable(self)
     end
     InitializeResourceBars(self)
+
+    -- Register listeners for cooldown viewer updates
+    -- When Essential/Utility cooldowns layout changes, resync anchored resource bars
+    if _G.SuaviUI_EventFrame then
+        _G.SuaviUI_EventFrame:RegisterListener("SuaviUI_EssentialCooldownsUpdated", function(eventName, viewerName)
+            -- Primary power bar
+            if _G.SuaviUI_UpdateLockedPowerBar then
+                _G.SuaviUI_UpdateLockedPowerBar()
+            end
+            -- Secondary power bar
+            if _G.SuaviUI_UpdateLockedSecondaryPowerBar then
+                _G.SuaviUI_UpdateLockedSecondaryPowerBar()
+            end
+        end)
+
+        _G.SuaviUI_EventFrame:RegisterListener("SuaviUI_UtilityCooldownsUpdated", function(eventName, viewerName)
+            -- Primary power bar (may be synced to utility)
+            if _G.SuaviUI_UpdateLockedPowerBar then
+                _G.SuaviUI_UpdateLockedPowerBar()
+            end
+            -- Secondary power bar (may be synced to utility)
+            if _G.SuaviUI_UpdateLockedSecondaryPowerBar then
+                _G.SuaviUI_UpdateLockedSecondaryPowerBar()
+            end
+        end)
+    end
 end
 
 
