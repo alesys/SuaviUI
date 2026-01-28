@@ -4,7 +4,7 @@
 ## AddonCompartmentFunc: SuaviUI_CompartmentClick
 ## AddonCompartmentFuncOnEnter: SuaviUI_CompartmentOnEnter
 ## AddonCompartmentFuncOnLeave: SuaviUI_CompartmentOnLeave
-## Notes: Installer for |cFF30D1FFSuavi|r UI
+## Notes: Complete |cFF30D1FFUI|r customization suite with configurable frames and widgets
 ## Author: Suavicremas
 ## Version: 0.0.1
 ## DefaultState: Enabled
