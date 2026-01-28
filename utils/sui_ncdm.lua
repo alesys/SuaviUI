@@ -942,6 +942,37 @@ end
 
 
 ---------------------------------------------------------------------------
+-- Apply GetScaledRect hook to a viewer frame
+-- This must happen ASAP to prevent EditMode nil rect errors
+-- Blizzard's EditMode doesn't handle nil returns from GetScaledRect
+---------------------------------------------------------------------------
+local function ApplyGetScaledRectHook(viewerName)
+    local viewer = _G[viewerName]
+    if not viewer or viewer._SUI_GetScaledRectHooked then return end
+    
+    viewer._SUI_GetScaledRectHooked = true
+    local originalGetScaledRect = viewer.GetScaledRect
+    viewer.GetScaledRect = function(self)
+        local left, bottom, width, height = originalGetScaledRect(self)
+        if left then
+            self._SUI_lastRect = {left, bottom, width, height}
+            return left, bottom, width, height
+        end
+        if self._SUI_lastRect then
+            return unpack(self._SUI_lastRect)
+        end
+        local w = self.__cdmIconWidth or self:GetWidth() or 200
+        local h = self.__cdmTotalHeight or self:GetHeight() or 50
+        local cx, cy = self:GetCenter()
+        if cx and cy then
+            return cx - w/2, cy - h/2, w, h
+        end
+        return 0, 0, w, h
+    end
+end
+
+
+---------------------------------------------------------------------------
 -- HOOK: Setup viewer with OnUpdate rescan
 ---------------------------------------------------------------------------
 local function HookViewer(viewerName, trackerKey)
@@ -951,8 +982,9 @@ local function HookViewer(viewerName, trackerKey)
 
     NCDM.hooked[trackerKey] = true
 
-    -- GetScaledRect hook is now applied earlier in PLAYER_LOGIN event handler
-    -- to prevent EditMode nil rect errors before Initialize() runs
+    -- GetScaledRect hook is applied earlier in PLAYER_LOGIN if frame exists,
+    -- but we also apply it here as fallback in case frame was created later
+    ApplyGetScaledRectHook(viewerName)
 
     -- Step 1 & 3: OnShow hook - enable polling and single deferred layout
     viewer:HookScript("OnShow", function(self)
@@ -1272,33 +1304,6 @@ local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("CHALLENGE_MODE_START")
-
--- Apply GetScaledRect hook to a viewer frame immediately if it exists
--- This must happen ASAP to prevent EditMode nil rect errors
-local function ApplyGetScaledRectHook(viewerName)
-    local viewer = _G[viewerName]
-    if not viewer or viewer._SUI_GetScaledRectHooked then return end
-    
-    viewer._SUI_GetScaledRectHooked = true
-    local originalGetScaledRect = viewer.GetScaledRect
-    viewer.GetScaledRect = function(self)
-        local left, bottom, width, height = originalGetScaledRect(self)
-        if left then
-            self._SUI_lastRect = {left, bottom, width, height}
-            return left, bottom, width, height
-        end
-        if self._SUI_lastRect then
-            return unpack(self._SUI_lastRect)
-        end
-        local w = self.__cdmIconWidth or self:GetWidth() or 200
-        local h = self.__cdmTotalHeight or self:GetHeight() or 50
-        local cx, cy = self:GetCenter()
-        if cx and cy then
-            return cx - w/2, cy - h/2, w, h
-        end
-        return 0, 0, w, h
-    end
-end
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_LOGIN" then
