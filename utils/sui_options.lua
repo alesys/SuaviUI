@@ -5724,6 +5724,7 @@ local function CreateCDMSetupPage(parent)
         -- Ensure powerBar settings exist
         if not db.powerBar then db.powerBar = {} end
         if not db.secondaryPowerBar then db.secondaryPowerBar = {} end
+        if not db.tertiaryPowerBar then db.tertiaryPowerBar = {} end
         
         -- Ensure all fields exist with defaults
         local primary = db.powerBar
@@ -5781,6 +5782,7 @@ local function CreateCDMSetupPage(parent)
                 local SUICore = _G.SuaviUI.SUICore
                 if SUICore.UpdatePowerBar then SUICore:UpdatePowerBar() end
                 if SUICore.UpdateSecondaryPowerBar then SUICore:UpdateSecondaryPowerBar() end
+                if SUICore.UpdateTertiaryPowerBar then SUICore:UpdateTertiaryPowerBar() end
             end
         end
         
@@ -7280,6 +7282,103 @@ local function CreateCDMSetupPage(parent)
         local textureSecondary = GUI:CreateFormDropdown(tabContent, "Bar Texture", GetTextureList(), "texture", secondary, RefreshPowerBars)
         textureSecondary:SetPoint("TOPLEFT", PAD, y)
         textureSecondary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        y = y - FORM_ROW
+
+        -- =====================================================
+        -- TERTIARY POWER BAR SECTION (Evoker Ebon Might)
+        -- =====================================================
+        y = y - 20  -- Spacer before Tertiary section
+
+        local tertiaryHeader = GUI:CreateSectionHeader(tabContent, "Tertiary Power Bar (Evoker Ebon Might)")
+        tertiaryHeader:SetPoint("TOPLEFT", PAD, y)
+        y = y - tertiaryHeader.gap
+
+        local tertiaryDesc = GUI:CreateLabel(tabContent, "Displays Evoker Ebon Might buff duration. Only available for Evoker Augmentation spec.", 11, C.textMuted)
+        tertiaryDesc:SetPoint("TOPLEFT", PAD, y)
+        tertiaryDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        tertiaryDesc:SetJustifyH("LEFT")
+        y = y - 20
+
+        local tertiary = db.tertiaryPowerBar
+        if tertiary.enabled == nil then tertiary.enabled = false end
+        if tertiary.width == nil then tertiary.width = 310 end
+        if tertiary.height == nil then tertiary.height = 3 end
+        if tertiary.offsetX == nil then tertiary.offsetX = 0 end
+        if tertiary.offsetY == nil then tertiary.offsetY = 20 end
+        if tertiary.texture == nil then tertiary.texture = "Solid" end
+        if tertiary.customColor == nil then tertiary.customColor = {0.3, 0.8, 1.0, 1} end
+        if tertiary.bgColor == nil then tertiary.bgColor = {0.1, 0.1, 0.1, 0.8} end
+        if tertiary.showText == nil then tertiary.showText = true end
+        if tertiary.textSize == nil then tertiary.textSize = 12 end
+        if tertiary.textX == nil then tertiary.textX = 0 end
+        if tertiary.textY == nil then tertiary.textY = 0 end
+        if tertiary.borderSize == nil then tertiary.borderSize = 1 end
+        if tertiary.usePowerColor == nil then tertiary.usePowerColor = false end
+        if tertiary.textCustomColor == nil then tertiary.textCustomColor = {1, 1, 1, 1} end
+
+        -- Tertiary enable toggle
+        local enableTertiary = GUI:CreateFormToggle(tabContent, "Enable Tertiary Power Bar", "enabled", tertiary, PromptResourceBarReload)
+        enableTertiary:SetPoint("TOPLEFT", PAD, y)
+        enableTertiary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        y = y - FORM_ROW
+
+        -- Tertiary size sliders
+        local widthTertiarySlider = GUI:CreateFormSlider(tabContent, "Width", 0, 2000, 1, "width", tertiary, RefreshPowerBars)
+        widthTertiarySlider:SetPoint("TOPLEFT", PAD, y)
+        widthTertiarySlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        y = y - FORM_ROW
+
+        local heightTertiary = GUI:CreateFormSlider(tabContent, "Height", 1, 100, 1, "height", tertiary, RefreshPowerBars)
+        heightTertiary:SetPoint("TOPLEFT", PAD, y)
+        heightTertiary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        y = y - FORM_ROW
+
+        local borderTertiary = GUI:CreateFormSlider(tabContent, "Border Size", 0, 8, 1, "borderSize", tertiary, RefreshPowerBars)
+        borderTertiary:SetPoint("TOPLEFT", PAD, y)
+        borderTertiary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        y = y - FORM_ROW
+
+        -- Tertiary position sliders
+        local xOffsetTertiarySlider = GUI:CreateFormSlider(tabContent, "X Offset", -1000, 1000, 1, "offsetX", tertiary, RefreshPowerBars)
+        xOffsetTertiarySlider:SetPoint("TOPLEFT", PAD, y)
+        xOffsetTertiarySlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        y = y - FORM_ROW
+
+        local yOffsetTertiarySlider = GUI:CreateFormSlider(tabContent, "Y Offset", -1000, 1000, 1, "offsetY", tertiary, RefreshPowerBars)
+        yOffsetTertiarySlider:SetPoint("TOPLEFT", PAD, y)
+        yOffsetTertiarySlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        y = y - FORM_ROW
+
+        -- Tertiary text options
+        local showTextTertiary = GUI:CreateFormCheckbox(tabContent, "Show Duration Text", "showText", tertiary, RefreshPowerBars)
+        showTextTertiary:SetPoint("TOPLEFT", PAD, y)
+        showTextTertiary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        y = y - FORM_ROW
+
+        local textSizeTertiary = GUI:CreateFormSlider(tabContent, "Text Size", 8, 50, 1, "textSize", tertiary, RefreshPowerBars)
+        textSizeTertiary:SetPoint("TOPLEFT", PAD, y)
+        textSizeTertiary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        y = y - FORM_ROW
+
+        -- Tertiary colors
+        local bgColorTertiary = GUI:CreateFormColorPicker(tabContent, "Background Color", "bgColor", tertiary, RefreshPowerBars)
+        bgColorTertiary:SetPoint("TOPLEFT", PAD, y)
+        bgColorTertiary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        y = y - FORM_ROW
+
+        local customColorTertiary = GUI:CreateFormColorPicker(tabContent, "Bar Color", "customColor", tertiary, RefreshPowerBars)
+        customColorTertiary:SetPoint("TOPLEFT", PAD, y)
+        customColorTertiary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        y = y - FORM_ROW
+
+        local textCustomColorTertiary = GUI:CreateFormColorPicker(tabContent, "Text Color", "textCustomColor", tertiary, RefreshPowerBars)
+        textCustomColorTertiary:SetPoint("TOPLEFT", PAD, y)
+        textCustomColorTertiary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        y = y - FORM_ROW
+
+        local textureTertiary = GUI:CreateFormDropdown(tabContent, "Bar Texture", GetTextureList(), "texture", tertiary, RefreshPowerBars)
+        textureTertiary:SetPoint("TOPLEFT", PAD, y)
+        textureTertiary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
         -- =====================================================
@@ -13988,7 +14087,8 @@ local function CreateCreditsPage(parent)
     -- Version
     local version = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     version:SetPoint("TOP", content, "TOP", 0, y)
-    version:SetText("Version 1.0")
+    local ADDON_VERSION = ns.VERSION or "2.0.0"
+    version:SetText("Version " .. ADDON_VERSION)
     version:SetTextColor(C.textMuted[1], C.textMuted[2], C.textMuted[3], 1)
     y = y - 40
 
@@ -14368,39 +14468,25 @@ function GUI:InitializeOptions()
     local frame = self:CreateMainFrame()
 
     -- Row 1: Core UI Elements
-    GUI:AddTab(frame, "General & QoL", CreateGeneralQoLPage)
-    GUI:AddTab(frame, "Single Frames & Castbars", CreateUnitFramesPage)
-    GUI:AddTab(frame, "Minimap & Datatext", CreateMinimapPage)
+    GUI:AddTab(frame, "General", CreateGeneralQoLPage)
+    GUI:AddTab(frame, "Unit Frames", CreateUnitFramesPage)
+    GUI:AddTab(frame, "Minimap", CreateMinimapPage)
     GUI:AddTab(frame, "Action Bars", CreateActionBarsPage)
-    GUI:AddTab(frame, "Autohide & Skinning", CreateAutohidesPage)
+    GUI:AddTab(frame, "Autohide", CreateAutohidesPage)
 
     -- Row 2: Cooldown System (CDM cluster)
-    GUI:AddTab(frame, "CDM Setup & Class Bars", CreateCDMSetupPage)
-    GUI:AddTab(frame, "CDM GCD & Effects", CreateCDEffectsPage)
-    GUI:AddTab(frame, "CDM Keybind & Rotation", CreateCDKeybindsPage)
-    GUI:AddTab(frame, "Custom Items/Spells/Buffs", CreateCustomTrackersPage)
+    GUI:AddTab(frame, "Miscellaneous", CreateCDMSetupPage)
+    GUI:AddTab(frame, "Effects", CreateCDEffectsPage)
+    GUI:AddTab(frame, "Keybinds", CreateCDKeybindsPage)
+    GUI:AddTab(frame, "Custom Trackers", CreateCustomTrackersPage)
 
     -- Row 3: Utilities + Action Buttons
-    GUI:AddTab(frame, "HUD Layering", CreateHUDLayeringPage)
-    GUI:AddTab(frame, "Spec Profiles", CreateSpecProfilesPage)
-    GUI:AddTab(frame, "SUI Import/Export", CreateImportExportPage)
+    GUI:AddTab(frame, "HUD Layers", CreateHUDLayeringPage)
+    GUI:AddTab(frame, "Profiles", CreateSpecProfilesPage)
+    GUI:AddTab(frame, "Import/Export", CreateImportExportPage)
     GUI:AddTab(frame, "Search", CreateSearchPage)
     GUI._searchTabIndex = #frame.tabs  -- Store Search tab index for ForceLoadAllTabs trigger
     GUI:AddTab(frame, "Credits", CreateCreditsPage)
-
-    GUI:AddActionButton(frame, "Cooldown Settings", function()
-        if CooldownViewerSettings then
-            CooldownViewerSettings:SetShown(not CooldownViewerSettings:IsShown())
-        else
-            print("|cFF56D1FFSuaviUI:|r Cooldown Settings not available. Enable Cooldown Manager in Options > Gameplay Enhancement.")
-        end
-    end)
-
-    GUI:AddActionButton(frame, "Edit Mode", function()
-        if EditModeManagerFrame then
-            ShowUIPanel(EditModeManagerFrame)
-        end
-    end)
 
     -- Mark that all tabs have been added (for search indexing)
     GUI._allTabsAdded = true

@@ -32,6 +32,7 @@ function SuaviUI:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New("SuaviUI_DB", self.defaults, "Default")
 
     self:RegisterChatCommand("SUI", "SlashCommandOpen")
+    self:RegisterChatCommand("suavi", "SlashCommandOpen")
     self:RegisterChatCommand("suaviui", "SlashCommandOpen")
     self:RegisterChatCommand("rl", "SlashCommandReload")
     

@@ -6,7 +6,7 @@
 ## AddonCompartmentFuncOnLeave: SuaviUI_CompartmentOnLeave
 ## Notes: Installer for |cFF30D1FFSuavi|r UI
 ## Author: Suavicremas
-## Version: 0.01
+## Version: 0.0.1
 ## DefaultState: Enabled
 ## LoadOnDemand: 0
 ## SavedVariables: SuaviUI_DB, SuaviUIDB

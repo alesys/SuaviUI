@@ -3291,6 +3291,34 @@ function GUI:CreateMainFrame()
 
     self.MainFrame = frame
 
+    ---------------------------------------------------------------------------
+    -- TAB RELAYOUT (called on resize to adjust tab widths)
+    ---------------------------------------------------------------------------
+    function GUI:RelayoutTabs(targetFrame)
+        if not targetFrame.tabs or #targetFrame.tabs == 0 then return end
+
+        local PADDING = 20
+        local TAB_SPACING = targetFrame.TAB_SPACING
+        local TABS_PER_ROW = targetFrame.TABS_PER_ROW
+        local TAB_BUTTON_HEIGHT = targetFrame.TAB_BUTTON_HEIGHT
+
+        local availableWidth = targetFrame:GetWidth() - PADDING - (TAB_SPACING * (TABS_PER_ROW - 1))
+        local tabWidth = math.floor(availableWidth / TABS_PER_ROW)
+
+        for i, tab in ipairs(targetFrame.tabs) do
+            local row = math.floor((i - 1) / TABS_PER_ROW)
+            local col = (i - 1) % TABS_PER_ROW
+            local x = col * (tabWidth + TAB_SPACING)
+            local y = -row * (TAB_BUTTON_HEIGHT + TAB_SPACING) - 5
+
+            tab:SetWidth(tabWidth)
+            tab:ClearAllPoints()
+            tab:SetPoint("TOPLEFT", targetFrame.tabContainer, "TOPLEFT", x, y)
+        end
+
+        targetFrame.TAB_BUTTON_WIDTH = tabWidth
+    end
+
     -- Handle resize events (relayout tabs when width changes)
     frame:SetScript("OnSizeChanged", function(self, width, height)
         GUI:RelayoutTabs(self)
@@ -3315,11 +3343,12 @@ function GUI:CreateMainFrame()
     title:SetText("Suavi UI")
     title:SetPoint("TOPLEFT", 12, -10)
     
-    -- Version text (mint green, to the left of close button)
+    -- Version text (next to title, smaller font)
     local version = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(version, 11, "", C.accentLight)  -- Same mint as title
-    version:SetText("Version 1.99A")
-    version:SetPoint("TOPRIGHT", -30, -10)
+    SetFont(version, 10, "", C.textMuted)  -- Smaller, muted text
+    local ADDON_VERSION = ns.VERSION or "0.0.1"
+    version:SetText("v" .. ADDON_VERSION)
+    version:SetPoint("LEFT", title, "RIGHT", 8, 0)
 
     -- Panel Scale (compact inline: label + editbox + slider)
     -- Uses OnMouseUp pattern to avoid jittery scaling during drag
@@ -3459,10 +3488,10 @@ function GUI:CreateMainFrame()
     tabContainer:SetHeight(100)  -- Height for 4 rows of tabs (22px each + spacing)
     frame.tabContainer = tabContainer
     
-    -- Content area (below tabs) - starts after 4 rows of tabs
+    -- Content area (below tabs, above bottom panel) - starts after 4 rows of tabs
     local contentArea = CreateFrame("Frame", nil, frame, "BackdropTemplate")
     contentArea:SetPoint("TOPLEFT", 10, -140)  -- 35 (title) + 100 (tabs) + 5 (gap)
-    contentArea:SetPoint("BOTTOMRIGHT", -10, 10)
+    contentArea:SetPoint("BOTTOMRIGHT", -10, 50)  -- Leave 50px for bottom panel
     contentArea:EnableMouse(false)  -- Container frame - let children handle clicks
 
     -- Content background (Dark Slate with transparency)
@@ -3487,6 +3516,83 @@ function GUI:CreateMainFrame()
     frame.TAB_BUTTON_HEIGHT = TAB_BUTTON_HEIGHT
     frame.TAB_SPACING = TAB_SPACING
     frame.TABS_PER_ROW = TABS_PER_ROW
+    
+    ---------------------------------------------------------------------------
+    -- BOTTOM PANEL (Action buttons)
+    ---------------------------------------------------------------------------
+    local bottomPanel = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+    bottomPanel:SetPoint("BOTTOMLEFT", 10, 10)
+    bottomPanel:SetPoint("BOTTOMRIGHT", -10, 10)
+    bottomPanel:SetHeight(40)
+    bottomPanel:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    bottomPanel:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
+    bottomPanel:SetBackdropBorderColor(unpack(C.border))
+    
+    -- Separator line above bottom panel
+    local bottomSep = frame:CreateTexture(nil, "ARTWORK")
+    bottomSep:SetPoint("BOTTOMLEFT", 0, 50)
+    bottomSep:SetPoint("BOTTOMRIGHT", 0, 50)
+    bottomSep:SetHeight(1)
+    bottomSep:SetColorTexture(unpack(C.border))
+    
+    -- Helper function to create bottom panel buttons
+    local function CreateBottomButton(text, callback)
+        local btn = CreateFrame("Button", nil, bottomPanel, "BackdropTemplate")
+        btn:SetSize(120, 28)
+        btn:EnableMouse(true)
+        btn:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        btn:SetBackdropColor(0.15, 0.15, 0.15, 0.9)
+        btn:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 0.8)
+        
+        local btnText = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        SetFont(btnText, 11, "", C.text)
+        btnText:SetText(text)
+        btnText:SetPoint("CENTER")
+        
+        btn:SetScript("OnEnter", function(self)
+            self:SetBackdropBorderColor(C.accent[1], C.accent[2], C.accent[3], 1)
+            btnText:SetTextColor(C.accent[1], C.accent[2], C.accent[3], 1)
+        end)
+        btn:SetScript("OnLeave", function(self)
+            self:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 0.8)
+            btnText:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
+        end)
+        btn:SetScript("OnClick", callback)
+        
+        return btn
+    end
+    
+    -- Cooldown Settings button
+    local cdmBtn = CreateBottomButton("Cooldown Settings", function()
+        if CooldownViewerSettings then
+            CooldownViewerSettings:SetShown(not CooldownViewerSettings:IsShown())
+        else
+            local CDMLoaded = C_AddOns.IsAddOnLoaded("CooldownManager")
+            if not CDMLoaded then
+                C_AddOns.EnableAddOn("CooldownManager")
+                print("|cFF56D1FFSuaviUI:|r Enabling Cooldown Manager... Please reload UI.")
+            else
+                print("|cFF56D1FFSuaviUI:|r Cooldown Manager enabled but settings frame not found. Try /reload")
+            end
+        end
+    end)
+    cdmBtn:SetPoint("BOTTOMLEFT", bottomPanel, "BOTTOMLEFT", 10, 6)
+    
+    -- Edit Mode button
+    local editModeBtn = CreateBottomButton("Edit Mode", function()
+        if EditModeManagerFrame then
+            ShowUIPanel(EditModeManagerFrame)
+        end
+    end)
+    editModeBtn:SetPoint("LEFT", cdmBtn, "RIGHT", 10, 0)
     
     ---------------------------------------------------------------------------
     -- RESIZE HANDLE (Bottom-right corner, horizontal and vertical)
@@ -3592,34 +3698,6 @@ function GUI:CreateMainFrame()
     end)
     
     frame.resizeHandle = resizeHandle
-
-    ---------------------------------------------------------------------------
-    -- TAB RELAYOUT (called on resize to adjust tab widths)
-    ---------------------------------------------------------------------------
-    function GUI:RelayoutTabs(targetFrame)
-        if not targetFrame.tabs or #targetFrame.tabs == 0 then return end
-
-        local PADDING = 20
-        local TAB_SPACING = targetFrame.TAB_SPACING
-        local TABS_PER_ROW = targetFrame.TABS_PER_ROW
-        local TAB_BUTTON_HEIGHT = targetFrame.TAB_BUTTON_HEIGHT
-
-        local availableWidth = targetFrame:GetWidth() - PADDING - (TAB_SPACING * (TABS_PER_ROW - 1))
-        local tabWidth = math.floor(availableWidth / TABS_PER_ROW)
-
-        for i, tab in ipairs(targetFrame.tabs) do
-            local row = math.floor((i - 1) / TABS_PER_ROW)
-            local col = (i - 1) % TABS_PER_ROW
-            local x = col * (tabWidth + TAB_SPACING)
-            local y = -row * (TAB_BUTTON_HEIGHT + TAB_SPACING) - 5
-
-            tab:SetWidth(tabWidth)
-            tab:ClearAllPoints()
-            tab:SetPoint("TOPLEFT", targetFrame.tabContainer, "TOPLEFT", x, y)
-        end
-
-        targetFrame.TAB_BUTTON_WIDTH = tabWidth
-    end
 
     return frame
 end

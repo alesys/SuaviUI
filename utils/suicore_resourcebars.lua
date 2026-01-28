@@ -129,9 +129,88 @@ local fragmentedPowerTypes = {
     [Enum.PowerType.Runes] = true,
 }
 
--- Smooth rune timer update state
-local runeUpdateElapsed = 0
-local runeUpdateRunning = false
+-- Detect tertiary resource for current class/spec
+local function GetTertiaryResource()
+    local playerClass = select(2, UnitClass("player"))
+    local spec = C_SpecializationInfo.GetSpecialization()
+    local specID = spec and C_SpecializationInfo.GetSpecializationInfo(spec)
+    
+    -- Class-specific tertiary resources
+    if playerClass == "EVOKER" then
+        if specID == 1473 then  -- Augmentation
+            return "EBON_MIGHT"
+        end
+    end
+    
+    -- Add more classes here in future as needed
+    
+    return nil  -- No tertiary resource
+end
+
+-- Get tertiary resource value (handles special cases like Ebon Might)
+local function GetTertiaryResourceValue(resource)
+    if not resource then return nil, nil end
+    
+    if resource == "EBON_MIGHT" then
+        -- Ebon Might is an aura duration, not a power pool
+        local auraData = C_UnitAuras.GetPlayerAuraBySpellID(395296)
+        local current = auraData and (auraData.expirationTime - GetTime()) or 0
+        local max = 20  -- Ebon Might duration is 20 seconds
+        
+        if current < 0 then current = 0 end
+        return max, math.max(0, current)
+    end
+    
+    -- Standard power resource
+    local current = UnitPower("player", resource)
+    local max = UnitPowerMax("player", resource)
+    if max <= 0 then return nil, nil end
+    
+    return max, current
+end
+
+-- Get color for tertiary resource
+local function GetTertiaryResourceColor(resource, colorMode, customColor, usePowerColor)
+    if not resource then return 0.5, 0.8, 1, 1 end
+    
+    local db = SUICore.db.profile.powerColors
+    if not db then return 0.5, 0.8, 1, 1 end
+    
+    -- Special handling for Ebon Might (cyan/turquoise)
+    if resource == "EBON_MIGHT" then
+        if usePowerColor and db.essence then
+            local c = db.essence
+            return c[1], c[2], c[3], c[4] or 1
+        end
+        return 0.3, 0.8, 1, 1  -- Default cyan
+    end
+    
+    -- Standard power color lookup
+    local powerTypeColor = db[resource]
+    if powerTypeColor then
+        return powerTypeColor[1], powerTypeColor[2], powerTypeColor[3], powerTypeColor[4] or 1
+    end
+    
+    return customColor[1], customColor[2], customColor[3], customColor[4] or 1
+end
+
+-- Format tertiary resource text
+local function FormatTertiaryResourceText(resource, current, max)
+    if not resource then return "" end
+    
+    if resource == "EBON_MIGHT" then
+        -- Show duration with decimal (e.g., "18.5s")
+        return string.format("%.1fs", current)
+    end
+    
+    -- Standard format
+    return string.format("%d / %d", current, max)
+end
+
+-- Smooth tertiary timer update state
+local tertiaryUpdateElapsed = 0
+local tertiaryUpdateRunning = false
+
 
 -- Event throttle (16ms = ~60 FPS, smooth updates while managing CPU)
 local UPDATE_THROTTLE = 0.016
@@ -2443,6 +2522,135 @@ end
     bar:Show()
 end
 
+-- TERTIARY POWER BAR
+
+function SUICore:GetTertiaryPowerBar()
+    if self.tertiaryPowerBar then return self.tertiaryPowerBar end
+
+    local cfg = self.db.profile.tertiaryPowerBar
+    
+    -- Always parent to UIParent so tertiary power bar works independently
+    local bar = CreateFrame("Frame", ADDON_NAME .. "TertiaryPowerBar", UIParent)
+    bar:SetFrameStrata("MEDIUM")
+    -- Apply HUD layer priority
+    local layerPriority = self.db.profile.hudLayering and self.db.profile.hudLayering.tertiaryPowerBar or 5
+    local frameLevel = self:GetHUDFrameLevel(layerPriority)
+    bar:SetFrameLevel(frameLevel)
+    bar:SetHeight(Scale(cfg.height or 3))
+    bar:SetPoint("CENTER", UIParent, "CENTER", Scale(cfg.offsetX or 0), Scale(cfg.offsetY or 20))
+
+    -- Calculate width - use configured width or fallback
+    local width = cfg.width or 0
+    if width <= 0 then
+        -- Try to get Essential Cooldowns width if available
+        local essentialViewer = _G["EssentialCooldownViewer"]
+        if essentialViewer then
+            width = essentialViewer.__cdmIconWidth or essentialViewer:GetWidth() or 0
+        end
+        if width <= 0 then
+            width = 200  -- Fallback width
+        end
+    end
+
+    bar:SetWidth(Scale(width))
+
+    -- BACKGROUND
+    bar.Background = bar:CreateTexture(nil, "BACKGROUND")
+    bar.Background:SetAllPoints()
+    local bgColor = cfg.bgColor or { 0.15, 0.15, 0.15, 1 }
+    bar.Background:SetColorTexture(bgColor[1], bgColor[2], bgColor[3], bgColor[4] or 1)
+
+    -- STATUS BAR
+    bar.StatusBar = CreateFrame("StatusBar", nil, bar)
+    bar.StatusBar:SetAllPoints()
+    local tex = LSM:Fetch("statusbar", GetBarTexture(cfg))
+    bar.StatusBar:SetStatusBarTexture(tex)
+    bar.StatusBar:SetFrameLevel(bar:GetFrameLevel())
+
+    -- BORDER (pixel-perfect)
+    local borderSize = Scale(cfg.borderSize or 1)
+    bar.Border = CreateFrame("Frame", nil, bar, "BackdropTemplate")
+    bar.Border:SetPoint("TOPLEFT", bar, -borderSize, borderSize)
+    bar.Border:SetPoint("BOTTOMRIGHT", bar, borderSize, -borderSize)
+    bar.Border:SetBackdrop({
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = borderSize,
+    })
+    bar.Border:SetBackdropBorderColor(0, 0, 0, 1)
+
+    -- TEXT FRAME (same strata, +2 levels to render above bar content)
+    bar.TextFrame = CreateFrame("Frame", nil, bar)
+    bar.TextFrame:SetAllPoints(bar)
+    bar.TextFrame:SetFrameStrata("MEDIUM")
+    bar.TextFrame:SetFrameLevel(frameLevel + 2)
+
+    bar.TextValue = bar.TextFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    bar.TextValue:SetPoint("CENTER", bar.TextFrame, "CENTER", Scale(cfg.textX or 0), Scale(cfg.textY or 0))
+    bar.TextValue:SetJustifyH("CENTER")
+    bar.TextValue:SetFont(GetGeneralFont(), Scale(cfg.textSize or 12), GetGeneralFontOutline())
+    bar.TextValue:SetShadowOffset(0, 0)
+    bar.TextValue:SetText("0")
+
+    bar:Hide()
+
+    self.tertiaryPowerBar = bar
+    return bar
+end
+
+function SUICore:UpdateTertiaryPowerBar()
+    local cfg = self.db.profile.tertiaryPowerBar
+    if not cfg.enabled then
+        if self.tertiaryPowerBar then self.tertiaryPowerBar:Hide() end
+        return
+    end
+
+    local bar = self:GetTertiaryPowerBar()
+    local resource = GetTertiaryResource()
+
+    if not resource then
+        bar:Hide()
+        return
+    end
+
+    -- Update HUD layer priority dynamically
+    local layerPriority = self.db.profile.hudLayering and self.db.profile.hudLayering.tertiaryPowerBar or 5
+    local frameLevel = self:GetHUDFrameLevel(layerPriority)
+    bar:SetFrameLevel(frameLevel)
+    if bar.TextFrame then
+        bar.TextFrame:SetFrameLevel(frameLevel + 2)
+    end
+
+    -- Get resource values
+    local max, current = GetTertiaryResourceValue(resource)
+    if not max or max <= 0 then
+        bar:Hide()
+        return
+    end
+
+    -- Set bar percentage
+    bar.StatusBar:SetMinMaxValues(0, max)
+    bar.StatusBar:SetValue(current)
+
+    -- Set color
+    local r, g, b, a = GetTertiaryResourceColor(resource, cfg.colorMode, cfg.customColor, cfg.usePowerColor)
+    bar.StatusBar:SetStatusBarColor(r, g, b, a or 1)
+
+    -- Set text
+    if cfg.showText ~= false then
+        local text = FormatTertiaryResourceText(resource, current, max)
+        bar.TextValue:SetText(text)
+
+        -- Determine text color
+        local c = cfg.textCustomColor or { 1, 1, 1, 1 }
+        bar.TextValue:SetTextColor(c[1], c[2], c[3], c[4] or 1)
+    end
+
+    -- Show text frame
+    bar.TextFrame:SetShown(cfg.showText ~= false)
+
+    bar:Show()
+end
+
 -- EVENT HANDLER
 
 function SUICore:OnUnitPower(_, unit)
@@ -2470,6 +2678,9 @@ function SUICore:OnUnitPower(_, unit)
         self:UpdateSecondaryPowerBar()
         lastSecondaryUpdate = now
     end
+
+    -- Tertiary bar (always unthrottled for smooth Ebon Might duration updates)
+    self:UpdateTertiaryPowerBar()
 end
 
 
@@ -2491,6 +2702,7 @@ function SUICore:RefreshAll()
 
     self:UpdatePowerBar()
     self:UpdateSecondaryPowerBar()
+    self:UpdateTertiaryPowerBar()
 end
 
 -- EVENT-DRIVEN RUNE UPDATES
@@ -2553,6 +2765,9 @@ local function InitializeResourceBars(self)
     self:RegisterEvent("UNIT_MAXPOWER", "OnUnitPower")
     self:RegisterEvent("RUNE_POWER_UPDATE", "OnRunePowerUpdate")  -- DK rune updates (event-driven, replaces ticker)
 
+    -- Tertiary bar events (for Evoker Ebon Might aura tracking)
+    self:RegisterEvent("UNIT_AURA", "OnUnitPower")
+
     -- Combat state events - force update on combat transitions
     -- Ensures bars show correct values when entering/exiting combat
     self:RegisterEvent("PLAYER_REGEN_DISABLED", "OnUnitPower")
@@ -2564,6 +2779,7 @@ local function InitializeResourceBars(self)
     -- Initial update
     self:UpdatePowerBar()
     self:UpdateSecondaryPowerBar()
+    self:UpdateTertiaryPowerBar()
 
     -- Hook Blizzard Edit Mode for power bars
     C_Timer.After(0.6, function()

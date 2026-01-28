@@ -6,6 +6,10 @@ local ADDON_NAME, ns = ...
 local SUI = SuaviUI
 local ADDON_NAME = "SuaviUI"
 
+-- Version constant (source of truth for all version displays)
+local ADDON_VERSION = "0.0.1"
+ns.VERSION = ADDON_VERSION
+
 -- Create SUICore as an Ace3 module within SuaviUI
 local SUICore = SUI:NewModule("SUICore", "AceConsole-3.0", "AceEvent-3.0")
 SUI.SUICore = SUICore
@@ -960,7 +964,40 @@ local defaults = {
             orientation   = "AUTO",   -- Bar orientation
             showFragmentedPowerBarText = false,  -- Show text on fragmented power bars
         },
-        -- Power Colors (global, used by both Primary and Secondary power bars)
+        tertiaryPowerBar = {
+            enabled           = false,  -- Disabled by default (only Evoker uses)
+            autoAttach        = false,
+            standaloneMode    = false,
+            attachTo          = "EssentialCooldownViewer",
+            height            = 8,
+            borderSize        = 1,
+            offsetY           = 8,       -- Positioned below secondary bar
+            offsetX           = 0,
+            width             = 326,
+            useRawPixels      = true,
+            texture           = "Suavi v5",
+            colorMode         = "power",
+            usePowerColor     = true,
+            useClassColor     = false,
+            customColor       = { 0.5, 0.8, 1, 1 },  -- Blueish for tertiary
+            showPercent       = false,
+            showText          = true,
+            textSize          = 14,
+            textX             = 0,
+            textY             = 2,
+            textUseClassColor = false,
+            textCustomColor   = { 1, 1, 1, 1 },
+            bgColor           = { 0.078, 0.078, 0.078, 0.83 },
+            showTicks         = false,
+            tickThickness     = 2,
+            tickColor         = { 0, 0, 0, 1 },
+            lockedToEssential = false,
+            lockedToUtility   = false,
+            lockedToSecondary = true,    -- Position relative to secondary bar
+            snapGap           = 5,
+            orientation       = "HORIZONTAL",
+        },
+        -- Power Colors (global, used by Primary, Secondary, and Tertiary power bars)
         powerColors = {
             -- Core Resources
             rage = { 1.00, 0.00, 0.00, 1 },
