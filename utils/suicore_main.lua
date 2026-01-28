@@ -7,7 +7,7 @@ local SUI = SuaviUI
 local ADDON_NAME = "SuaviUI"
 
 -- Version constant (source of truth for all version displays)
-local ADDON_VERSION = "0.0.1"
+local ADDON_VERSION = "0.0.2"
 ns.VERSION = ADDON_VERSION
 
 -- Create SUICore as an Ace3 module within SuaviUI
