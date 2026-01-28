@@ -6,9 +6,8 @@ local ADDON_NAME, ns = ...
 local SUI = SuaviUI
 local ADDON_NAME = "SuaviUI"
 
--- Version constant (source of truth in SuaviUI.toc)
--- Dynamically read from TOC to eliminate sync issues
-local ADDON_VERSION = GetAddOnMetadata(ADDON_NAME, "Version") or "0.0.0"
+-- Version will be set in OnInitialize after addon system is ready
+local ADDON_VERSION = "0.0.2"
 ns.VERSION = ADDON_VERSION
 
 -- Create SUICore as an Ace3 module within SuaviUI
