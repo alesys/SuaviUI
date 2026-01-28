@@ -942,9 +942,45 @@ end
 
 
 ---------------------------------------------------------------------------
--- Apply GetScaledRect hook to a viewer frame
--- This must happen ASAP to prevent EditMode nil rect errors
+-- Hook EditMode's GetScaledSelectionSides to handle nil GetScaledRect
+-- This is the function that actually crashes - hook it directly
 -- Blizzard's EditMode doesn't handle nil returns from GetScaledRect
+---------------------------------------------------------------------------
+local function HookEditModeGetScaledSelectionSides()
+    -- Only hook once
+    if NCDM.editModeHooked then return end
+    NCDM.editModeHooked = true
+    
+    -- EditModeSystemMixin is the mixin used by all EditMode frames
+    if EditModeSystemMixin and EditModeSystemMixin.GetScaledSelectionSides then
+        local originalGetScaledSelectionSides = EditModeSystemMixin.GetScaledSelectionSides
+        EditModeSystemMixin.GetScaledSelectionSides = function(self)
+            local left, bottom, width, height = self:GetScaledRect()
+            -- If GetScaledRect returns nil (during drag when anchors are cleared),
+            -- calculate from dimensions instead of crashing
+            if not left then
+                local w = self:GetWidth() or 200
+                local h = self:GetHeight() or 50
+                local cx, cy = self:GetCenter()
+                if cx and cy then
+                    left = cx - w/2
+                    bottom = cy - h/2
+                    width = w
+                    height = h
+                else
+                    -- Absolute fallback
+                    left, bottom, width, height = 0, 0, w, h
+                end
+            end
+            local scale = self:GetScale() or 1
+            return left * scale, bottom * scale, (left + width) * scale, (bottom + height) * scale
+        end
+    end
+end
+
+
+---------------------------------------------------------------------------
+-- Apply GetScaledRect hook to a viewer frame (legacy, kept as backup)
 ---------------------------------------------------------------------------
 local function ApplyGetScaledRectHook(viewerName)
     local viewer = _G[viewerName]
@@ -1305,10 +1341,16 @@ eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("CHALLENGE_MODE_START")
 
+-- Hook EditMode mixin IMMEDIATELY at file load time (before any events)
+-- This is the earliest possible moment to prevent the nil rect crash
+HookEditModeGetScaledSelectionSides()
+
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_LOGIN" then
-        -- Apply GetScaledRect hook IMMEDIATELY to prevent EditMode nil rect errors
-        -- This must happen before user can enter EditMode
+        -- Re-apply EditMode hook in case it wasn't available at load time
+        HookEditModeGetScaledSelectionSides()
+        
+        -- Also try per-frame hooks as backup
         ApplyGetScaledRectHook(VIEWER_ESSENTIAL)
         ApplyGetScaledRectHook(VIEWER_UTILITY)
         
