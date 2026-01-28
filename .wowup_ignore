@@ -1,0 +1,7 @@
+.git/
+.github/
+docs/
+README.md
+.copilot-instructions.md
+.gitignore
+.wowup_ignore
