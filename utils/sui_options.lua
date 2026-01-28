@@ -11677,6 +11677,24 @@ local function CreateActionBarsPage(parent)
         y = y - FORM_ROW
 
         -- Action Button Lock - combined lock + override key in one clear dropdown
+        -- Queue protected modifier changes during combat and apply after combat ends
+        local lockQueueFrame = _G.SuaviUI_ActionBarLockQueueFrame
+        if not lockQueueFrame then
+            lockQueueFrame = CreateFrame("Frame")
+            lockQueueFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+            lockQueueFrame:SetScript("OnEvent", function()
+                local queued = _G.SuaviUI_ActionBarLockQueuedModifier
+                if queued then
+                    _G.SuaviUI_ActionBarLockQueuedModifier = nil
+                    SetCVar("lockActionBars", "1")
+                    SetModifiedClick("PICKUPACTION", queued)
+                    SaveBindings(GetCurrentBindingSet())
+                    print("|cFF56D1FFSuaviUI|r: Action button lock modifier applied after combat.")
+                end
+            end)
+            _G.SuaviUI_ActionBarLockQueueFrame = lockQueueFrame
+        end
+
         local lockOptions = {
             {value = "unlocked", text = "Unlocked"},
             {value = "shift", text = "Locked - Shift to drag"},
@@ -11700,8 +11718,14 @@ local function CreateActionBarsPage(parent)
                     if v == "unlocked" then
                         SetCVar("lockActionBars", "0")
                     else
-                        SetCVar("lockActionBars", "1")
                         local modifier = (v == "none") and "NONE" or v:upper()
+                        if InCombatLockdown and InCombatLockdown() then
+                            _G.SuaviUI_ActionBarLockQueuedModifier = modifier
+                            SetCVar("lockActionBars", "1")
+                            print("|cFF56D1FFSuaviUI|r: Action button lock modifier queued; will apply after combat.")
+                            return
+                        end
+                        SetCVar("lockActionBars", "1")
                         SetModifiedClick("PICKUPACTION", modifier)
                         SaveBindings(GetCurrentBindingSet())
                     end
