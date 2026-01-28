@@ -562,6 +562,10 @@ local function LayoutViewer(viewerName, trackerKey)
     local viewer = _G[viewerName]
     if not viewer then return end
 
+    -- Skip layout entirely if viewer is being dragged in EditMode
+    -- This prevents interference with Blizzard's snap calculations
+    if viewer.isDragging or viewer.isEditing then return end
+
     local settings = GetTrackerSettings(trackerKey)
     if not settings or not settings.enabled then return end
 
