@@ -884,10 +884,13 @@ local function LayoutViewer(viewerName, trackerKey)
     end
 
     -- If Essential just finished layout and anchor mode is on, reposition Utility
-    if trackerKey == "essential" then
+    -- Skipped during EditMode to avoid triggering Blizzard's nil rect bug
+    if trackerKey == "essential" and not viewer.isEditing then
         local db = GetDB()
         if db and db.utility and db.utility.anchorBelowEssential then
             C_Timer.After(0.05, function()
+                -- Re-check isEditing at callback time
+                if viewer.isEditing then return end
                 if _G.SuaviUI_ApplyUtilityAnchor then
                     _G.SuaviUI_ApplyUtilityAnchor()
                 end
@@ -897,10 +900,13 @@ local function LayoutViewer(viewerName, trackerKey)
 
     -- Update locked power bars, castbars, and unit frames after layout completes
     -- Debounced to prevent spam during rapid layout changes
-    if not viewer.__cdmUpdatePending then
+    -- Skipped entirely during EditMode to avoid triggering Blizzard's nil rect bug
+    if not viewer.__cdmUpdatePending and not viewer.isEditing then
         viewer.__cdmUpdatePending = true
         C_Timer.After(0.05, function()
             viewer.__cdmUpdatePending = nil
+            -- Re-check isEditing at callback time - user may have entered EditMode after timer started
+            if viewer.isEditing then return end
             if trackerKey == "essential" then
                 if _G.SuaviUI_UpdateLockedPowerBar then
                     _G.SuaviUI_UpdateLockedPowerBar()
