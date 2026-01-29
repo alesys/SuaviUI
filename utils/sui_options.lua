@@ -389,11 +389,8 @@ local function CreateGeneralQoLPage(parent)
         end
         -- Refresh power bars (recreate to apply new fonts/textures)
         if SUICore then
-            if SUICore.UpdatePowerBar then
-                SUICore:UpdatePowerBar()
-            end
-            if SUICore.UpdateSecondaryPowerBar then
-                SUICore:UpdateSecondaryPowerBar()
+            if SUICore.UpdateAllResourceBars then
+                SUICore:UpdateAllResourceBars()
             end
         end
         -- Refresh minimap/datatext
@@ -5740,12 +5737,32 @@ local function CreateClassResourceBarsPage(parent)
     GUI:SetSearchContext({tabIndex = 7, tabName = "Class Resource Bars"})
 
     -- Ensure powerBar settings exist
-    if not db.powerBar then db.powerBar = {} end
-    if not db.secondaryPowerBar then db.secondaryPowerBar = {} end
-    if not db.tertiaryPowerBar then db.tertiaryPowerBar = {} end
+    -- Migrate old settings to new resourceBars structure
+    if db.powerBar or db.secondaryPowerBar or db.tertiaryPowerBar then
+        if not db.resourceBars then db.resourceBars = {} end
+        if db.powerBar and not db.resourceBars.primaryPowerBar then
+            db.resourceBars.primaryPowerBar = { ["Default"] = db.powerBar }
+        end
+        if db.secondaryPowerBar and not db.resourceBars.secondaryPowerBar then
+            db.resourceBars.secondaryPowerBar = { ["Default"] = db.secondaryPowerBar }
+        end
+        if db.tertiaryPowerBar and not db.resourceBars.tertiaryPowerBar then
+            db.resourceBars.tertiaryPowerBar = { ["Default"] = db.tertiaryPowerBar }
+        end
+        db.powerBar = nil
+        db.secondaryPowerBar = nil
+        db.tertiaryPowerBar = nil
+    end
     
-    -- Ensure all fields exist with defaults
-    local primary = db.powerBar
+    if not db.resourceBars then db.resourceBars = {} end
+    if not db.resourceBars.primaryPowerBar then db.resourceBars.primaryPowerBar = { ["Default"] = {} } end
+    if not db.resourceBars.secondaryPowerBar then db.resourceBars.secondaryPowerBar = { ["Default"] = {} } end
+    if not db.resourceBars.tertiaryPowerBar then db.resourceBars.tertiaryPowerBar = { ["Default"] = {} } end
+    
+    -- Setup references to new structure
+    local primary = db.resourceBars.primaryPowerBar["Default"]
+    local secondary = db.resourceBars.secondaryPowerBar["Default"]
+    local tertiary = db.resourceBars.tertiaryPowerBar["Default"]
     if primary.enabled == nil then primary.enabled = true end
     if primary.autoAttach == nil then primary.autoAttach = true end
     if primary.width == nil then primary.width = 310 end
@@ -5768,15 +5785,10 @@ local function CreateClassResourceBarsPage(parent)
     if primary.orientation == nil then primary.orientation = "AUTO" end
     if primary.snapGap == nil then primary.snapGap = 5 end
 
-    local secondary = db.secondaryPowerBar
+    -- Secondary defaults
     if secondary.enabled == nil then secondary.enabled = true end
-    if secondary.autoAttach == nil then secondary.autoAttach = true end
     if secondary.width == nil then secondary.width = 310 end
     if secondary.height == nil then secondary.height = 8 end
-    if secondary.lockedBaseX == nil then secondary.lockedBaseX = 0 end
-    if secondary.lockedBaseY == nil then secondary.lockedBaseY = 0 end
-    if secondary.offsetX == nil then secondary.offsetX = 0 end
-    if secondary.offsetY == nil then secondary.offsetY = 0 end
     if secondary.texture == nil then secondary.texture = "Solid" end
     if secondary.colorMode == nil then secondary.colorMode = "power" end
     if secondary.usePowerColor == nil then secondary.usePowerColor = true end
@@ -5796,11 +5808,11 @@ local function CreateClassResourceBarsPage(parent)
 
     -- Callback to refresh power bars
     local function RefreshPowerBars()
-        if _G.SuaviUI and _G.SuaviUI.SUICore then
-            local SUICore = _G.SuaviUI.SUICore
-            if SUICore.UpdatePowerBar then SUICore:UpdatePowerBar() end
-            if SUICore.UpdateSecondaryPowerBar then SUICore:UpdateSecondaryPowerBar() end
-            if SUICore.UpdateTertiaryPowerBar then SUICore:UpdateTertiaryPowerBar() end
+        if SUICore and SUICore.bars then
+            if SUICore.bars.primary then SUICore.bars.primary:UpdatePower() end
+            if SUICore.bars.secondary then SUICore.bars.secondary:UpdatePower() end
+            if SUICore.bars.tertiary then SUICore.bars.tertiary:UpdatePower() end
+            if SUICore.bars.health then SUICore.bars.health:UpdateHealth() end
         end
     end
     
@@ -6694,12 +6706,10 @@ local function CreateClassResourceBarsPage(parent)
     tertiaryDesc:SetJustifyH("LEFT")
     y = y - 20
 
-    local tertiary = db.tertiaryPowerBar
+    -- Tertiary defaults (already initialized at top)
     if tertiary.enabled == nil then tertiary.enabled = false end
     if tertiary.width == nil then tertiary.width = 310 end
     if tertiary.height == nil then tertiary.height = 3 end
-    if tertiary.offsetX == nil then tertiary.offsetX = 0 end
-    if tertiary.offsetY == nil then tertiary.offsetY = 20 end
     if tertiary.texture == nil then tertiary.texture = "Solid" end
     if tertiary.customColor == nil then tertiary.customColor = {0.3, 0.8, 1.0, 1} end
     if tertiary.bgColor == nil then tertiary.bgColor = {0.1, 0.1, 0.1, 0.8} end

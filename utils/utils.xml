@@ -11,7 +11,19 @@
     <Script file="suicore_main.lua"/>
     <Script file="perfectpixel.lua"/>
     <Script file="sui_actionbars.lua"/>
-    <Script file="suicore_resourcebars.lua"/>
+    <!-- Resource Bars Module (Refactored) -->
+    <Script file="resourcebars/helpers.lua"/>
+    <Script file="resourcebars/resources/detection.lua"/>
+    <Script file="resourcebars/resources/colors.lua"/>
+    <Script file="resourcebars/resources/fragmented.lua"/>
+    <Script file="resourcebars/mixins/BarMixin.lua"/>
+    <Script file="resourcebars/mixins/PowerBarMixin.lua"/>
+    <Script file="resourcebars/mixins/CDMAlignedMixin.lua"/>
+    <Script file="resourcebars/bars/HealthBar.lua"/>
+    <Script file="resourcebars/bars/PrimaryPowerBar.lua"/>
+    <Script file="resourcebars/bars/SecondaryPowerBar.lua"/>
+    <Script file="resourcebars/bars/TertiaryPowerBar.lua"/>
+    <Script file="resourcebars/init.lua"/>
     <Script file="sui_castbar.lua"/>
     <Script file="sui_unitframes.lua"/>
     <Script file="suicore_minimap.lua"/>
