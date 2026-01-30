@@ -28,9 +28,6 @@
     <Script file="sui_castbar_options.lua"/>
     <Script file="sui_options.lua"/>
     <Script file="sui_blizzard_options.lua"/>
-    <Script file="sui_ncdm.lua"/>
-    <!-- Disabled: CDM EditMode integration -->
-    <!-- <Script file="sui_ncdm_editmode.lua"/> -->
     <Script file="sui_buffbar.lua"/>
     <Script file="sui_spellscanner.lua"/>
     <Script file="sui_customtrackers.lua"/>
