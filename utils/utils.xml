@@ -4,6 +4,9 @@
     <Script file="backwards.lua"/>
     <Script file="cooldownmanager.lua"/>
     <Script file="cooldown_editmode.lua"/>
+    <Script file="cooldown_icons.lua"/>
+    <Script file="cooldown_fonts.lua"/>
+    <Script file="cooldown_advanced.lua"/>
     <Script file="customglows.lua"/>
     <Script file="cooldowneffects.lua"/>
     <Script file="cooldownswipe.lua"/>

@@ -480,12 +480,29 @@ function ViewerAdapters.CollectViewerChildren(viewer)
     return all
 end
 
-local function PositionRowHorizontal(viewer, row, yOffset, w, padding, iconDirectionModifier, rowAnchor)
+local function PositionRowHorizontal(viewer, row, yOffset, w, padding, iconDirectionModifier, rowAnchor, viewerType)
     -- Why: Place a single horizontal row centered with optional reversed direction and stack visuals.
     -- When: Essential/Utility viewers are horizontal or configured to grow by rows.
     local count = #row
     local xOffsets = LayoutEngine.CenteredRowXOffsets(count, w, padding, iconDirectionModifier)
     for i, icon in ipairs(row) do
+        -- Apply square styling if enabled
+        if SUI.StyledIcons and viewerType then
+            SUI.StyledIcons.UpdateIconStyle(icon, viewerType)
+        end
+        
+        -- Apply font styling
+        if SUI.CooldownFonts and viewerType then
+            SUI.CooldownFonts.ApplyCooldownFont(icon, viewerType)
+            SUI.CooldownFonts.ApplyStackFont(icon, viewerType)
+            SUI.CooldownFonts.ApplyKeybindFont(icon, viewerType)
+        end
+        
+        -- Apply advanced features
+        if SUI.CooldownAdvanced and viewerType then
+            SUI.CooldownAdvanced.ApplyAllFeatures(icon, viewerType)
+        end
+        
         local x = xOffsets[i] or 0
         local stillNeedToSet = true
         if icon.GetPoint then
@@ -509,12 +526,29 @@ local function PositionRowHorizontal(viewer, row, yOffset, w, padding, iconDirec
     end
 end
 
-local function PositionRowVertical(viewer, row, xOffset, h, padding, iconDirectionModifier, colAnchor)
+local function PositionRowVertical(viewer, row, xOffset, h, padding, iconDirectionModifier, colAnchor, viewerType)
     -- Why: Place a single vertical column centered with optional reversed direction and stack visuals.
     -- When: Essential/Utility viewers are vertical or configured to grow by columns.
     local count = #row
     local yOffsets = LayoutEngine.CenteredColYOffsets(count, h, padding, iconDirectionModifier)
     for i, icon in ipairs(row) do
+        -- Apply square styling if enabled
+        if SUI.StyledIcons and viewerType then
+            SUI.StyledIcons.UpdateIconStyle(icon, viewerType)
+        end
+        
+        -- Apply font styling
+        if SUI.CooldownFonts and viewerType then
+            SUI.CooldownFonts.ApplyCooldownFont(icon, viewerType)
+            SUI.CooldownFonts.ApplyStackFont(icon, viewerType)
+            SUI.CooldownFonts.ApplyKeybindFont(icon, viewerType)
+        end
+        
+        -- Apply advanced features
+        if SUI.CooldownAdvanced and viewerType then
+            SUI.CooldownAdvanced.ApplyAllFeatures(icon, viewerType)
+        end
+        
         local y = yOffsets[i] or 0
         icon:ClearAllPoints()
         icon:SetPoint(colAnchor, viewer, colAnchor, xOffset, y)
@@ -582,7 +616,7 @@ function ViewerAdapters.CenterAllRows(viewer, fromDirection)
         local rowAnchor = (fromDirection == "BOTTOM") and "BOTTOM" or "TOP"
         for iRow, row in ipairs(rows) do
             local yOffset = (iRow - 1) * (h + padding) * rowOffsetModifier
-            PositionRowHorizontal(viewer, row, yOffset, w, padding, iconDirectionModifier, rowAnchor)
+            PositionRowHorizontal(viewer, row, yOffset, w, padding, iconDirectionModifier, rowAnchor, viewerType)
         end
     else
         local rowOffsetModifier = fromDirection == "BOTTOM" and -1 or 1
@@ -590,7 +624,7 @@ function ViewerAdapters.CenterAllRows(viewer, fromDirection)
         local colAnchor = (fromDirection == "BOTTOM") and "RIGHT" or "LEFT"
         for iRow, row in ipairs(rows) do
             local xOffset = (iRow - 1) * (w + padding) * rowOffsetModifier
-            PositionRowVertical(viewer, row, xOffset, h, padding, iconDirectionModifier, colAnchor)
+            PositionRowVertical(viewer, row, xOffset, h, padding, iconDirectionModifier, colAnchor, viewerType)
         end
     end
 end

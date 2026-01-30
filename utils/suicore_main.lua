@@ -2637,6 +2637,96 @@ local defaults = {
         cooldownManager_utility_dimOpacity = 0.3,
         cooldownManager_limitUtilitySizeToEssential = false,
         
+        -- Square Icon Styling (Phase 2)
+        cooldownManager_squareIcons_Essential = false,
+        cooldownManager_squareIconsBorder_Essential = 4,
+        cooldownManager_squareIconsZoom_Essential = 0,
+        
+        cooldownManager_squareIcons_Utility = false,
+        cooldownManager_squareIconsBorder_Utility = 4,
+        cooldownManager_squareIconsZoom_Utility = 0,
+        
+        cooldownManager_squareIcons_BuffIcons = false,
+        cooldownManager_squareIconsBorder_BuffIcons = 4,
+        cooldownManager_squareIconsZoom_BuffIcons = 0,
+        
+        -- Icon Sizes
+        cooldownManager_iconSize_Essential = 64,
+        cooldownManager_iconSize_Utility = 64,
+        cooldownManager_iconSize_BuffIcons = 32,
+        
+        -- Font Settings (Phase 3)
+        -- Global cooldown font
+        cooldownManager_cooldownFontName = "Friz Quadrata TT",
+        cooldownManager_cooldownFontFlags = {OUTLINE = true},
+        
+        -- Per-viewer cooldown font size overrides
+        cooldownManager_cooldownFontSizeEssential_enabled = false,
+        cooldownManager_cooldownFontSizeEssential = "NIL",
+        cooldownManager_cooldownFontSizeUtility_enabled = false,
+        cooldownManager_cooldownFontSizeUtility = "NIL",
+        cooldownManager_cooldownFontSizeBuffIcons_enabled = false,
+        cooldownManager_cooldownFontSizeBuffIcons = "NIL",
+        
+        -- Global stack font
+        cooldownManager_stackFontName = "Friz Quadrata TT",
+        cooldownManager_stackFontFlags = {OUTLINE = true},
+        
+        -- Per-viewer stack settings
+        cooldownManager_stackAnchorEssential_enabled = false,
+        cooldownManager_stackAnchorEssential_point = "BOTTOMRIGHT",
+        cooldownManager_stackFontSizeEssential = "NIL",
+        cooldownManager_stackAnchorEssential_offsetX = 0,
+        cooldownManager_stackAnchorEssential_offsetY = 0,
+        
+        cooldownManager_stackAnchorUtility_enabled = false,
+        cooldownManager_stackAnchorUtility_point = "BOTTOMRIGHT",
+        cooldownManager_stackFontSizeUtility = "NIL",
+        cooldownManager_stackAnchorUtility_offsetX = 0,
+        cooldownManager_stackAnchorUtility_offsetY = 0,
+        
+        cooldownManager_stackAnchorBuffIcons_enabled = false,
+        cooldownManager_stackAnchorBuffIcons_point = "BOTTOMRIGHT",
+        cooldownManager_stackFontSizeBuffIcons = "NIL",
+        cooldownManager_stackAnchorBuffIcons_offsetX = 0,
+        cooldownManager_stackAnchorBuffIcons_offsetY = 0,
+        
+        -- Global keybind font
+        cooldownManager_keybindFontName = "Friz Quadrata TT",
+        cooldownManager_keybindFontFlags = {OUTLINE = true},
+        
+        -- Per-viewer keybind settings (Essential/Utility only)
+        cooldownManager_showKeybinds_Essential = false,
+        cooldownManager_keybindAnchor_Essential = "TOPRIGHT",
+        cooldownManager_keybindFontSize_Essential = 14,
+        cooldownManager_keybindOffsetX_Essential = -3,
+        cooldownManager_keybindOffsetY_Essential = -3,
+        
+        cooldownManager_showKeybinds_Utility = false,
+        cooldownManager_keybindAnchor_Utility = "TOPRIGHT",
+        cooldownManager_keybindFontSize_Utility = 10,
+        cooldownManager_keybindOffsetX_Utility = -3,
+        cooldownManager_keybindOffsetY_Utility = -3,
+        
+        -- Advanced Features (Phase 4)
+        -- Custom swipe colors
+        cooldownManager_customSwipeColor_enabled = false,
+        cooldownManager_customActiveColor_r = 1,
+        cooldownManager_customActiveColor_g = 0.95,
+        cooldownManager_customActiveColor_b = 0.57,
+        cooldownManager_customActiveColor_a = 0.69,
+        cooldownManager_customCDSwipeColor_r = 0,
+        cooldownManager_customCDSwipeColor_g = 0,
+        cooldownManager_customCDSwipeColor_b = 0,
+        cooldownManager_customCDSwipeColor_a = 0.69,
+        
+        -- Size controls
+        cooldownManager_normalizeUtilitySize = false,
+        
+        -- Rotation highlights
+        cooldownManager_showHighlight_Essential = false,
+        cooldownManager_showHighlight_Utility = false,
+        
         -- Custom Glow Settings (for Essential/Utility cooldown viewers)
         customGlow = {
             -- Essential Cooldowns
