@@ -354,6 +354,9 @@ local defaults = {
         -- Nudge amount for moving frames
         nudgeAmount = 1,
 
+        -- Resource bars (per-profile)
+        resourceBars = {},
+
         -- General Settings
         general = {
             uiScale = 0.64,  -- Default UI scale for 1440p+ monitors
@@ -3310,6 +3313,22 @@ function SUICore:OnProfileChanged(event, db, profileKey)
         end
     end)
 
+    -- Refresh Resource Bars (profile-aware) on profile change
+    C_Timer.After(0.48, function()
+        if SUICore.ResourceBars and SUICore.ResourceBars.GetResourceBarsDB then
+            SUICore.ResourceBars.GetResourceBarsDB()
+            local LEM = SUICore.ResourceBars.LEM
+            local layoutName = (LEM and LEM.GetActiveLayoutName and LEM.GetActiveLayoutName()) or "Default"
+            for _, bar in pairs(SUICore.ResourceBars.barInstances or {}) do
+                if bar and bar.ApplyVisibilitySettings and bar.ApplyLayout and bar.UpdateDisplay then
+                    bar:ApplyVisibilitySettings(layoutName)
+                    bar:ApplyLayout(layoutName, true)
+                    bar:UpdateDisplay(layoutName, true)
+                end
+            end
+        end
+    end)
+
     -- Refresh Spec Profiles tab if options panel is open
     if _G.SuaviUI_RefreshSpecProfilesTab then
         _G.SuaviUI_RefreshSpecProfilesTab()
@@ -4638,8 +4657,7 @@ function SUICore:RefreshAll()
             self:ApplyViewerSkin(viewer)
         end
     end
-    self:UpdatePowerBar()
-    self:UpdateSecondaryPowerBar()
+    -- Resource bars now handled by hook in init.lua
     -- Also refresh Blizzard UI fonts when global font changes
     if self.ApplyGlobalFont then
         self:ApplyGlobalFont()

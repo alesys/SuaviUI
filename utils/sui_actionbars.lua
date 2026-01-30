@@ -392,6 +392,9 @@ local function CreateExtraButtonHolder(buttonType, displayName)
 
     -- Drag handlers
     mover:SetScript("OnDragStart", function(self)
+        if InCombatLockdown() or (holder.IsProtected and holder:IsProtected()) then
+            return
+        end
         holder:StartMoving()
     end)
 

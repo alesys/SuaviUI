@@ -9,7 +9,8 @@
 ## Version: 0.0.6
 ## DefaultState: Enabled
 ## LoadOnDemand: 0
-## SavedVariables: SuaviUI_DB, SuaviUIDB
+## OptionalDeps: SenseiClassResourceBar
+## SavedVariables: SuaviUI_DB, SuaviUIDB, SuaviUI_ResourceBarsDB
 
 ## X-Contributors: Suavicremas
 ## X-License: GPLv3

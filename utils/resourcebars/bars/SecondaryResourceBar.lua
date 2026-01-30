@@ -1,0 +1,517 @@
+local addonName, SUICore = ...
+
+local RB = SUICore.ResourceBars
+local LEM = RB.LEM
+local L = RB.L
+
+------------------------------------------------------------
+-- DRUID FORM CONSTANTS
+------------------------------------------------------------
+local DRUID_CAT_FORM = 1
+local DRUID_MOONKIN_FORM_1 = 31
+local DRUID_MOONKIN_FORM_2 = 35
+
+------------------------------------------------------------
+-- SECONDARY RESOURCE BAR MIXIN
+------------------------------------------------------------
+
+local SecondaryResourceBarMixin = Mixin({}, RB.PowerBarMixin)
+
+function SecondaryResourceBarMixin:OnLoad()
+    RB.PowerBarMixin.OnLoad(self)
+
+    -- Modules for the special cases requiring more work
+    RB.TipOfTheSpear:OnLoad(self)
+    RB.Whirlwind:OnLoad(self)
+end
+
+function SecondaryResourceBarMixin:OnEvent(event, ...)
+    RB.PowerBarMixin.OnEvent(self, event, ...)
+
+    -- Modules for the special cases requiring more work
+    RB.TipOfTheSpear:OnEvent(self, event, ...)
+    RB.Whirlwind:OnEvent(self, event, ...)
+end
+
+function SecondaryResourceBarMixin:GetResource()
+    local playerClass = select(2, UnitClass("player"))
+    local secondaryResources = {
+        ["DEATHKNIGHT"] = Enum.PowerType.Runes,
+        ["DEMONHUNTER"] = {
+            [581] = "SOUL_FRAGMENTS_VENGEANCE", -- Vengeance
+            [1480] = "SOUL_FRAGMENTS", -- Devourer
+        },
+        ["DRUID"] = {
+            [0] = {
+                [102] = Enum.PowerType.Mana, -- Balance
+            },
+            [DRUID_CAT_FORM] = Enum.PowerType.ComboPoints,
+            [DRUID_MOONKIN_FORM_1] = Enum.PowerType.Mana,
+            [DRUID_MOONKIN_FORM_2] = Enum.PowerType.Mana,
+        },
+        ["EVOKER"] = Enum.PowerType.Essence,
+        ["HUNTER"] = {
+            [255] = "TIP_OF_THE_SPEAR", -- Survival
+        },
+        ["MAGE"] = {
+            [62] = Enum.PowerType.ArcaneCharges, -- Arcane
+        },
+        ["MONK"] = {
+            [268] = "STAGGER", -- Brewmaster
+            [269] = Enum.PowerType.Chi, -- Windwalker
+        },
+        ["PALADIN"] = Enum.PowerType.HolyPower,
+        ["PRIEST"] = {
+            [258] = Enum.PowerType.Mana, -- Shadow
+        },
+        ["ROGUE"] = Enum.PowerType.ComboPoints,
+        ["SHAMAN"] = {
+            [262] = Enum.PowerType.Mana, -- Elemental
+            [263] = "MAELSTROM_WEAPON", -- Enhancement
+        },
+        ["WARLOCK"] = Enum.PowerType.SoulShards,
+        ["WARRIOR"] = {
+            [72] = "WHIRLWIND",
+        },
+    }
+
+    local spec = C_SpecializationInfo.GetSpecialization()
+    local specID = C_SpecializationInfo.GetSpecializationInfo(spec)
+
+    local resource = secondaryResources[playerClass]
+
+    -- Druid: form-based
+    if playerClass == "DRUID" then
+        local formID = GetShapeshiftFormID()
+        resource = resource and resource[formID or 0]
+    end
+
+    if type(resource) == "table" then
+        return resource[specID]
+    else
+        return resource
+    end
+end
+
+function SecondaryResourceBarMixin:GetResourceValue(resource)
+    if not resource then return nil, nil end
+    local data = self:GetData()
+    if not data then return nil, nil end
+
+    if resource == "STAGGER" then
+        local stagger = UnitStagger("player") or 0
+        local maxHealth = UnitHealthMax("player") or 1
+
+        self._lastStaggerPercent = self._lastStaggerPercent or ((stagger / maxHealth) * 100)
+        local staggerPercent = (stagger / maxHealth) * 100
+        if (staggerPercent >= 30 and self._lastStaggerPercent < 30)
+            or (staggerPercent < 30 and self._lastStaggerPercent >= 30)
+            or (staggerPercent >= 60 and self._lastStaggerPercent < 60)
+            or (staggerPercent < 60 and self._lastStaggerPercent >= 60) then
+            self:ApplyForegroundSettings()
+        end
+        self._lastStaggerPercent = staggerPercent
+
+        return maxHealth, stagger
+    end
+
+    if resource == "SOUL_FRAGMENTS_VENGEANCE" then
+        local current = C_Spell.GetSpellCastCount(228477) or 0 -- Soul Cleave
+        local max = 6
+
+        return max, current
+    end
+
+    if resource == "SOUL_FRAGMENTS" then
+        local auraData = C_UnitAuras.GetPlayerAuraBySpellID(1225789) or C_UnitAuras.GetPlayerAuraBySpellID(1227702) -- Soul Fragments / Collapsing Star
+        local current = auraData and auraData.applications or 0
+        local max = C_SpellBook.IsSpellKnown(1247534) and 35 or 50 -- Soul Glutton
+
+        -- For performance, only update the foreground when current is below 1
+        if current <= 1 then
+            self:ApplyForegroundSettings()
+        end
+
+        return max, current
+    end
+
+    if resource == Enum.PowerType.Runes then
+        local current = 0
+        local max = UnitPowerMax("player", resource)
+        if max <= 0 then return nil, nil, nil, nil, nil end
+
+        -- Cache rune cooldown data to avoid redundant GetRuneCooldown calls
+        if not self._runeCooldownCache then
+            self._runeCooldownCache = {}
+        end
+
+        for i = 1, max do
+            local start, duration, runeReady = GetRuneCooldown(i)
+            self._runeCooldownCache[i] = { start = start, duration = duration, runeReady = runeReady }
+            if runeReady then
+                current = current + 1
+            end
+        end
+
+        return max, current
+    end
+
+    if resource == Enum.PowerType.SoulShards then
+        local current = UnitPower("player", resource, true)
+        local max = UnitPowerMax("player", resource, true)
+        if max <= 0 then return nil, nil end
+
+        return max, current
+    end
+
+    if resource == "MAELSTROM_WEAPON" then
+        local auraData = C_UnitAuras.GetPlayerAuraBySpellID(344179) -- Maelstrom Weapon
+        local current = auraData and auraData.applications or 0
+        local max = 10
+
+        return max / 2, current
+    end
+
+    if resource == "TIP_OF_THE_SPEAR" then
+        return RB.TipOfTheSpear:GetStacks()
+    end
+
+    if resource == "WHIRLWIND" then
+        return RB.Whirlwind:GetStacks()
+    end
+
+    -- Regular secondary resource types
+    local current = UnitPower("player", resource)
+    local max = UnitPowerMax("player", resource)
+    if max <= 0 then return nil, nil end
+
+    return max, current
+end
+
+function SecondaryResourceBarMixin:GetTagValues(resource, max, current, precision)
+    local pFormat = "%." .. (precision or 0) .. "f"
+
+    local tagValues = RB.PowerBarMixin.GetTagValues(self, resource, max, current, precision)
+
+    if resource == "STAGGER" then
+        local staggerPercentStr = string.format(pFormat, self._lastStaggerPercent)
+        tagValues["[percent]"] = function() return staggerPercentStr end
+    end
+
+    if resource == "SOUL_FRAGMENTS_VENGEANCE" then
+        tagValues["[percent]"] = function() return '' end -- As the value is secret, cannot get percent for it
+    end
+
+    if resource == Enum.PowerType.SoulShards then
+        local currentStr = string.format("%s", AbbreviateNumbers(current / 10))
+        local percentStr = string.format(pFormat, UnitPowerPercent("player", resource, true, CurveConstants.ScaleTo100))
+        local maxStr = string.format("%s", AbbreviateNumbers(max / 10))
+        tagValues = {
+            ["[current]"] = function() return currentStr end,
+            ["[percent]"] = function() return percentStr end,
+            ["[max]"] = function() return maxStr end,
+        }
+    end
+
+    if resource == "MAELSTROM_WEAPON" then
+        local percentStr = string.format(pFormat, (current / (max * 2)) * 100)
+        local maxStr = string.format("%s", AbbreviateNumbers(max * 2))
+        tagValues["[percent]"] = function() return percentStr end
+        tagValues["[max]"] = function() return maxStr end
+    end
+
+    return tagValues
+end
+
+function SecondaryResourceBarMixin:GetPoint(layoutName, ignorePositionMode)
+    local data = self:GetData(layoutName)
+
+    if not ignorePositionMode then
+        if data and data.positionMode == "Use Primary Resource Bar Position If Hidden" then
+            local primaryResource = RB.barInstances and RB.barInstances["SuaviUI_PrimaryResourceBar"]
+
+            if primaryResource then
+                primaryResource:ApplyVisibilitySettings(layoutName)
+                if not primaryResource:IsShown() then
+                    return primaryResource:GetPoint(layoutName, true)
+                end
+            end
+        elseif data and data.positionMode == "Use Health Bar Position If Hidden" then
+            local health = RB.barInstances and RB.barInstances["SuaviUI_HealthBar"]
+
+            if health then
+                health:ApplyVisibilitySettings(layoutName)
+                if not health:IsShown() then
+                    return health:GetPoint(layoutName, true)
+                end
+            end
+        end
+    end
+
+    return RB.PowerBarMixin.GetPoint(self, layoutName)
+end
+
+function SecondaryResourceBarMixin:OnShow()
+    local data = self:GetData()
+
+    if data and data.positionMode ~= nil and data.positionMode ~= "Self" then
+        self:ApplyLayout()
+    end
+end
+
+function SecondaryResourceBarMixin:OnHide()
+    local data = self:GetData()
+
+    if data and data.positionMode ~= nil and data.positionMode ~= "Self" then
+        self:ApplyLayout()
+    end
+end
+
+RB.SecondaryResourceBarMixin = SecondaryResourceBarMixin
+
+------------------------------------------------------------
+-- REGISTERED BAR CONFIG
+------------------------------------------------------------
+
+RB.RegisteredBar = RB.RegisteredBar or {}
+RB.RegisteredBar.SecondaryResourceBar = {
+    mixin = RB.SecondaryResourceBarMixin,
+    dbName = "SecondaryResourceBarDB",
+    editModeName = L["SECONDARY_POWER_BAR_EDIT_MODE_NAME"],
+    frameName = "SuaviUI_SecondaryResourceBar",
+    frameLevel = 2,
+    defaultValues = {
+        point = "CENTER",
+        x = 0,
+        y = -40,
+        positionMode = "Self",
+        hideBlizzardSecondaryResourceUi = false,
+        hideManaOnRole = {},
+        showManaAsPercent = false,
+        showTicks = true,
+        tickColor = { r = 0, g = 0, b = 0, a = 1 },
+        tickThickness = 1,
+        useResourceAtlas = false,
+    },
+    lemSettings = function(bar, defaults)
+        local config = bar:GetConfig()
+        local dbName = config.dbName
+
+        return {
+            {
+                parentId = L["CATEGORY_BAR_VISIBILITY"],
+                order = 103,
+                name = L["HIDE_MANA_ON_ROLE"],
+                kind = LEM.SettingType.MultiDropdown,
+                default = defaults.hideManaOnRole,
+                values = RB.availableRoleOptions,
+                hideSummary = true,
+                useOldStyle = true,
+                get = function(layoutName)
+                    return (SuaviUI_ResourceBarsDB[dbName][layoutName] and SuaviUI_ResourceBarsDB[dbName][layoutName].hideManaOnRole) or defaults.hideManaOnRole
+                end,
+                set = function(layoutName, value)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName].hideManaOnRole = value
+                end,
+            },
+            {
+                parentId = L["CATEGORY_BAR_VISIBILITY"],
+                order = 105,
+                name = L["HIDE_BLIZZARD_UI"],
+                kind = LEM.SettingType.Checkbox,
+                default = defaults.hideBlizzardSecondaryResourceUi,
+                get = function(layoutName)
+                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    if data and data.hideBlizzardSecondaryResourceUi ~= nil then
+                        return data.hideBlizzardSecondaryResourceUi
+                    else
+                        return defaults.hideBlizzardSecondaryResourceUi
+                    end
+                end,
+                set = function(layoutName, value)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName].hideBlizzardSecondaryResourceUi = value
+                    bar:HideBlizzardSecondaryResource(layoutName)
+                end,
+                tooltip = L["HIDE_BLIZZARD_UI_SECONDARY_POWER_BAR_TOOLTIP"],
+            },
+            {
+                parentId = L["CATEGORY_POSITION_AND_SIZE"],
+                order = 201,
+                name = L["POSITION"],
+                kind = LEM.SettingType.Dropdown,
+                default = defaults.positionMode,
+                useOldStyle = true,
+                values = RB.availablePositionModeOptions(config),
+                get = function(layoutName)
+                    return (SuaviUI_ResourceBarsDB[dbName][layoutName] and SuaviUI_ResourceBarsDB[dbName][layoutName].positionMode) or defaults.positionMode
+                end,
+                set = function(layoutName, value)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName].positionMode = value
+                    bar:ApplyLayout(layoutName)
+                end,
+            },
+            {
+                parentId = L["CATEGORY_BAR_SETTINGS"],
+                order = 304,
+                kind = LEM.SettingType.Divider,
+            },
+            {
+                parentId = L["CATEGORY_BAR_SETTINGS"],
+                order = 305,
+                name = L["SHOW_TICKS_WHEN_AVAILABLE"],
+                kind = LEM.SettingType.CheckboxColor,
+                default = defaults.showTicks,
+                colorDefault = defaults.tickColor,
+                get = function(layoutName)
+                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    if data and data.showTicks ~= nil then
+                        return data.showTicks
+                    else
+                        return defaults.showTicks
+                    end
+                end,
+                colorGet = function(layoutName)
+                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    return data and data.tickColor or defaults.tickColor
+                end,
+                set = function(layoutName, value)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName].showTicks = value
+                    bar:UpdateTicksLayout(layoutName)
+                end,
+                colorSet = function(layoutName, value)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName].tickColor = value
+                    bar:UpdateTicksLayout(layoutName)
+                end,
+            },
+            {
+                parentId = L["CATEGORY_BAR_SETTINGS"],
+                order = 306,
+                name = L["TICK_THICKNESS"],
+                kind = LEM.SettingType.Slider,
+                default = defaults.tickThickness,
+                minValue = 1,
+                maxValue = 5,
+                valueStep = 1,
+                get = function(layoutName)
+                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    return data and data.tickThickness or defaults.tickThickness
+                end,
+                set = function(layoutName, value)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName].tickThickness = value
+                    bar:UpdateTicksLayout(layoutName)
+                end,
+                isEnabled = function(layoutName)
+                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    return data.showTicks
+                end,
+            },
+            {
+                parentId = L["CATEGORY_BAR_STYLE"],
+                order = 401,
+                name = L["USE_RESOURCE_TEXTURE_AND_COLOR"],
+                kind = LEM.SettingType.Checkbox,
+                default = defaults.useResourceAtlas,
+                get = function(layoutName)
+                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    if data and data.useResourceAtlas ~= nil then
+                        return data.useResourceAtlas
+                    else
+                        return defaults.useResourceAtlas
+                    end
+                end,
+                set = function(layoutName, value)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName].useResourceAtlas = value
+                    bar:ApplyLayout(layoutName)
+                end,
+            },
+            {
+                parentId = L["CATEGORY_TEXT_SETTINGS"],
+                order = 505,
+                name = L["SHOW_MANA_AS_PERCENT"],
+                kind = LEM.SettingType.Checkbox,
+                default = defaults.showManaAsPercent,
+                get = function(layoutName)
+                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    if data and data.showManaAsPercent ~= nil then
+                        return data.showManaAsPercent
+                    else
+                        return defaults.showManaAsPercent
+                    end
+                end,
+                set = function(layoutName, value)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName].showManaAsPercent = value
+                    bar:UpdateDisplay(layoutName)
+                end,
+                isEnabled = function(layoutName)
+                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    return data.showText
+                end,
+                tooltip = L["SHOW_MANA_AS_PERCENT_TOOLTIP"],
+            },
+            {
+                parentId = L["CATEGORY_TEXT_SETTINGS"],
+                order = 506,
+                kind = LEM.SettingType.Divider,
+            },
+            {
+                parentId = L["CATEGORY_TEXT_SETTINGS"],
+                order = 507,
+                name = L["SHOW_RESOURCE_CHARGE_TIMER"],
+                kind = LEM.SettingType.CheckboxColor,
+                default = defaults.showFragmentedPowerBarText,
+                colorDefault = defaults.fragmentedPowerBarTextColor,
+                get = function(layoutName)
+                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    if data and data.showFragmentedPowerBarText ~= nil then
+                        return data.showFragmentedPowerBarText
+                    else
+                        return defaults.showFragmentedPowerBarText
+                    end
+                end,
+                colorGet = function(layoutName)
+                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    return data and data.fragmentedPowerBarTextColor or defaults.fragmentedPowerBarTextColor
+                end,
+                set = function(layoutName, value)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName].showFragmentedPowerBarText = value
+                    bar:ApplyTextVisibilitySettings(layoutName)
+                end,
+                colorSet = function(layoutName, value)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName].fragmentedPowerBarTextColor = value
+                    bar:ApplyFontSettings(layoutName)
+                end,
+            },
+            {
+                parentId = L["CATEGORY_TEXT_SETTINGS"],
+                order = 508,
+                name = L["CHARGE_TIMER_PRECISION"],
+                kind = LEM.SettingType.Dropdown,
+                default = defaults.fragmentedPowerBarTextPrecision,
+                useOldStyle = true,
+                values = RB.availableTextPrecisions,
+                get = function(layoutName)
+                    return (SuaviUI_ResourceBarsDB[dbName][layoutName] and SuaviUI_ResourceBarsDB[dbName][layoutName].fragmentedPowerBarTextPrecision) or defaults.fragmentedPowerBarTextPrecision
+                end,
+                set = function(layoutName, value)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
+                    SuaviUI_ResourceBarsDB[dbName][layoutName].fragmentedPowerBarTextPrecision = value
+                    bar:UpdateDisplay(layoutName)
+                end,
+                isEnabled = function(layoutName)
+                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    return data.showFragmentedPowerBarText
+                end,
+            },
+        }
+    end
+}
