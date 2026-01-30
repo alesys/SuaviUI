@@ -2627,6 +2627,15 @@ local defaults = {
         cooldownManager = {
             -- hideSwipe removed - now handled by cooldownSwipe
         },
+
+        -- CooldownManagerCentered (layout/centering defaults)
+        cooldownManager_alignBuffIcons_growFromDirection = "START",
+        cooldownManager_alignBuffBars_growFromDirection = "BOTTOM",
+        cooldownManager_centerEssential_growFromDirection = "TOP",
+        cooldownManager_centerUtility_growFromDirection = "TOP",
+        cooldownManager_utility_dimWhenNotOnCD = false,
+        cooldownManager_utility_dimOpacity = 0.3,
+        cooldownManager_limitUtilitySizeToEssential = false,
         
         -- Custom Glow Settings (for Essential/Utility cooldown viewers)
         customGlow = {

@@ -2,6 +2,10 @@ local ADDON_NAME, ns = ...
 local SUICore = ns.Addon
 local LSM = LibStub("LibSharedMedia-3.0")
 
+if _G.SuaviUI and _G.SuaviUI.CooldownManagerCentered then
+    return
+end
+
 ---------------------------------------------------------------------------
 -- SUI Buff Bar Manager
 -- Handles dynamic centering of BuffIconCooldownViewer and BuffBarCooldownViewer

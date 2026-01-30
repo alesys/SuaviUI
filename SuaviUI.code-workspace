@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "../AccWideUILayoutSelection"
+		},
+		{
+			"path": "../CooldownManagerCentered"
 		}
 	],
 	"settings": {}
