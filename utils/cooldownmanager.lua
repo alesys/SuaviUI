@@ -1,17 +1,21 @@
 -- cooldownmanager.lua
 -- CooldownManagerCentered core centering logic integrated into SuaviUI
 
-local _, SUI = ...
+local _, ns = ...
 
 local CooldownManager = {}
 local Runtime = {}
 
-SUI.CooldownManager = CooldownManager
-SUI.CooldownManagerCentered = CooldownManager
-SUI.CooldownRuntime = Runtime
+-- Export to both the addon namespace and the global SuaviUI table
+ns.CooldownManager = CooldownManager
+ns.CooldownManagerCentered = CooldownManager
+ns.CooldownRuntime = Runtime
+SuaviUI.CooldownManager = CooldownManager
+SuaviUI.CooldownManagerCentered = CooldownManager
+SuaviUI.CooldownRuntime = Runtime
 
 local function GetSUICore()
-    return (SUI and SUI.SUICore) or (_G.SuaviUI and _G.SuaviUI.SUICore)
+    return (ns and ns.SUICore) or (_G.SuaviUI and _G.SuaviUI.SUICore)
 end
 
 local function GetProfile()
@@ -95,6 +99,49 @@ local LayoutEngine = {}
 local StateTracker = {}
 local ViewerAdapters = {}
 local EventHandler = {}
+
+local function DebugPrintSquare(...)
+    print("[SuaviUI SquareIcons]", ...)
+end
+
+local function DebugSquareIcons()
+    DebugPrintSquare("Test start")
+    if not ns or not ns.StyledIcons then
+        DebugPrintSquare("StyledIcons missing")
+        return
+    end
+
+    local viewersToCheck = {
+        { name = "EssentialCooldownViewer", typeKey = "Essential" },
+        { name = "UtilityCooldownViewer", typeKey = "Utility" },
+        { name = "BuffIconCooldownViewer", typeKey = "BuffIcons" },
+    }
+
+    for _, info in ipairs(viewersToCheck) do
+        local viewer = _G[info.name]
+        local count = 0
+        if viewer and viewer.GetChildren then
+            for _, child in ipairs({ viewer:GetChildren() }) do
+                if child and (child.Icon or child.icon or child.texture or child.Texture) then
+                    count = count + 1
+                    ns.StyledIcons.UpdateIconStyle(child, info.typeKey)
+                end
+            end
+        end
+
+        DebugPrintSquare(info.name .. " icons:", count,
+            "enabled:", GetSetting("cooldownManager_squareIcons_" .. info.typeKey, false))
+    end
+
+    DebugPrintSquare("Test end")
+end
+
+if SLASH_SUI_SQUARETEST1 == nil then
+    SLASH_SUI_SQUARETEST1 = "/suisquaretest"
+    SlashCmdList.SUI_SQUARETEST = function()
+        DebugSquareIcons()
+    end
+end
 
 local viewers = {
     EssentialCooldownViewer = _G["EssentialCooldownViewer"],
@@ -376,6 +423,9 @@ function ViewerAdapters.UpdateBuffIcons()
 
         for i, icon in ipairs(icons) do
             local x = offsets[i] or 0
+            if ns.StyledIcons then
+                ns.StyledIcons.UpdateIconStyle(icon, "BuffIcons")
+            end
             icon:ClearAllPoints()
             icon:SetPoint(anchor, BuffIconCooldownViewer, relativePoint, x, 0)
         end
@@ -400,6 +450,9 @@ function ViewerAdapters.UpdateBuffIcons()
 
         for i, icon in ipairs(icons) do
             local y = offsets[i] or 0
+            if ns.StyledIcons then
+                ns.StyledIcons.UpdateIconStyle(icon, "BuffIcons")
+            end
             icon:ClearAllPoints()
             icon:SetPoint(anchor, BuffIconCooldownViewer, relativePoint, 0, y)
         end
@@ -452,14 +505,14 @@ function ViewerAdapters.CollectViewerChildren(viewer)
         if child and child:IsShown() and child.Icon then
             all[#all + 1] = child
 
-            if child.cooldownID and toDim and SUI.CooldownTracker then
+            if child.cooldownID and toDim and ns.CooldownTracker then
                 local info = C_CooldownViewer.GetCooldownViewerCooldownInfo(child.cooldownID)
                 if not C_Spell.GetSpellCooldown(info.spellID).isOnGCD then
                     local cd = nil
                     if not issecretvalue(child.cooldownChargesShown) and child.cooldownChargesShown then
-                        cd = SUI.CooldownTracker:getChargeCD(info.spellID)
+                        cd = ns.CooldownTracker:getChargeCD(info.spellID)
                     else
-                        cd = SUI.CooldownTracker:getSpellCD(info.spellID)
+                        cd = ns.CooldownTracker:getSpellCD(info.spellID)
                     end
 
                     local curve = C_CurveUtil.CreateCurve()
@@ -487,20 +540,20 @@ local function PositionRowHorizontal(viewer, row, yOffset, w, padding, iconDirec
     local xOffsets = LayoutEngine.CenteredRowXOffsets(count, w, padding, iconDirectionModifier)
     for i, icon in ipairs(row) do
         -- Apply square styling if enabled
-        if SUI.StyledIcons and viewerType then
-            SUI.StyledIcons.UpdateIconStyle(icon, viewerType)
+        if ns.StyledIcons and viewerType then
+            ns.StyledIcons.UpdateIconStyle(icon, viewerType)
         end
         
         -- Apply font styling
-        if SUI.CooldownFonts and viewerType then
-            SUI.CooldownFonts.ApplyCooldownFont(icon, viewerType)
-            SUI.CooldownFonts.ApplyStackFont(icon, viewerType)
-            SUI.CooldownFonts.ApplyKeybindFont(icon, viewerType)
+        if ns.CooldownFonts and viewerType then
+            ns.CooldownFonts.ApplyCooldownFont(icon, viewerType)
+            ns.CooldownFonts.ApplyStackFont(icon, viewerType)
+            ns.CooldownFonts.ApplyKeybindFont(icon, viewerType)
         end
         
         -- Apply advanced features
-        if SUI.CooldownAdvanced and viewerType then
-            SUI.CooldownAdvanced.ApplyAllFeatures(icon, viewerType)
+        if ns.CooldownAdvanced and viewerType then
+            ns.CooldownAdvanced.ApplyAllFeatures(icon, viewerType)
         end
         
         local x = xOffsets[i] or 0
@@ -533,20 +586,20 @@ local function PositionRowVertical(viewer, row, xOffset, h, padding, iconDirecti
     local yOffsets = LayoutEngine.CenteredColYOffsets(count, h, padding, iconDirectionModifier)
     for i, icon in ipairs(row) do
         -- Apply square styling if enabled
-        if SUI.StyledIcons and viewerType then
-            SUI.StyledIcons.UpdateIconStyle(icon, viewerType)
+        if ns.StyledIcons and viewerType then
+            ns.StyledIcons.UpdateIconStyle(icon, viewerType)
         end
         
         -- Apply font styling
-        if SUI.CooldownFonts and viewerType then
-            SUI.CooldownFonts.ApplyCooldownFont(icon, viewerType)
-            SUI.CooldownFonts.ApplyStackFont(icon, viewerType)
-            SUI.CooldownFonts.ApplyKeybindFont(icon, viewerType)
+        if ns.CooldownFonts and viewerType then
+            ns.CooldownFonts.ApplyCooldownFont(icon, viewerType)
+            ns.CooldownFonts.ApplyStackFont(icon, viewerType)
+            ns.CooldownFonts.ApplyKeybindFont(icon, viewerType)
         end
         
         -- Apply advanced features
-        if SUI.CooldownAdvanced and viewerType then
-            SUI.CooldownAdvanced.ApplyAllFeatures(icon, viewerType)
+        if ns.CooldownAdvanced and viewerType then
+            ns.CooldownAdvanced.ApplyAllFeatures(icon, viewerType)
         end
         
         local y = yOffsets[i] or 0
@@ -568,6 +621,12 @@ function ViewerAdapters.CenterAllRows(viewer, fromDirection)
     end
 
     local viewerName = viewer:GetName()
+    local viewerType = nil
+    if viewerName == "EssentialCooldownViewer" then
+        viewerType = "Essential"
+    elseif viewerName == "UtilityCooldownViewer" then
+        viewerType = "Utility"
+    end
 
     local isHorizontal = viewer.isHorizontal ~= false
     local iconDirection = viewer.iconDirection == 1 and "NORMAL" or "REVERSED"
@@ -747,9 +806,15 @@ function CooldownManager.HookViewerRefreshLayout()
         if v and v.RefreshLayout and not v.__suiCMCRefreshHooked then
             v.__suiCMCRefreshHooked = true
             hooksecurefunc(v, "RefreshLayout", function()
-                CooldownManager.ForceRefresh(viewerReasonPartsMap[n])
-                C_Timer.After(0, function()
+                -- Wrap in pcall to prevent affecting Blizzard's Edit Mode flow
+                -- which can trigger EncounterWarnings bugs
+                pcall(function()
                     CooldownManager.ForceRefresh(viewerReasonPartsMap[n])
+                end)
+                C_Timer.After(0, function()
+                    pcall(function()
+                        CooldownManager.ForceRefresh(viewerReasonPartsMap[n])
+                    end)
                 end)
             end)
         end

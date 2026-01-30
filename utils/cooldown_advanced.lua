@@ -310,7 +310,7 @@ end
 local initFrame = CreateFrame("Frame")
 initFrame:RegisterEvent("ADDON_LOADED")
 initFrame:SetScript("OnEvent", function(self, event, addonName)
-    if addonName == GetAddOnMetadata("SuaviUI", "Title") then
+    if addonName == "SuaviUI" then
         HookCooldownUpdates()
         self:UnregisterEvent("ADDON_LOADED")
     end

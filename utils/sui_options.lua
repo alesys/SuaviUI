@@ -5204,12 +5204,37 @@ local function CreateCooldownViewersPage(parent)
     local FORM_ROW = 32
 
     -- Set search context for auto-registration
-    GUI:SetSearchContext({tabIndex = 8, tabName = "Cooldown Viewers"})
+    GUI:SetSearchContext({tabIndex = 8, tabName = "CDM Styles"})
 
     -- Refresh functions
     local function RefreshIcons()
+        -- Direct and immediate refresh for responsive feel
         if SUI and SUI.StyledIcons then
-            SUI.StyledIcons.RefreshAllIcons()
+            -- RefreshAll applies styles immediately without going through state tracking
+            if SUI.StyledIcons.RefreshAll then
+                SUI.StyledIcons:RefreshAll()
+            end
+            if SUI.StyledIcons.ApplyNormalizedSize then
+                SUI.StyledIcons:ApplyNormalizedSize()
+            end
+        end
+        
+        -- Force the viewer frames to refresh their layout immediately
+        -- Wrap in pcall to avoid Blizzard EditMode bugs
+        local viewers = {
+            _G["EssentialCooldownViewer"],
+            _G["UtilityCooldownViewer"],
+            _G["BuffIconCooldownViewer"],
+        }
+        for _, viewer in ipairs(viewers) do
+            if viewer and viewer.RefreshLayout then
+                pcall(viewer.RefreshLayout, viewer)
+            end
+        end
+        
+        -- Also call ForceRefreshAll for centering
+        if SUI and SUI.CooldownManager and SUI.CooldownManager.ForceRefreshAll then
+            SUI.CooldownManager.ForceRefreshAll()
         end
     end
     
@@ -5280,13 +5305,13 @@ local function CreateCooldownViewersPage(parent)
     essentialSquareCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - FORM_ROW
 
-    local essentialBorderSlider = GUI:CreateFormSlider(content, "Border Thickness", 1, 6, 1, "cooldownManager_squareIconsBorder_Essential", db, RefreshIcons)
+    local essentialBorderSlider = GUI:CreateFormSlider(content, "Border Thickness", 1, 6, 1, "cooldownManager_squareIconsBorder_Essential", db, RefreshIcons, { deferOnDrag = true })
     essentialBorderSlider:SetPoint("TOPLEFT", PADDING, y)
     essentialBorderSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     essentialBorderSlider.SetFormattedValue = function(value) return string.format("%.0fpx", value) end
     y = y - SLIDER_HEIGHT
 
-    local essentialZoomSlider = GUI:CreateFormSlider(content, "Icon Zoom", 0, 0.5, 0.05, "cooldownManager_squareIconsZoom_Essential", db, RefreshIcons)
+    local essentialZoomSlider = GUI:CreateFormSlider(content, "Icon Zoom", 0, 0.5, 0.05, "cooldownManager_squareIconsZoom_Essential", db, RefreshIcons, { deferOnDrag = true })
     essentialZoomSlider:SetPoint("TOPLEFT", PADDING, y)
     essentialZoomSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     essentialZoomSlider.SetFormattedValue = function(value) return string.format("%.0f%%", value * 100) end
@@ -5303,13 +5328,13 @@ local function CreateCooldownViewersPage(parent)
     utilitySquareCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - FORM_ROW
 
-    local utilityBorderSlider = GUI:CreateFormSlider(content, "Border Thickness", 1, 6, 1, "cooldownManager_squareIconsBorder_Utility", db, RefreshIcons)
+    local utilityBorderSlider = GUI:CreateFormSlider(content, "Border Thickness", 1, 6, 1, "cooldownManager_squareIconsBorder_Utility", db, RefreshIcons, { deferOnDrag = true })
     utilityBorderSlider:SetPoint("TOPLEFT", PADDING, y)
     utilityBorderSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     utilityBorderSlider.SetFormattedValue = function(value) return string.format("%.0fpx", value) end
     y = y - SLIDER_HEIGHT
 
-    local utilityZoomSlider = GUI:CreateFormSlider(content, "Icon Zoom", 0, 0.5, 0.05, "cooldownManager_squareIconsZoom_Utility", db, RefreshIcons)
+    local utilityZoomSlider = GUI:CreateFormSlider(content, "Icon Zoom", 0, 0.5, 0.05, "cooldownManager_squareIconsZoom_Utility", db, RefreshIcons, { deferOnDrag = true })
     utilityZoomSlider:SetPoint("TOPLEFT", PADDING, y)
     utilityZoomSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     utilityZoomSlider.SetFormattedValue = function(value) return string.format("%.0f%%", value * 100) end
@@ -5326,13 +5351,13 @@ local function CreateCooldownViewersPage(parent)
     buffSquareCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - FORM_ROW
 
-    local buffBorderSlider = GUI:CreateFormSlider(content, "Border Thickness", 1, 6, 1, "cooldownManager_squareIconsBorder_BuffIcons", db, RefreshIcons)
+    local buffBorderSlider = GUI:CreateFormSlider(content, "Border Thickness", 1, 6, 1, "cooldownManager_squareIconsBorder_BuffIcons", db, RefreshIcons, { deferOnDrag = true })
     buffBorderSlider:SetPoint("TOPLEFT", PADDING, y)
     buffBorderSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     buffBorderSlider.SetFormattedValue = function(value) return string.format("%.0fpx", value) end
     y = y - SLIDER_HEIGHT
 
-    local buffZoomSlider = GUI:CreateFormSlider(content, "Icon Zoom", 0, 0.5, 0.05, "cooldownManager_squareIconsZoom_BuffIcons", db, RefreshIcons)
+    local buffZoomSlider = GUI:CreateFormSlider(content, "Icon Zoom", 0, 0.5, 0.05, "cooldownManager_squareIconsZoom_BuffIcons", db, RefreshIcons, { deferOnDrag = true })
     buffZoomSlider:SetPoint("TOPLEFT", PADDING, y)
     buffZoomSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     buffZoomSlider.SetFormattedValue = function(value) return string.format("%.0f%%", value * 100) end
@@ -5369,14 +5394,14 @@ local function CreateCooldownViewersPage(parent)
     y = y - FORM_ROW
 
     -- Font Flags (checkboxes for OUTLINE, THICKOUTLINE, MONOCHROME)
-    local fontFlagsGroup = GUI:CreateFormGroup(content, "Font Style")
-    fontFlagsGroup:SetPoint("TOPLEFT", PADDING, y)
-    fontFlagsGroup:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    local fontFlagsLabel = GUI:CreateLabel(content, "Font Style", 12, {1, 1, 1})
+    fontFlagsLabel:SetPoint("TOPLEFT", PADDING, y)
+    y = y - 20
     
     local outlineCheck = GUI:CreateFormCheckbox(content, "Outline", "cooldownManager_cooldownFontFlags.OUTLINE", db, function() 
         if SUI and SUI.CooldownFonts then SUI.CooldownFonts.RefreshAllFonts() end
     end)
-    outlineCheck:SetPoint("TOPLEFT", fontFlagsGroup, "BOTTOMLEFT", 0, -5)
+    outlineCheck:SetPoint("TOPLEFT", PADDING, y)
     
     local thickCheck = GUI:CreateFormCheckbox(content, "Thick Outline", "cooldownManager_cooldownFontFlags.THICKOUTLINE", db, function() 
         if SUI and SUI.CooldownFonts then SUI.CooldownFonts.RefreshAllFonts() end
@@ -5448,14 +5473,14 @@ local function CreateCooldownViewersPage(parent)
     y = y - FORM_ROW
 
     -- Stack font flags (similar to cooldown flags)
-    local stackFlagsGroup = GUI:CreateFormGroup(content, "Stack Font Style")
-    stackFlagsGroup:SetPoint("TOPLEFT", PADDING, y)
-    stackFlagsGroup:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    local stackFlagsLabel = GUI:CreateLabel(content, "Stack Font Style", 12, {1, 1, 1})
+    stackFlagsLabel:SetPoint("TOPLEFT", PADDING, y)
+    y = y - 20
     
     local stackOutlineCheck = GUI:CreateFormCheckbox(content, "Outline", "cooldownManager_stackFontFlags.OUTLINE", db, function() 
         if SUI and SUI.CooldownFonts then SUI.CooldownFonts.RefreshAllFonts() end
     end)
-    stackOutlineCheck:SetPoint("TOPLEFT", stackFlagsGroup, "BOTTOMLEFT", 0, -5)
+    stackOutlineCheck:SetPoint("TOPLEFT", PADDING, y)
     
     local stackThickCheck = GUI:CreateFormCheckbox(content, "Thick Outline", "cooldownManager_stackFontFlags.THICKOUTLINE", db, function() 
         if SUI and SUI.CooldownFonts then SUI.CooldownFonts.RefreshAllFonts() end
@@ -5553,14 +5578,14 @@ local function CreateCooldownViewersPage(parent)
     y = y - FORM_ROW
 
     -- Keybind font flags
-    local keybindFlagsGroup = GUI:CreateFormGroup(content, "Keybind Font Style")
-    keybindFlagsGroup:SetPoint("TOPLEFT", PADDING, y)
-    keybindFlagsGroup:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    local keybindFlagsLabel = GUI:CreateLabel(content, "Keybind Font Style", 12, {1, 1, 1})
+    keybindFlagsLabel:SetPoint("TOPLEFT", PADDING, y)
+    y = y - 20
     
     local keybindOutlineCheck = GUI:CreateFormCheckbox(content, "Outline", "cooldownManager_keybindFontFlags.OUTLINE", db, function() 
         if SUI and SUI.CooldownFonts then SUI.CooldownFonts.RefreshAllFonts() end
     end)
-    keybindOutlineCheck:SetPoint("TOPLEFT", keybindFlagsGroup, "BOTTOMLEFT", 0, -5)
+    keybindOutlineCheck:SetPoint("TOPLEFT", PADDING, y)
     
     local keybindThickCheck = GUI:CreateFormCheckbox(content, "Thick Outline", "cooldownManager_keybindFontFlags.THICKOUTLINE", db, function() 
         if SUI and SUI.CooldownFonts then SUI.CooldownFonts.RefreshAllFonts() end
@@ -5642,21 +5667,21 @@ local function CreateCooldownViewersPage(parent)
     y = y - advancedHeader.gap
 
     -- Custom Swipe Colors
-    local swipeColorsGroup = GUI:CreateFormGroup(content, "Custom Swipe Colors")
-    swipeColorsGroup:SetPoint("TOPLEFT", PADDING, y)
-    swipeColorsGroup:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    local swipeColorsLabel = GUI:CreateLabel(content, "Custom Swipe Colors", 12, {1, 1, 1})
+    swipeColorsLabel:SetPoint("TOPLEFT", PADDING, y)
+    y = y - 20
     
     local enableSwipeCheck = GUI:CreateFormCheckbox(content, "Enable Custom Swipe Colors", "cooldownManager_customSwipeColor_enabled", db, function() 
         if SUI and SUI.CooldownAdvanced then SUI.CooldownAdvanced.RefreshAllFeatures() end
     end)
-    enableSwipeCheck:SetPoint("TOPLEFT", swipeColorsGroup, "BOTTOMLEFT", 0, -5)
+    enableSwipeCheck:SetPoint("TOPLEFT", PADDING, y)
     enableSwipeCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - 60
 
     -- Active Aura Color
     local activeColorPicker = GUI:CreateFormColorPicker(content, "Active Aura Color", "cooldownManager_customActiveColor", db, function() 
         if SUI and SUI.CooldownAdvanced then SUI.CooldownAdvanced.RefreshAllFeatures() end
-    end, true)  -- true for alpha support
+    end, { hasAlpha = true })
     activeColorPicker:SetPoint("TOPLEFT", PADDING + 20, y)
     activeColorPicker:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - FORM_ROW
@@ -5664,13 +5689,13 @@ local function CreateCooldownViewersPage(parent)
     -- Cooldown Swipe Color
     local swipeColorPicker = GUI:CreateFormColorPicker(content, "Cooldown Swipe Color", "cooldownManager_customCDSwipeColor", db, function() 
         if SUI and SUI.CooldownAdvanced then SUI.CooldownAdvanced.RefreshAllFeatures() end
-    end, true)  -- true for alpha support
+    end, { hasAlpha = true })
     swipeColorPicker:SetPoint("TOPLEFT", PADDING + 20, y)
     swipeColorPicker:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - FORM_ROW
 
     -- Reset to Defaults Button
-    local resetButton = GUI:CreateButton(content, "Reset to Defaults", function()
+    local resetButton = GUI:CreateButton(content, "Reset to Defaults", 150, 25, function()
         if db then
             db.cooldownManager_customActiveColor_r = 1
             db.cooldownManager_customActiveColor_g = 0.95
@@ -5689,14 +5714,14 @@ local function CreateCooldownViewersPage(parent)
 
     -- Size Controls
     y = y - 10
-    local sizeControlsGroup = GUI:CreateFormGroup(content, "Size Controls")
-    sizeControlsGroup:SetPoint("TOPLEFT", PADDING, y)
-    sizeControlsGroup:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    local sizeControlsLabel = GUI:CreateLabel(content, "Size Controls", 12, {1, 1, 1})
+    sizeControlsLabel:SetPoint("TOPLEFT", PADDING, y)
+    y = y - 20
 
     local limitSizeCheck = GUI:CreateFormCheckbox(content, "Limit Utility Size to Essential Width", "cooldownManager_limitUtilitySizeToEssential", db, function() 
         if SUI and SUI.CooldownAdvanced then SUI.CooldownAdvanced.RefreshAllFeatures() end
     end)
-    limitSizeCheck:SetPoint("TOPLEFT", sizeControlsGroup, "BOTTOMLEFT", 0, -5)
+    limitSizeCheck:SetPoint("TOPLEFT", PADDING, y)
     limitSizeCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - 60
 
@@ -5709,14 +5734,14 @@ local function CreateCooldownViewersPage(parent)
 
     -- Rotation Highlights
     y = y - 10
-    local rotationGroup = GUI:CreateFormGroup(content, "Rotation Highlights")
-    rotationGroup:SetPoint("TOPLEFT", PADDING, y)
-    rotationGroup:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    local rotationLabel = GUI:CreateLabel(content, "Rotation Highlights", 12, {1, 1, 1})
+    rotationLabel:SetPoint("TOPLEFT", PADDING, y)
+    y = y - 20
 
     local essentialHighlightCheck = GUI:CreateFormCheckbox(content, "Show Rotation Highlight - Essential", "cooldownManager_showHighlight_Essential", db, function() 
         if SUI and SUI.CooldownAdvanced then SUI.CooldownAdvanced.RefreshAllFeatures() end
     end)
-    essentialHighlightCheck:SetPoint("TOPLEFT", rotationGroup, "BOTTOMLEFT", 0, -5)
+    essentialHighlightCheck:SetPoint("TOPLEFT", PADDING, y)
     essentialHighlightCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - 60
 
@@ -12192,7 +12217,7 @@ function GUI:InitializeOptions()
 
     -- Row 2: Cooldown System (CDM removed - see CDM_SETTINGS_REFERENCE.md)
     GUI:AddTab(frame, "Effects", CreateCDEffectsPage)
-    GUI:AddTab(frame, "Cooldown Viewers", CreateCooldownViewersPage)
+    GUI:AddTab(frame, "CDM Styles", CreateCooldownViewersPage)
     GUI:AddTab(frame, "Keybinds", CreateCDKeybindsPage)
     GUI:AddTab(frame, "Custom Trackers", CreateCustomTrackersPage)
 

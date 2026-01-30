@@ -66,6 +66,32 @@ local function GetDB()
     return nil
 end
 
+local function ApplySquareBuffOverrides(settings)
+    local profile = SUICore and SUICore.db and SUICore.db.profile
+    if not profile or not profile.cooldownManager_squareIcons_BuffIcons then
+        return settings
+    end
+
+    local overridden = {}
+    for key, value in pairs(settings or {}) do
+        overridden[key] = value
+    end
+
+    overridden.aspectRatioCrop = 1.0
+
+    local borderKey = profile.cooldownManager_squareIconsBorder_BuffIcons
+    if borderKey ~= nil then
+        overridden.borderSize = borderKey
+    end
+
+    local zoomKey = profile.cooldownManager_squareIconsZoom_BuffIcons
+    if zoomKey ~= nil then
+        overridden.zoom = zoomKey
+    end
+
+    return overridden
+end
+
 local function GetBuffSettings()
     local db = GetDB()
     if db and db.buff then
@@ -78,10 +104,10 @@ local function GetBuffSettings()
                 buff.aspectRatioCrop = 1.0  -- square
             end
         end
-        return buff
+        return ApplySquareBuffOverrides(buff)
     end
     -- Return defaults if no DB
-    return {
+    return ApplySquareBuffOverrides({
         enabled = true,
         iconSize = 42,
         borderSize = 2,
@@ -89,7 +115,7 @@ local function GetBuffSettings()
         zoom = 0,
         padding = 0,
         opacity = 1.0,
-    }
+    })
 end
 
 local function GetTrackedBarSettings()
@@ -1551,15 +1577,18 @@ local function Initialize()
     -- Using hooksecurefunc is safer than replacing methods - avoids breaking Blizzard's code paths.
     if BuffBarCooldownViewer and BuffBarCooldownViewer.RefreshLayout then
         hooksecurefunc(BuffBarCooldownViewer, "RefreshLayout", function(self)
-            local settings = GetTrackedBarSettings()
-            if settings.enabled and settings.orientation == "vertical" then
-                -- Blizzard just set isHorizontal=true, we need to fix it
-                -- But RefreshLayout already called Layout(), so we just ensure
-                -- the flag is correct for any subsequent Layout() calls
-                self.isHorizontal = false
-                self.layoutFramesGoingRight = settings.growUp ~= false  -- growUp becomes growRight
-                self.layoutFramesGoingUp = false
-            end
+            -- Wrap in pcall to prevent affecting Blizzard's Edit Mode flow
+            pcall(function()
+                local settings = GetTrackedBarSettings()
+                if settings.enabled and settings.orientation == "vertical" then
+                    -- Blizzard just set isHorizontal=true, we need to fix it
+                    -- But RefreshLayout already called Layout(), so we just ensure
+                    -- the flag is correct for any subsequent Layout() calls
+                    self.isHorizontal = false
+                    self.layoutFramesGoingRight = settings.growUp ~= false  -- growUp becomes growRight
+                    self.layoutFramesGoingUp = false
+                end
+            end)
         end)
     end
 
