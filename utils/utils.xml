@@ -19,6 +19,7 @@
     <Include file="resourcebars/resourcebars.xml"/>
     <Script file="sui_castbar.lua"/>
     <Script file="sui_unitframes.lua"/>
+    <Script file="unitframes_editmode.lua"/>
     <Script file="suicore_minimap.lua"/>
     <Script file="sui_dungeon_data.lua"/>
     <Script file="sui_datatexts.lua"/>

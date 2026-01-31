@@ -414,10 +414,10 @@ RB.L = {
     ["FONT_OUTLINE"] = "Font Outline",
 
     -- Edit Mode Names
-    ["HEALTH_BAR_EDIT_MODE_NAME"] = "SuaviUI Health Bar",
-    ["PRIMARY_POWER_BAR_EDIT_MODE_NAME"] = "SuaviUI Primary Power",
-    ["SECONDARY_POWER_BAR_EDIT_MODE_NAME"] = "SuaviUI Secondary Power",
-    ["TERTIARY_POWER_BAR_EDIT_MODE_NAME"] = "SuaviUI Tertiary Power",
+    ["HEALTH_BAR_EDIT_MODE_NAME"] = "Suavihealth",
+    ["PRIMARY_POWER_BAR_EDIT_MODE_NAME"] = "Suavipower",
+    ["SECONDARY_POWER_BAR_EDIT_MODE_NAME"] = "Suavipower II",
+    ["TERTIARY_POWER_BAR_EDIT_MODE_NAME"] = "Suavipower III",
 
     -- Import/Export
     ["POWER_COLOR_SETTINGS"] = "Power Color Settings",
