@@ -1,4 +1,4 @@
---- SuaviUI Core - Main Integration Module
+﻿--- SuaviUI Core - Main Integration Module
 --- Integrated from SUICore v1.18 with proper AceDB support
 --- All branding changed to SuaviUI
 
@@ -341,8 +341,8 @@ end
 ---=================================================================================
 
 -- NOTE: All cooldown viewers are now handled by dedicated modules:
--- EssentialCooldownViewer/UtilityCooldownViewer → sui_ncdm.lua
--- BuffIconCooldownViewer/BuffBarCooldownViewer → sui_buffbar.lua
+-- EssentialCooldownViewer/UtilityCooldownViewer â†’ sui_ncdm.lua
+-- BuffIconCooldownViewer/BuffBarCooldownViewer â†’ sui_buffbar.lua
 SUICore.viewers = {
     -- "EssentialCooldownViewer",  -- Handled by NCDM
     -- "UtilityCooldownViewer",    -- Handled by NCDM
@@ -362,9 +362,9 @@ local defaults = {
             uiScale = 0.64,  -- Default UI scale for 1440p+ monitors
             eyefinity = false,  -- Triple monitor support
             ultrawide = false,  -- Ultrawide monitor support
-            font = "Suavi",  -- Default font face
+            font = "Suavifont",  -- Default font face
             fontOutline = "OUTLINE",  -- Default font outline: "", "OUTLINE", "THICKOUTLINE"
-            texture = "Suavi v5",  -- Default bar texture
+            texture = "Suavitex v5",  -- Default bar texture
             darkMode = false,
             darkModeHealthColor = { 0, 0, 0, 1 },
             darkModeBgColor = { 0.592, 0.592, 0.592, 1 },
@@ -701,7 +701,7 @@ local defaults = {
                 hideIcon = false,
                 barHeight = 25,
                 barWidth = 215,
-                texture = "Suavi v5",
+                texture = "Suavitex v5",
                 useClassColor = true,
                 barColor = {0.204, 0.827, 0.6, 1},  -- mint accent fallback
                 borderSize = 2,
@@ -869,7 +869,7 @@ local defaults = {
             offsetX           = 0,
             width             = 326,       -- Matches Essential CDM width
             useRawPixels      = true,
-            texture           = "Suavi v5",
+            texture           = "Suavitex v5",
             colorMode         = "power",  -- "power" = power type color, "class" = class color
             usePowerColor     = true,     -- Use power type color (customizable in Power Colors section)
             useClassColor     = false,    -- Use class color
@@ -944,7 +944,7 @@ local defaults = {
             offsetX       = 0,
             width         = 326,      -- Matches Primary bar width
             useRawPixels  = true,
-            texture       = "Suavi v5",
+            texture       = "Suavitex v5",
             colorMode     = "power",  -- "power" = power type color, "class" = class color
             usePowerColor = true,     -- Use power type color (customizable in Power Colors section)
             useClassColor = false,    -- Use class color
@@ -977,7 +977,7 @@ local defaults = {
             offsetX           = 0,
             width             = 326,
             useRawPixels      = true,
-            texture           = "Suavi v5",
+            texture           = "Suavitex v5",
             colorMode         = "power",
             usePowerColor     = true,
             useClassColor     = false,
@@ -1100,7 +1100,7 @@ local defaults = {
             rechargeColor = { 0.4, 0.9, 1.0, 1 },         -- 66E6FF
             borderSize = 1,
             borderColor = { 0, 0, 0, 1 },
-            barTexture = "Suavi v4",
+            barTexture = "Suavitex v4",
             showSegments = true,
             segmentThickness = 1,
             showSpeed = true,
@@ -1420,7 +1420,7 @@ local defaults = {
                 anchorTo = "disabled",
                 anchorGap = 10,
                 anchorYOffset = 0,
-                texture = "Suavi v5",
+                texture = "Suavitex v5",
                 useClassColor = true,
                 customHealthColor = { 0.2, 0.6, 0.2, 1 },
                 -- Portrait
@@ -1473,7 +1473,7 @@ local defaults = {
                     enabled = false,
                     color = { 1, 1, 1, 1 },
                     opacity = 0.3,
-                    texture = "SUI Stripes",
+                    texture = "Suavistripes",
                 },
                 -- Castbar
                 castbar = {
@@ -1487,7 +1487,7 @@ local defaults = {
                     fontSize = 14,
                     color = {0.404, 1, 0.984, 1},  -- Cyan color from your profile
                     anchor = "none",
-                    texture = "Suavi v5",
+                    texture = "Suavitex v5",
                     bgColor = {0.149, 0.149, 0.149, 1},
                     borderSize = 1,
                     useClassColor = false,
@@ -1607,7 +1607,7 @@ local defaults = {
                 anchorTo = "disabled",
                 anchorGap = 10,
                 anchorYOffset = 0,
-                texture = "Suavi v5 Inverse",
+                texture = "Suavitex v5 Inverse",
                 useClassColor = true,
                 useHostilityColor = true,  -- Use red/yellow/green based on unit hostility
                 customHealthColor = { 0.2, 0.6, 0.2, 1 },
@@ -1668,7 +1668,7 @@ local defaults = {
                     enabled = true,
                     color = { 1, 1, 1, 1 },
                     opacity = 0.3,
-                    texture = "SUI Stripes",
+                    texture = "Suavistripes",
                 },
                 -- Castbar
                 castbar = {
@@ -1682,7 +1682,7 @@ local defaults = {
                     fontSize = 14,
                     color = {0.2, 0.6, 1, 1},
                     anchor = "unitframe",
-                    texture = "Suavi v5",
+                    texture = "Suavitex v5",
                     bgColor = {0.149, 0.149, 0.149, 1},
                     borderSize = 1,
                     highlightInterruptible = true,
@@ -1814,7 +1814,7 @@ local defaults = {
                     enabled = true,
                     color = { 1, 1, 1, 1 },
                     opacity = 0.7,
-                    texture = "SUI Stripes",
+                    texture = "Suavistripes",
                 },
                 -- Castbar
                 castbar = {
@@ -1910,7 +1910,7 @@ local defaults = {
                     enabled = true,
                     color = { 1, 1, 1 },
                     opacity = 0.7,
-                    texture = "SUI Stripes",
+                    texture = "Suavistripes",
                 },
                 -- Auras (buffs/debuffs)
                 auras = {
@@ -1960,7 +1960,7 @@ local defaults = {
                 height = 30,
                 offsetX = -496,
                 offsetY = -214,
-                texture = "Suavi v5",
+                texture = "Suavitex v5",
                 useClassColor = true,
                 useHostilityColor = true,  -- Use red/yellow/green based on unit hostility
                 customHealthColor = { 0.2, 0.6, 0.2, 1 },
@@ -2014,7 +2014,7 @@ local defaults = {
                     enabled = true,
                     color = { 1, 1, 1, 1 },
                     opacity = 0.7,
-                    texture = "SUI Stripes",
+                    texture = "Suavistripes",
                 },
                 -- Castbar
                 castbar = {
@@ -2074,7 +2074,7 @@ local defaults = {
                 offsetX = 974,
                 offsetY = 106,
                 spacing = 35,           -- Vertical spacing between boss frames
-                texture = "Suavi v5",
+                texture = "Suavitex v5",
                 useClassColor = true,
                 useHostilityColor = true,
                 customHealthColor = { 0.6, 0.2, 0.2, 1 },
@@ -2118,7 +2118,7 @@ local defaults = {
                     enabled = true,
                     color = { 1, 1, 1 },
                     opacity = 0.7,
-                    texture = "SUI Stripes",
+                    texture = "Suavistripes",
                 },
                 -- Castbar
                 castbar = {
@@ -3086,25 +3086,25 @@ function SUICore:OnInitialize()
     SUI.db = self.db  -- Make database accessible to other SUI modules
 
     -- Migrate visibility settings to SHOW logic
-    -- Old hideWhenX → new showX (semantic conversion)
-    -- hideOutOfCombat=true → showInCombat=true (user wants combat-only)
-    -- hideWhenNotInGroup=true → showInGroup=true (user wants group-only)
-    -- hideWhenNotInInstance=true → showInInstance=true (user wants instance-only)
+    -- Old hideWhenX â†’ new showX (semantic conversion)
+    -- hideOutOfCombat=true â†’ showInCombat=true (user wants combat-only)
+    -- hideWhenNotInGroup=true â†’ showInGroup=true (user wants group-only)
+    -- hideWhenNotInInstance=true â†’ showInInstance=true (user wants instance-only)
     -- hideWhenMounted has no equivalent (can't express "hide when mounted" in SHOW logic)
     local profile = self.db.profile
 
     -- Helper to migrate a visibility table from HIDE to SHOW logic
     local function migrateToShowLogic(visTable)
         if not visTable then return end
-        -- Convert hideOutOfCombat → showInCombat
+        -- Convert hideOutOfCombat â†’ showInCombat
         if visTable.hideOutOfCombat then
             visTable.showInCombat = true
         end
-        -- Convert hideWhenNotInGroup → showInGroup
+        -- Convert hideWhenNotInGroup â†’ showInGroup
         if visTable.hideWhenNotInGroup then
             visTable.showInGroup = true
         end
-        -- Convert hideWhenNotInInstance → showInInstance
+        -- Convert hideWhenNotInInstance â†’ showInInstance
         if visTable.hideWhenNotInInstance then
             visTable.showInInstance = true
         end
@@ -3122,7 +3122,7 @@ function SUICore:OnInitialize()
         if not profile.unitframesVisibility then
             profile.unitframesVisibility = {}
         end
-        -- Copy hideOutOfCombat → showInCombat for both
+        -- Copy hideOutOfCombat â†’ showInCombat for both
         if profile.classHud.hideOutOfCombat then
             profile.cdmVisibility.showInCombat = true
             profile.unitframesVisibility.showInCombat = true
@@ -3148,7 +3148,7 @@ function SUICore:OnInitialize()
     end
 
     -- Migrate power bar lock flags to new alignTo/widthSync string system
-    -- Old: lockedToEssential=true, lockedToUtility=false → New: widthSync="essential"
+    -- Old: lockedToEssential=true, lockedToUtility=false â†’ New: widthSync="essential"
     local function migratePowerBarLockFlags(barConfig)
         if not barConfig then return end
         -- Only migrate if old flags exist and new fields don't

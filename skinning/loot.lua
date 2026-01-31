@@ -455,7 +455,7 @@ local function CreateRollFrame(index)
     frame.timer:SetHeight(ROLL_TIMER_HEIGHT)
     frame.timer:SetPoint("BOTTOMLEFT", 4, 4)
     frame.timer:SetPoint("BOTTOMRIGHT", -4, 4)
-    frame.timer:SetStatusBarTexture(LSM:Fetch("statusbar", "Suavi") or "Interface\\TargetingFrame\\UI-StatusBar")
+    frame.timer:SetStatusBarTexture(LSM:Fetch("statusbar", "Suavitex") or "Interface\\TargetingFrame\\UI-StatusBar")
     frame.timer:SetStatusBarColor(borderColor[1], borderColor[2], borderColor[3], 1)  -- Accent color
     frame.timer:SetMinMaxValues(0, 1)
     frame.timer:SetValue(1)
@@ -823,7 +823,7 @@ local function SkinGroupLootHistoryFrame()
         if Timer.Border then Timer.Border:SetAlpha(0) end
 
         if Timer.Fill then
-            Timer.Fill:SetTexture(LSM:Fetch("statusbar", "Suavi") or "Interface\\TargetingFrame\\UI-StatusBar")
+            Timer.Fill:SetTexture(LSM:Fetch("statusbar", "Suavitex") or "Interface\\TargetingFrame\\UI-StatusBar")
             Timer.Fill:SetVertexColor(borderColor[1], borderColor[2], borderColor[3], 1)
         end
 

@@ -223,15 +223,16 @@ local function GetTexturePath(textureName)
     -- If no specific texture, use general default
     if not name or name == "" then
         local general = GetGeneralSettings()
-        name = general and general.texture or "Suavi"
+        name = general and general.texture or "Suavitex v5"
     end
-    return LSM:Fetch("statusbar", name) or "Interface\\Buttons\\WHITE8x8"
+    -- Fallback to Suavisolid if texture not found (handles old profile names)
+    return LSM:Fetch("statusbar", name) or LSM:Fetch("statusbar", "Suavisolid") or "Interface\\Buttons\\WHITE8x8"
 end
 
 local function GetAbsorbTexturePath(textureName)
     local name = textureName
     if not name or name == "" then
-        name = "SUI Stripes"
+        name = "Suavistripes"
     end
     return LSM:Fetch("statusbar", name) or "Interface\\AddOns\\SuaviUI\\assets\\absorb_stripe"
 end

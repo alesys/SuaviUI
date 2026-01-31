@@ -1,5 +1,7 @@
 -- SuaviUI Media Registration
--- This file handles the registration of fonts and textures with LibSharedMedia
+-- This file handles the registration of ALL fonts and textures with LibSharedMedia
+-- Consolidated from media.lua and resourcebars/Constants.lua
+-- All media follows the "Suavi" naming convention
 
 local LSM = LibStub("LibSharedMedia-3.0")
 
@@ -10,127 +12,182 @@ local STATUSBAR = MediaType.STATUSBAR
 local BACKGROUND = MediaType.BACKGROUND
 local BORDER = MediaType.BORDER
 
--- Register media synchronously (LSM:Register is lightweight - just table entries)
--- Register the suavi font (used as the main UI font)
-    local suaviFontPath = "Interface\\AddOns\\SuaviUI\\assets\\suavi.ttf"
-    LSM:Register(FONT, "suavi", suaviFontPath)
+------------------------------------------------------------
+-- FONTS
+------------------------------------------------------------
+-- Main UI font
+local suaviFontPath = "Interface\\AddOns\\SuaviUI\\assets\\suavi.ttf"
+LSM:Register(FONT, "Suavifont", suaviFontPath)
 
-    -- Register Poppins fonts
-    LSM:Register(FONT, "Poppins Black", "Interface\\AddOns\\SuaviUI\\assets\\Poppins-Black.ttf")
-    LSM:Register(FONT, "Poppins Bold", "Interface\\AddOns\\SuaviUI\\assets\\Poppins-Bold.ttf")
-    LSM:Register(FONT, "Poppins Medium", "Interface\\AddOns\\SuaviUI\\assets\\Poppins-Medium.ttf")
-    LSM:Register(FONT, "Poppins SemiBold", "Interface\\AddOns\\SuaviUI\\assets\\Poppins-SemiBold.ttf")
+-- Poppins family
+LSM:Register(FONT, "Suavifont Poppins Black", "Interface\\AddOns\\SuaviUI\\assets\\Poppins-Black.ttf")
+LSM:Register(FONT, "Suavifont Poppins Bold", "Interface\\AddOns\\SuaviUI\\assets\\Poppins-Bold.ttf")
+LSM:Register(FONT, "Suavifont Poppins Medium", "Interface\\AddOns\\SuaviUI\\assets\\Poppins-Medium.ttf")
+LSM:Register(FONT, "Suavifont Poppins SemiBold", "Interface\\AddOns\\SuaviUI\\assets\\Poppins-SemiBold.ttf")
 
-    -- Register Expressway font
-    LSM:Register(FONT, "Expressway", "Interface\\AddOns\\SuaviUI\\assets\\Expressway.TTF")
+-- Expressway
+LSM:Register(FONT, "Suavifont Expressway", "Interface\\AddOns\\SuaviUI\\assets\\Expressway.TTF")
 
-    -- Register the suavi Logo texture
-    local logoTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suaviLogo.tga"
-    LSM:Register(BACKGROUND, "suaviLogo", logoTexturePath)
+-- Standard WoW fonts (for compatibility)
+LSM:Register(FONT, "Friz Quadrata TT", [[Fonts\FRIZQT___CYR.TTF]])
+LSM:Register(FONT, "Morpheus", [[Fonts\MORPHEUS_CYR.TTF]])
+LSM:Register(FONT, "Arial Narrow", [[Fonts\ARIALN.TTF]])
+LSM:Register(FONT, "Skurri", [[Fonts\SKURRI_CYR.TTF]])
 
-    -- Register the suavi texture
-    local suaviTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi.tga"
-    LSM:Register(BACKGROUND, "suavi", suaviTexturePath)
-    LSM:Register(STATUSBAR, "suavi", suaviTexturePath)
-    LSM:Register(BORDER, "suavi", suaviTexturePath)
+------------------------------------------------------------
+-- STATUS BAR TEXTURES
+------------------------------------------------------------
+-- Main Suavi textures
+local suaviTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi.tga"
+LSM:Register(STATUSBAR, "Suavitex", suaviTexturePath)
+LSM:Register(BACKGROUND, "Suavitex", suaviTexturePath)
+LSM:Register(BORDER, "Suavitex", suaviTexturePath)
 
-    -- Register the suavi Reverse texture
-    local suaviReverseTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_reverse.tga"
-    LSM:Register(BACKGROUND, "suavi Reverse", suaviReverseTexturePath)
-    LSM:Register(STATUSBAR, "suavi Reverse", suaviReverseTexturePath)
-    LSM:Register(BORDER, "suavi Reverse", suaviReverseTexturePath)
+-- Suavi Reverse
+local suaviReverseTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_reverse.tga"
+LSM:Register(STATUSBAR, "Suavitex Reverse", suaviReverseTexturePath)
+LSM:Register(BACKGROUND, "Suavitex Reverse", suaviReverseTexturePath)
+LSM:Register(BORDER, "Suavitex Reverse", suaviReverseTexturePath)
 
-    -- Register Square texture
-    local squareTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\Square.tga"
-    LSM:Register(BACKGROUND, "Square", squareTexturePath)
-    LSM:Register(STATUSBAR, "Square", squareTexturePath)
-    LSM:Register(BORDER, "Square", squareTexturePath)
+-- Square
+local squareTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\Square.tga"
+LSM:Register(STATUSBAR, "Suavisquare", squareTexturePath)
+LSM:Register(BACKGROUND, "Suavisquare", squareTexturePath)
+LSM:Register(BORDER, "Suavisquare", squareTexturePath)
 
-    -- Register suavi v2 texture
-    local suaviV2TexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v2.tga"
-    LSM:Register(BACKGROUND, "suavi v2", suaviV2TexturePath)
-    LSM:Register(STATUSBAR, "suavi v2", suaviV2TexturePath)
-    LSM:Register(BORDER, "suavi v2", suaviV2TexturePath)
+-- Suavi v2
+local suaviV2TexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v2.tga"
+LSM:Register(STATUSBAR, "Suavitex v2", suaviV2TexturePath)
+LSM:Register(BACKGROUND, "Suavitex v2", suaviV2TexturePath)
+LSM:Register(BORDER, "Suavitex v2", suaviV2TexturePath)
 
-    -- Register suavi v2 Reverse texture
-    local suaviV2ReverseTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v2reverse.tga"
-    LSM:Register(BACKGROUND, "suavi v2 Reverse", suaviV2ReverseTexturePath)
-    LSM:Register(STATUSBAR, "suavi v2 Reverse", suaviV2ReverseTexturePath)
-    LSM:Register(BORDER, "suavi v2 Reverse", suaviV2ReverseTexturePath)
+local suaviV2ReverseTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v2reverse.tga"
+LSM:Register(STATUSBAR, "Suavitex v2 Reverse", suaviV2ReverseTexturePath)
+LSM:Register(BACKGROUND, "Suavitex v2 Reverse", suaviV2ReverseTexturePath)
+LSM:Register(BORDER, "Suavitex v2 Reverse", suaviV2ReverseTexturePath)
 
-    -- Register suavi v3 texture
-    local suaviV3TexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v3.tga"
-    LSM:Register(BACKGROUND, "suavi v3", suaviV3TexturePath)
-    LSM:Register(STATUSBAR, "suavi v3", suaviV3TexturePath)
-    LSM:Register(BORDER, "suavi v3", suaviV3TexturePath)
+-- Suavi v3
+local suaviV3TexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v3.tga"
+LSM:Register(STATUSBAR, "Suavitex v3", suaviV3TexturePath)
+LSM:Register(BACKGROUND, "Suavitex v3", suaviV3TexturePath)
+LSM:Register(BORDER, "Suavitex v3", suaviV3TexturePath)
 
-    -- Register suavi v3 Inverse texture
-    local suaviV3InverseTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v3inverse.tga"
-    LSM:Register(BACKGROUND, "suavi v3 Inverse", suaviV3InverseTexturePath)
-    LSM:Register(STATUSBAR, "suavi v3 Inverse", suaviV3InverseTexturePath)
-    LSM:Register(BORDER, "suavi v3 Inverse", suaviV3InverseTexturePath)
+local suaviV3InverseTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v3inverse.tga"
+LSM:Register(STATUSBAR, "Suavitex v3 Inverse", suaviV3InverseTexturePath)
+LSM:Register(BACKGROUND, "Suavitex v3 Inverse", suaviV3InverseTexturePath)
+LSM:Register(BORDER, "Suavitex v3 Inverse", suaviV3InverseTexturePath)
 
-    -- Register suavi v4 texture
-    local suaviV4TexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v4.tga"
-    LSM:Register(BACKGROUND, "suavi v4", suaviV4TexturePath)
-    LSM:Register(STATUSBAR, "suavi v4", suaviV4TexturePath)
-    LSM:Register(BORDER, "suavi v4", suaviV4TexturePath)
+-- Suavi v4
+local suaviV4TexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v4.tga"
+LSM:Register(STATUSBAR, "Suavitex v4", suaviV4TexturePath)
+LSM:Register(BACKGROUND, "Suavitex v4", suaviV4TexturePath)
+LSM:Register(BORDER, "Suavitex v4", suaviV4TexturePath)
 
-    -- Register suavi v4 Inverse texture
-    local suaviV4InverseTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v4inverse.tga"
-    LSM:Register(BACKGROUND, "suavi v4 Inverse", suaviV4InverseTexturePath)
-    LSM:Register(STATUSBAR, "suavi v4 Inverse", suaviV4InverseTexturePath)
-    LSM:Register(BORDER, "suavi v4 Inverse", suaviV4InverseTexturePath)
+local suaviV4InverseTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v4inverse.tga"
+LSM:Register(STATUSBAR, "Suavitex v4 Inverse", suaviV4InverseTexturePath)
+LSM:Register(BACKGROUND, "Suavitex v4 Inverse", suaviV4InverseTexturePath)
+LSM:Register(BORDER, "Suavitex v4 Inverse", suaviV4InverseTexturePath)
 
-    -- Register suavi v5 texture
-    local suaviV5TexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v5.tga"
-    LSM:Register(BACKGROUND, "suavi v5", suaviV5TexturePath)
-    LSM:Register(STATUSBAR, "suavi v5", suaviV5TexturePath)
-    LSM:Register(BORDER, "suavi v5", suaviV5TexturePath)
+-- Suavi v5
+local suaviV5TexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v5.tga"
+LSM:Register(STATUSBAR, "Suavitex v5", suaviV5TexturePath)
+LSM:Register(BACKGROUND, "Suavitex v5", suaviV5TexturePath)
+LSM:Register(BORDER, "Suavitex v5", suaviV5TexturePath)
 
-    -- Register suavi v5 Inverse texture
-    local suaviV5InverseTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v5_inverse.tga"
-    LSM:Register(BACKGROUND, "suavi v5 Inverse", suaviV5InverseTexturePath)
-    LSM:Register(STATUSBAR, "suavi v5 Inverse", suaviV5InverseTexturePath)
-    LSM:Register(BORDER, "suavi v5 Inverse", suaviV5InverseTexturePath)
+local suaviV5InverseTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v5_inverse.tga"
+LSM:Register(STATUSBAR, "Suavitex v5 Inverse", suaviV5InverseTexturePath)
+LSM:Register(BACKGROUND, "Suavitex v5 Inverse", suaviV5InverseTexturePath)
+LSM:Register(BORDER, "Suavitex v5 Inverse", suaviV5InverseTexturePath)
 
-    -- Register suavi v6 texture
-    local suaviV6TexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v6.tga"
-    LSM:Register(BACKGROUND, "suavi v6", suaviV6TexturePath)
-    LSM:Register(STATUSBAR, "suavi v6", suaviV6TexturePath)
-    LSM:Register(BORDER, "suavi v6", suaviV6TexturePath)
+-- Suavi v6
+local suaviV6TexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v6.tga"
+LSM:Register(STATUSBAR, "Suavitex v6", suaviV6TexturePath)
+LSM:Register(BACKGROUND, "Suavitex v6", suaviV6TexturePath)
+LSM:Register(BORDER, "Suavitex v6", suaviV6TexturePath)
 
-    -- Register suavi v6 Inverse texture
-    local suaviV6InverseTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v6inverse.tga"
-    LSM:Register(BACKGROUND, "suavi v6 Inverse", suaviV6InverseTexturePath)
-    LSM:Register(STATUSBAR, "suavi v6 Inverse", suaviV6InverseTexturePath)
-    LSM:Register(BORDER, "suavi v6 Inverse", suaviV6InverseTexturePath)
+local suaviV6InverseTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suavi_v6inverse.tga"
+LSM:Register(STATUSBAR, "Suavitex v6 Inverse", suaviV6InverseTexturePath)
+LSM:Register(BACKGROUND, "Suavitex v6 Inverse", suaviV6InverseTexturePath)
+LSM:Register(BORDER, "Suavitex v6 Inverse", suaviV6InverseTexturePath)
 
-    -- Register SUI Stripes texture (for absorb shield overlays)
-    local absorbStripeTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\absorb_stripe"
-    LSM:Register(STATUSBAR, "SUI Stripes", absorbStripeTexturePath)
+-- Fade textures (from resourcebars)
+LSM:Register(STATUSBAR, "Suavifade Left", [[Interface\AddOns\SuaviUI\assets\textures\fade-left.png]])
+LSM:Register(STATUSBAR, "Suavifade Bottom", [[Interface\AddOns\SuaviUI\assets\textures\fade-bottom.png]])
+LSM:Register(STATUSBAR, "Suavifade Top", [[Interface\AddOns\SuaviUI\assets\textures\fade-top.png]])
 
--- Function to check if our media is registered
-function SuaviUI:CheckMediaRegistration()
-    local suaviFontRegistered = LSM:IsValid(FONT, "suavi")
-    local logoTextureRegistered = LSM:IsValid(BACKGROUND, "suaviLogo")
-    local suaviTextureRegistered = LSM:IsValid(BACKGROUND, "suavi")
-    local suaviReverseTextureRegistered = LSM:IsValid(BACKGROUND, "suavi Reverse")
-    
-    -- Silent check - only print if there's a failure
-    if not (suaviFontRegistered and logoTextureRegistered and suaviTextureRegistered and suaviReverseTextureRegistered) then
-        SuaviUI:Print("Media registration failed:")
-        if not suaviFontRegistered then SuaviUI:Print("- suavi font not registered") end
-        if not logoTextureRegistered then SuaviUI:Print("- suaviLogo texture not registered") end
-        if not suaviTextureRegistered then SuaviUI:Print("- suavi texture not registered") end
-        if not suaviReverseTextureRegistered then SuaviUI:Print("- suavi Reverse texture not registered") end
+-- Solid texture
+LSM:Register(STATUSBAR, "Suavisolid", [[Interface\AddOns\SuaviUI\assets\textures\solid.png]])
+
+-- Transparent (None)
+LSM:Register(STATUSBAR, "None", [[Interface\AddOns\SuaviUI\assets\textures\transparent.png]])
+
+-- Stripes (for absorb shield overlays)
+local absorbStripeTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\absorb_stripe"
+LSM:Register(STATUSBAR, "Suavistripes", absorbStripeTexturePath)
+
+-- Linea (PNG test texture)
+local suaviLineaTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\Suavilinea.png"
+LSM:Register(STATUSBAR, "Suavilinea", suaviLineaTexturePath)
+LSM:Register(BACKGROUND, "Suavilinea", suaviLineaTexturePath)
+LSM:Register(BORDER, "Suavilinea", suaviLineaTexturePath)
+
+-- Lineas (PNG test texture - striped variant)
+local suaviLineasTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\Suavilineas.png"
+LSM:Register(STATUSBAR, "Suavilineas", suaviLineasTexturePath)
+LSM:Register(BACKGROUND, "Suavilineas", suaviLineasTexturePath)
+LSM:Register(BORDER, "Suavilineas", suaviLineasTexturePath)
+
+------------------------------------------------------------
+-- BACKGROUND TEXTURES
+------------------------------------------------------------
+-- Bevelled backgrounds
+LSM:Register(BACKGROUND, "Suavibevel", [[Interface\AddOns\SuaviUI\assets\textures\bevelled.png]])
+LSM:Register(BACKGROUND, "Suavibevel Grey", [[Interface\AddOns\SuaviUI\assets\textures\bevelled-grey.png]])
+
+-- Logo
+local logoTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\suaviLogo.tga"
+LSM:Register(BACKGROUND, "Suavilogo", logoTexturePath)
+
+------------------------------------------------------------
+-- BORDER TEXTURES
+------------------------------------------------------------
+LSM:Register(BORDER, "Suaviborder Classic", [[Interface\AddOns\SuaviUI\assets\textures\blizzard-classic.png]])
+LSM:Register(BORDER, "Suaviborder Classic Thin", [[Interface\AddOns\SuaviUI\assets\textures\blizzard-classic-thin.png]])
+
+------------------------------------------------------------
+-- MEDIA FETCH HELPER (with fallback for old profiles)
+------------------------------------------------------------
+-- Default fallback texture path
+local solidTexturePath = [[Interface\AddOns\SuaviUI\assets\textures\solid.png]]
+
+-- Safe fetch function that falls back to Suavisolid if texture not found
+function SuaviUI:FetchTexture(mediaType, name)
+    if not name or name == "" then
+        return LSM:Fetch(mediaType, "Suavisolid") or solidTexturePath
     end
+    local path = LSM:Fetch(mediaType, name)
+    if not path then
+        -- Texture not found, fall back to solid
+        return LSM:Fetch(mediaType, "Suavisolid") or solidTexturePath
+    end
+    return path
 end
 
--- Register any additional fonts or textures here
--- Example:
--- LSM:Register(FONT, "MyCustomFont", "Interface\\AddOns\\SuaviUI\\assets\\mycustomfont.ttf")
--- LSM:Register(STATUSBAR, "MyCustomTexture", "Interface\\AddOns\\SuaviUI\\assets\\mycustomtexture.tga") 
+------------------------------------------------------------
+-- MEDIA VALIDATION
+------------------------------------------------------------
+function SuaviUI:CheckMediaRegistration()
+    local suaviFontRegistered = LSM:IsValid(FONT, "Suavifont")
+    local logoTextureRegistered = LSM:IsValid(BACKGROUND, "Suavilogo")
+    local suaviTextureRegistered = LSM:IsValid(STATUSBAR, "Suavitex")
+    
+    if not (suaviFontRegistered and logoTextureRegistered and suaviTextureRegistered) then
+        SuaviUI:Print("Media registration failed:")
+        if not suaviFontRegistered then SuaviUI:Print("- Suavifont not registered") end
+        if not logoTextureRegistered then SuaviUI:Print("- Suavilogo not registered") end
+        if not suaviTextureRegistered then SuaviUI:Print("- Suavitex not registered") end
+    end
+end 
 
 
 

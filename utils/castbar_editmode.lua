@@ -1,0 +1,1249 @@
+--[[
+    SuaviUI Castbar Edit Mode Integration
+    Registers castbars with Blizzard's Edit Mode using LibEQOLEditMode-1.0
+    Provides sidebar settings panel for castbar customization
+]]
+
+local ADDON_NAME, ns = ...
+
+---------------------------------------------------------------------------
+-- LIBRARY REFERENCES
+---------------------------------------------------------------------------
+local LEM = ns.LEM  -- LibEQOLEditMode (loaded in init.lua)
+local LSM = LibStub("LibSharedMedia-3.0", true)
+
+-- Wait for LEM to be available
+if not LEM then
+    C_Timer.After(1, function()
+        LEM = ns.LEM
+    end)
+end
+
+---------------------------------------------------------------------------
+-- MODULE TABLE
+---------------------------------------------------------------------------
+local CB_EditMode = {}
+ns.CB_EditMode = CB_EditMode
+
+CB_EditMode.registeredFrames = {}
+
+---------------------------------------------------------------------------
+-- DATABASE HELPERS
+---------------------------------------------------------------------------
+local function GetDB()
+    local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
+    if SUICore and SUICore.db and SUICore.db.profile then
+        return SUICore.db.profile
+    end
+    return nil
+end
+
+local function GetUFDB()
+    local db = GetDB()
+    return db and db.suiUnitFrames or nil
+end
+
+local function GetCastSettings(unitKey)
+    local ufdb = GetUFDB()
+    if not ufdb or not ufdb[unitKey] then return nil end
+    return ufdb[unitKey].castbar
+end
+
+-- Refresh castbar after settings change
+local function RefreshCastbar(unitKey)
+    local SUI_Castbar = ns.SUI_Castbar
+    local SUI_UF = ns.SUI_UnitFrames
+    
+    if SUI_UF and SUI_UF.RefreshFrame then
+        SUI_UF:RefreshFrame(unitKey)
+    elseif _G.SuaviUI_RefreshCastbar then
+        _G.SuaviUI_RefreshCastbar(unitKey)
+    end
+end
+
+---------------------------------------------------------------------------
+-- TEXTURE LIST FOR DROPDOWNS
+---------------------------------------------------------------------------
+local function GetTextureList()
+    local textures = {}
+    if LSM then
+        for name in pairs(LSM:HashTable("statusbar")) do
+            table.insert(textures, {value = name, text = name})
+        end
+        table.sort(textures, function(a, b) return a.text < b.text end)
+    end
+    if #textures == 0 then
+        table.insert(textures, {value = "Solid", text = "Solid"})
+    end
+    return textures
+end
+
+---------------------------------------------------------------------------
+-- ANCHOR OPTIONS
+---------------------------------------------------------------------------
+local ANCHOR_OPTIONS = {
+    {value = "none", text = "None (Free Position)"},
+    {value = "unitframe", text = "Unit Frame"},
+}
+
+local PLAYER_ANCHOR_OPTIONS = {
+    {value = "none", text = "None (Free Position)"},
+    {value = "unitframe", text = "Unit Frame"},
+    {value = "essential", text = "Essential Cooldowns"},
+    {value = "utility", text = "Utility Cooldowns"},
+}
+
+local NINE_POINT_ANCHOR_OPTIONS = {
+    {value = "TOPLEFT", text = "Top Left"},
+    {value = "TOP", text = "Top"},
+    {value = "TOPRIGHT", text = "Top Right"},
+    {value = "LEFT", text = "Left"},
+    {value = "CENTER", text = "Center"},
+    {value = "RIGHT", text = "Right"},
+    {value = "BOTTOMLEFT", text = "Bottom Left"},
+    {value = "BOTTOM", text = "Bottom"},
+    {value = "BOTTOMRIGHT", text = "Bottom Right"},
+}
+
+---------------------------------------------------------------------------
+-- FRAME LABEL MAPPINGS
+---------------------------------------------------------------------------
+local FRAME_LABELS = {
+    player = "Suavicast: You",
+    target = "Suavicast: Target",
+    targettarget = "Suavicast: ToT",
+    pet = "Suavicast: Pet",
+    focus = "Suavicast: Focus",
+    boss = "Suavicast: Boss",
+}
+
+---------------------------------------------------------------------------
+-- POSITION CHANGE CALLBACK
+---------------------------------------------------------------------------
+local function OnPositionChanged(frame, point, x, y, layoutName)
+    if not frame or not frame._suiCastbarUnit then return end
+    
+    local unitKey = frame._suiCastbarUnit
+    local castSettings = GetCastSettings(unitKey)
+    if not castSettings then return end
+    
+    -- Only update position if anchor is "none" (free positioning)
+    if castSettings.anchor == "none" then
+        castSettings.offsetX = math.floor(x + 0.5)
+        castSettings.offsetY = math.floor(y + 0.5)
+        RefreshCastbar(unitKey)
+    end
+end
+
+---------------------------------------------------------------------------
+-- SETTINGS DEFINITIONS
+---------------------------------------------------------------------------
+
+-- Build settings for a castbar
+local function BuildCastbarSettings(unitKey)
+    local settings = {}
+    local order = 100
+    
+    local isPlayer = (unitKey == "player")
+    
+    -- =====================================================================
+    -- GENERAL CATEGORY
+    -- =====================================================================
+    table.insert(settings, {
+        order = order,
+        name = "General",
+        kind = LEM.SettingType.Collapsible,
+        id = "CATEGORY_GENERAL_" .. unitKey,
+        defaultCollapsed = false,
+    })
+    order = order + 1
+    
+    -- Enable Castbar
+    table.insert(settings, {
+        parentId = "CATEGORY_GENERAL_" .. unitKey,
+        order = order,
+        name = "Enable Castbar",
+        kind = LEM.SettingType.Checkbox,
+        default = true,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.enabled ~= false
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.enabled = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Show Spell Icon
+    table.insert(settings, {
+        parentId = "CATEGORY_GENERAL_" .. unitKey,
+        order = order,
+        name = "Show Spell Icon",
+        kind = LEM.SettingType.Checkbox,
+        default = true,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.showIcon ~= false
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.showIcon = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Use Class Color (player only)
+    if isPlayer then
+        table.insert(settings, {
+            parentId = "CATEGORY_GENERAL_" .. unitKey,
+            order = order,
+            name = "Use Class Color",
+            kind = LEM.SettingType.Checkbox,
+            default = false,
+            get = function(layoutName)
+                local s = GetCastSettings(unitKey)
+                return s and s.useClassColor == true
+            end,
+            set = function(layoutName, value)
+                local s = GetCastSettings(unitKey)
+                if s then
+                    s.useClassColor = value
+                    RefreshCastbar(unitKey)
+                end
+            end,
+        })
+        order = order + 1
+    end
+    
+    -- Castbar Color
+    table.insert(settings, {
+        parentId = "CATEGORY_GENERAL_" .. unitKey,
+        order = order,
+        name = "Castbar Color",
+        kind = LEM.SettingType.Color,
+        default = {1, 0.7, 0, 1},
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            if s and s.color then
+                return s.color[1] or 1, s.color[2] or 0.7, s.color[3] or 0, s.color[4] or 1
+            end
+            return 1, 0.7, 0, 1
+        end,
+        set = function(layoutName, r, g, b, a)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.color = {r, g, b, a or 1}
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Background Color
+    table.insert(settings, {
+        parentId = "CATEGORY_GENERAL_" .. unitKey,
+        order = order,
+        name = "Background Color",
+        kind = LEM.SettingType.Color,
+        default = {0.149, 0.149, 0.149, 1},
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            if s and s.bgColor then
+                return s.bgColor[1] or 0.149, s.bgColor[2] or 0.149, s.bgColor[3] or 0.149, s.bgColor[4] or 1
+            end
+            return 0.149, 0.149, 0.149, 1
+        end,
+        set = function(layoutName, r, g, b, a)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.bgColor = {r, g, b, a or 1}
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Bar Texture
+    table.insert(settings, {
+        parentId = "CATEGORY_GENERAL_" .. unitKey,
+        order = order,
+        name = "Bar Texture",
+        kind = LEM.SettingType.Dropdown,
+        options = GetTextureList(),
+        default = "Solid",
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.texture or "Solid"
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.texture = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Border Size
+    table.insert(settings, {
+        parentId = "CATEGORY_GENERAL_" .. unitKey,
+        order = order,
+        name = "Border Size",
+        kind = LEM.SettingType.Slider,
+        default = 1,
+        minValue = 0,
+        maxValue = 5,
+        valueStep = 1,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.borderSize or 1
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.borderSize = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- =====================================================================
+    -- POSITIONING & SIZE CATEGORY
+    -- =====================================================================
+    table.insert(settings, {
+        order = order,
+        name = "Position & Size",
+        kind = LEM.SettingType.Collapsible,
+        id = "CATEGORY_POSITION_" .. unitKey,
+        defaultCollapsed = false,
+    })
+    order = order + 1
+    
+    -- Anchor dropdown
+    table.insert(settings, {
+        parentId = "CATEGORY_POSITION_" .. unitKey,
+        order = order,
+        name = "Lock To",
+        kind = LEM.SettingType.Dropdown,
+        options = isPlayer and PLAYER_ANCHOR_OPTIONS or ANCHOR_OPTIONS,
+        default = "none",
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.anchor or "none"
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                local wasNone = (s.anchor == "none")
+                local isNone = (value == "none")
+                
+                -- Swap offsets between free and locked modes
+                if wasNone and not isNone then
+                    s.freeOffsetX = s.offsetX or 0
+                    s.freeOffsetY = s.offsetY or 0
+                    s.offsetX = s.lockedOffsetX or 0
+                    s.offsetY = s.lockedOffsetY or -25
+                elseif not wasNone and isNone then
+                    s.lockedOffsetX = s.offsetX or 0
+                    s.lockedOffsetY = s.offsetY or 0
+                    s.offsetX = s.freeOffsetX or 0
+                    s.offsetY = s.freeOffsetY or 0
+                end
+                
+                s.anchor = value
+                
+                -- Clear width for auto-resize anchors
+                if value == "essential" or value == "utility" then
+                    s.width = 0
+                end
+                
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Width
+    table.insert(settings, {
+        parentId = "CATEGORY_POSITION_" .. unitKey,
+        order = order,
+        name = "Width",
+        kind = LEM.SettingType.Slider,
+        default = 250,
+        minValue = 50,
+        maxValue = 2000,
+        valueStep = 1,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.width or 250
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.width = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Width Adjustment (for locked modes)
+    table.insert(settings, {
+        parentId = "CATEGORY_POSITION_" .. unitKey,
+        order = order,
+        name = "Width Adjustment",
+        kind = LEM.SettingType.Slider,
+        default = 0,
+        minValue = -500,
+        maxValue = 500,
+        valueStep = 1,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.widthAdjustment or 0
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.widthAdjustment = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Bar Height
+    table.insert(settings, {
+        parentId = "CATEGORY_POSITION_" .. unitKey,
+        order = order,
+        name = "Bar Height",
+        kind = LEM.SettingType.Slider,
+        default = 25,
+        minValue = 4,
+        maxValue = 40,
+        valueStep = 1,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.height or 25
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.height = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- X Offset
+    table.insert(settings, {
+        parentId = "CATEGORY_POSITION_" .. unitKey,
+        order = order,
+        name = "X Offset",
+        kind = LEM.SettingType.Slider,
+        default = 0,
+        minValue = -3000,
+        maxValue = 3000,
+        valueStep = 1,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.offsetX or 0
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.offsetX = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Y Offset
+    table.insert(settings, {
+        parentId = "CATEGORY_POSITION_" .. unitKey,
+        order = order,
+        name = "Y Offset",
+        kind = LEM.SettingType.Slider,
+        default = 0,
+        minValue = -3000,
+        maxValue = 3000,
+        valueStep = 1,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.offsetY or 0
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.offsetY = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Channel Fill Forward
+    table.insert(settings, {
+        parentId = "CATEGORY_POSITION_" .. unitKey,
+        order = order,
+        name = "Channel Fill Forward",
+        kind = LEM.SettingType.Checkbox,
+        default = false,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.channelFillForward == true
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.channelFillForward = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- =====================================================================
+    -- ICON SETTINGS CATEGORY
+    -- =====================================================================
+    table.insert(settings, {
+        order = order,
+        name = "Icon",
+        kind = LEM.SettingType.Collapsible,
+        id = "CATEGORY_ICON_" .. unitKey,
+        defaultCollapsed = true,
+    })
+    order = order + 1
+    
+    -- Icon Size
+    table.insert(settings, {
+        parentId = "CATEGORY_ICON_" .. unitKey,
+        order = order,
+        name = "Icon Size",
+        kind = LEM.SettingType.Slider,
+        default = 25,
+        minValue = 8,
+        maxValue = 80,
+        valueStep = 1,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.iconSize or 25
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.iconSize = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Icon Scale
+    table.insert(settings, {
+        parentId = "CATEGORY_ICON_" .. unitKey,
+        order = order,
+        name = "Icon Scale",
+        kind = LEM.SettingType.Slider,
+        default = 1.0,
+        minValue = 0.5,
+        maxValue = 2.0,
+        valueStep = 0.1,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.iconScale or 1.0
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.iconScale = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Icon Anchor
+    table.insert(settings, {
+        parentId = "CATEGORY_ICON_" .. unitKey,
+        order = order,
+        name = "Icon Anchor",
+        kind = LEM.SettingType.Dropdown,
+        options = NINE_POINT_ANCHOR_OPTIONS,
+        default = "LEFT",
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.iconAnchor or "LEFT"
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.iconAnchor = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Icon Spacing
+    table.insert(settings, {
+        parentId = "CATEGORY_ICON_" .. unitKey,
+        order = order,
+        name = "Icon Spacing",
+        kind = LEM.SettingType.Slider,
+        default = 0,
+        minValue = -50,
+        maxValue = 50,
+        valueStep = 1,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.iconSpacing or 0
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.iconSpacing = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Icon Border Size
+    table.insert(settings, {
+        parentId = "CATEGORY_ICON_" .. unitKey,
+        order = order,
+        name = "Icon Border Size",
+        kind = LEM.SettingType.Slider,
+        default = 2,
+        minValue = 0,
+        maxValue = 5,
+        valueStep = 0.1,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.iconBorderSize or 2
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.iconBorderSize = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- =====================================================================
+    -- TEXT SETTINGS CATEGORY
+    -- =====================================================================
+    table.insert(settings, {
+        order = order,
+        name = "Text",
+        kind = LEM.SettingType.Collapsible,
+        id = "CATEGORY_TEXT_" .. unitKey,
+        defaultCollapsed = true,
+    })
+    order = order + 1
+    
+    -- Font Size
+    table.insert(settings, {
+        parentId = "CATEGORY_TEXT_" .. unitKey,
+        order = order,
+        name = "Font Size",
+        kind = LEM.SettingType.Slider,
+        default = 12,
+        minValue = 8,
+        maxValue = 24,
+        valueStep = 1,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.fontSize or 12
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.fontSize = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Max Length
+    table.insert(settings, {
+        parentId = "CATEGORY_TEXT_" .. unitKey,
+        order = order,
+        name = "Max Text Length (0=none)",
+        kind = LEM.SettingType.Slider,
+        default = 0,
+        minValue = 0,
+        maxValue = 30,
+        valueStep = 1,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.maxLength or 0
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.maxLength = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Show Spell Text
+    table.insert(settings, {
+        parentId = "CATEGORY_TEXT_" .. unitKey,
+        order = order,
+        name = "Show Spell Text",
+        kind = LEM.SettingType.Checkbox,
+        default = true,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.showSpellText ~= false
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.showSpellText = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Spell Text Anchor
+    table.insert(settings, {
+        parentId = "CATEGORY_TEXT_" .. unitKey,
+        order = order,
+        name = "Spell Text Anchor",
+        kind = LEM.SettingType.Dropdown,
+        options = NINE_POINT_ANCHOR_OPTIONS,
+        default = "LEFT",
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.spellTextAnchor or "LEFT"
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.spellTextAnchor = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Spell Text X Offset
+    table.insert(settings, {
+        parentId = "CATEGORY_TEXT_" .. unitKey,
+        order = order,
+        name = "Spell Text X Offset",
+        kind = LEM.SettingType.Slider,
+        default = 4,
+        minValue = -200,
+        maxValue = 200,
+        valueStep = 1,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.spellTextOffsetX or 4
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.spellTextOffsetX = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Spell Text Y Offset
+    table.insert(settings, {
+        parentId = "CATEGORY_TEXT_" .. unitKey,
+        order = order,
+        name = "Spell Text Y Offset",
+        kind = LEM.SettingType.Slider,
+        default = 0,
+        minValue = -200,
+        maxValue = 200,
+        valueStep = 1,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.spellTextOffsetY or 0
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.spellTextOffsetY = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Show Time Text
+    table.insert(settings, {
+        parentId = "CATEGORY_TEXT_" .. unitKey,
+        order = order,
+        name = "Show Time Text",
+        kind = LEM.SettingType.Checkbox,
+        default = true,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.showTimeText ~= false
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.showTimeText = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Time Text Anchor
+    table.insert(settings, {
+        parentId = "CATEGORY_TEXT_" .. unitKey,
+        order = order,
+        name = "Time Text Anchor",
+        kind = LEM.SettingType.Dropdown,
+        options = NINE_POINT_ANCHOR_OPTIONS,
+        default = "RIGHT",
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.timeTextAnchor or "RIGHT"
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.timeTextAnchor = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Time Text X Offset
+    table.insert(settings, {
+        parentId = "CATEGORY_TEXT_" .. unitKey,
+        order = order,
+        name = "Time Text X Offset",
+        kind = LEM.SettingType.Slider,
+        default = -4,
+        minValue = -200,
+        maxValue = 200,
+        valueStep = 1,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.timeTextOffsetX or -4
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.timeTextOffsetX = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Time Text Y Offset
+    table.insert(settings, {
+        parentId = "CATEGORY_TEXT_" .. unitKey,
+        order = order,
+        name = "Time Text Y Offset",
+        kind = LEM.SettingType.Slider,
+        default = 0,
+        minValue = -200,
+        maxValue = 200,
+        valueStep = 1,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.timeTextOffsetY or 0
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.timeTextOffsetY = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- =====================================================================
+    -- EMPOWERED SETTINGS (PLAYER ONLY)
+    -- =====================================================================
+    if isPlayer then
+        table.insert(settings, {
+            order = order,
+            name = "Empowered Casts",
+            kind = LEM.SettingType.Collapsible,
+            id = "CATEGORY_EMPOWERED_" .. unitKey,
+            defaultCollapsed = true,
+        })
+        order = order + 1
+        
+        -- Hide Time Text on Empowered
+        table.insert(settings, {
+            parentId = "CATEGORY_EMPOWERED_" .. unitKey,
+            order = order,
+            name = "Hide Time on Empowered",
+            kind = LEM.SettingType.Checkbox,
+            default = false,
+            get = function(layoutName)
+                local s = GetCastSettings(unitKey)
+                return s and s.hideTimeTextOnEmpowered == true
+            end,
+            set = function(layoutName, value)
+                local s = GetCastSettings(unitKey)
+                if s then
+                    s.hideTimeTextOnEmpowered = value
+                    RefreshCastbar(unitKey)
+                end
+            end,
+        })
+        order = order + 1
+        
+        -- Show Empowered Level
+        table.insert(settings, {
+            parentId = "CATEGORY_EMPOWERED_" .. unitKey,
+            order = order,
+            name = "Show Empowered Level",
+            kind = LEM.SettingType.Checkbox,
+            default = false,
+            get = function(layoutName)
+                local s = GetCastSettings(unitKey)
+                return s and s.showEmpoweredLevel == true
+            end,
+            set = function(layoutName, value)
+                local s = GetCastSettings(unitKey)
+                if s then
+                    s.showEmpoweredLevel = value
+                    RefreshCastbar(unitKey)
+                end
+            end,
+        })
+        order = order + 1
+        
+        -- Empowered Level Text Anchor
+        table.insert(settings, {
+            parentId = "CATEGORY_EMPOWERED_" .. unitKey,
+            order = order,
+            name = "Level Text Anchor",
+            kind = LEM.SettingType.Dropdown,
+            options = NINE_POINT_ANCHOR_OPTIONS,
+            default = "CENTER",
+            get = function(layoutName)
+                local s = GetCastSettings(unitKey)
+                return s and s.empoweredLevelTextAnchor or "CENTER"
+            end,
+            set = function(layoutName, value)
+                local s = GetCastSettings(unitKey)
+                if s then
+                    s.empoweredLevelTextAnchor = value
+                    RefreshCastbar(unitKey)
+                end
+            end,
+        })
+        order = order + 1
+        
+        -- Empowered Level X Offset
+        table.insert(settings, {
+            parentId = "CATEGORY_EMPOWERED_" .. unitKey,
+            order = order,
+            name = "Level Text X Offset",
+            kind = LEM.SettingType.Slider,
+            default = 0,
+            minValue = -200,
+            maxValue = 200,
+            valueStep = 1,
+            get = function(layoutName)
+                local s = GetCastSettings(unitKey)
+                return s and s.empoweredLevelTextOffsetX or 0
+            end,
+            set = function(layoutName, value)
+                local s = GetCastSettings(unitKey)
+                if s then
+                    s.empoweredLevelTextOffsetX = value
+                    RefreshCastbar(unitKey)
+                end
+            end,
+        })
+        order = order + 1
+        
+        -- Empowered Level Y Offset
+        table.insert(settings, {
+            parentId = "CATEGORY_EMPOWERED_" .. unitKey,
+            order = order,
+            name = "Level Text Y Offset",
+            kind = LEM.SettingType.Slider,
+            default = 0,
+            minValue = -200,
+            maxValue = 200,
+            valueStep = 1,
+            get = function(layoutName)
+                local s = GetCastSettings(unitKey)
+                return s and s.empoweredLevelTextOffsetY or 0
+            end,
+            set = function(layoutName, value)
+                local s = GetCastSettings(unitKey)
+                if s then
+                    s.empoweredLevelTextOffsetY = value
+                    RefreshCastbar(unitKey)
+                end
+            end,
+        })
+        order = order + 1
+        
+        -- Stage Colors (5 colors)
+        for i = 1, 5 do
+            local defaultColors = {
+                {0.15, 0.38, 0.58, 1},
+                {0.55, 0.20, 0.24, 1},
+                {0.58, 0.45, 0.18, 1},
+                {0.27, 0.50, 0.21, 1},
+                {0.45, 0.20, 0.50, 1},
+            }
+            table.insert(settings, {
+                parentId = "CATEGORY_EMPOWERED_" .. unitKey,
+                order = order,
+                name = "Stage " .. i .. " Color",
+                kind = LEM.SettingType.Color,
+                default = defaultColors[i],
+                get = function(layoutName)
+                    local s = GetCastSettings(unitKey)
+                    if s and s.empoweredStageColors and s.empoweredStageColors[i] then
+                        local c = s.empoweredStageColors[i]
+                        return c[1] or defaultColors[i][1], c[2] or defaultColors[i][2], c[3] or defaultColors[i][3], c[4] or 1
+                    end
+                    return defaultColors[i][1], defaultColors[i][2], defaultColors[i][3], defaultColors[i][4]
+                end,
+                set = function(layoutName, r, g, b, a)
+                    local s = GetCastSettings(unitKey)
+                    if s then
+                        if not s.empoweredStageColors then s.empoweredStageColors = {} end
+                        s.empoweredStageColors[i] = {r, g, b, a or 1}
+                        RefreshCastbar(unitKey)
+                    end
+                end,
+            })
+            order = order + 1
+        end
+        
+        -- Fill Colors (5 colors)
+        for i = 1, 5 do
+            local defaultFillColors = {
+                {0.26, 0.64, 0.96, 1},
+                {0.91, 0.35, 0.40, 1},
+                {0.95, 0.75, 0.30, 1},
+                {0.45, 0.82, 0.35, 1},
+                {0.75, 0.40, 0.85, 1},
+            }
+            table.insert(settings, {
+                parentId = "CATEGORY_EMPOWERED_" .. unitKey,
+                order = order,
+                name = "Fill " .. i .. " Color",
+                kind = LEM.SettingType.Color,
+                default = defaultFillColors[i],
+                get = function(layoutName)
+                    local s = GetCastSettings(unitKey)
+                    if s and s.empoweredFillColors and s.empoweredFillColors[i] then
+                        local c = s.empoweredFillColors[i]
+                        return c[1] or defaultFillColors[i][1], c[2] or defaultFillColors[i][2], c[3] or defaultFillColors[i][3], c[4] or 1
+                    end
+                    return defaultFillColors[i][1], defaultFillColors[i][2], defaultFillColors[i][3], defaultFillColors[i][4]
+                end,
+                set = function(layoutName, r, g, b, a)
+                    local s = GetCastSettings(unitKey)
+                    if s then
+                        if not s.empoweredFillColors then s.empoweredFillColors = {} end
+                        s.empoweredFillColors[i] = {r, g, b, a or 1}
+                        RefreshCastbar(unitKey)
+                    end
+                end,
+            })
+            order = order + 1
+        end
+    end
+    
+    return settings
+end
+
+---------------------------------------------------------------------------
+-- FRAME REGISTRATION
+---------------------------------------------------------------------------
+
+-- Register a castbar with Edit Mode
+function CB_EditMode:RegisterFrame(unitKey, frame)
+    if not LEM or not frame then return end
+    if self.registeredFrames[unitKey] then return end  -- Already registered
+    
+    -- Store unit key on frame for callbacks
+    frame._suiCastbarUnit = unitKey
+    
+    -- Set custom Edit Mode label directly on the frame
+    frame.editModeName = FRAME_LABELS[unitKey] or ("Suavicast: " .. unitKey:gsub("^%l", string.upper))
+    
+    -- Get current position
+    local s = GetCastSettings(unitKey)
+    local defaults = {
+        point = "CENTER",
+        x = s and s.offsetX or 0,
+        y = s and s.offsetY or 0,
+    }
+    
+    -- Register with LibEQOL
+    local success, err = pcall(function()
+        LEM:AddFrame(frame, OnPositionChanged, defaults)
+        
+        -- Add settings
+        local settings = BuildCastbarSettings(unitKey)
+        LEM:AddFrameSettings(frame, settings)
+        
+        -- Disable position reset when locked to anchor
+        LEM:SetFrameResetVisible(frame, function(layoutName)
+            local st = GetCastSettings(unitKey)
+            return st and st.anchor == "none"
+        end)
+        
+        -- Disable dragging when locked to anchor
+        LEM:SetFrameDragEnabled(frame, function(layoutName)
+            local st = GetCastSettings(unitKey)
+            return st and st.anchor == "none"
+        end)
+    end)
+    
+    if success then
+        self.registeredFrames[unitKey] = frame
+    end
+end
+
+-- Unregister a frame
+function CB_EditMode:UnregisterFrame(unitKey)
+    if not LEM then return end
+    local frame = self.registeredFrames[unitKey]
+    if frame and LEM.RemoveFrame then
+        pcall(function()
+            LEM:RemoveFrame(frame)
+        end)
+    end
+    self.registeredFrames[unitKey] = nil
+end
+
+-- Register all available castbars
+function CB_EditMode:RegisterAllFrames()
+    local SUI_UF = ns.SUI_UnitFrames
+    if not SUI_UF or not SUI_UF.castbars then return end
+    
+    for unitKey, castbar in pairs(SUI_UF.castbars) do
+        if castbar and castbar.statusBar then
+            -- Boss frames share settings, only register once
+            if unitKey:match("^boss%d+$") then
+                if not self.registeredFrames["boss"] then
+                    self:RegisterFrame("boss", castbar)
+                end
+            else
+                self:RegisterFrame(unitKey, castbar)
+            end
+        end
+    end
+end
+
+---------------------------------------------------------------------------
+-- INITIALIZATION
+---------------------------------------------------------------------------
+
+function CB_EditMode:Initialize()
+    if not LEM then
+        LEM = ns.LEM
+        if not LEM then return end
+    end
+    
+    -- Try to register frames immediately
+    self:RegisterAllFrames()
+    
+    -- Also hook into frame creation for late-loaded castbars
+    local SUI_UF = ns.SUI_UnitFrames
+    if SUI_UF then
+        hooksecurefunc(SUI_UF, "RefreshFrame", function(_, unitKey)
+            C_Timer.After(0.1, function()
+                if SUI_UF.castbars and SUI_UF.castbars[unitKey] then
+                    local castbar = SUI_UF.castbars[unitKey]
+                    if castbar and castbar.statusBar and not CB_EditMode.registeredFrames[unitKey] then
+                        if unitKey:match("^boss%d+$") then
+                            if not CB_EditMode.registeredFrames["boss"] then
+                                CB_EditMode:RegisterFrame("boss", castbar)
+                            end
+                        else
+                            CB_EditMode:RegisterFrame(unitKey, castbar)
+                        end
+                    end
+                end
+            end)
+        end)
+    end
+    
+    -- Register callbacks for Edit Mode enter/exit
+    LEM:RegisterCallback("enter", function()
+        -- Enable preview mode for castbars when entering edit mode
+        local ufdb = GetUFDB()
+        if ufdb then
+            for unitKey, unitDB in pairs(ufdb) do
+                if unitDB.castbar then
+                    unitDB.castbar.previewMode = true
+                end
+            end
+            -- Refresh all castbars to show preview
+            if ns.SUI_UnitFrames and ns.SUI_UnitFrames.RefreshAll then
+                ns.SUI_UnitFrames:RefreshAll()
+            end
+        end
+    end)
+    
+    LEM:RegisterCallback("exit", function()
+        -- Disable preview mode for castbars when exiting edit mode
+        local ufdb = GetUFDB()
+        if ufdb then
+            for unitKey, unitDB in pairs(ufdb) do
+                if unitDB.castbar then
+                    unitDB.castbar.previewMode = false
+                end
+            end
+            -- Refresh all castbars to hide preview
+            if ns.SUI_UnitFrames and ns.SUI_UnitFrames.RefreshAll then
+                ns.SUI_UnitFrames:RefreshAll()
+            end
+        end
+    end)
+end
+
+---------------------------------------------------------------------------
+-- DELAYED INITIALIZATION
+---------------------------------------------------------------------------
+-- Wait for both LEM and unit frames to be ready
+local initFrame = CreateFrame("Frame")
+initFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+initFrame:SetScript("OnEvent", function(self, event)
+    self:UnregisterEvent("PLAYER_ENTERING_WORLD")
+    
+    -- Delay to ensure all modules are loaded
+    C_Timer.After(2, function()
+        CB_EditMode:Initialize()
+    end)
+end)

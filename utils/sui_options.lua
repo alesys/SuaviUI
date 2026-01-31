@@ -8596,7 +8596,7 @@ local function CreateUnitFramesPage(parent)
                 enabled = true,
                 color = { 0.2, 0.8, 0.8 },
                 opacity = 0.7,
-                texture = "SUI Stripes",
+                texture = "Suavistripes",
             }
         end
 

@@ -12,28 +12,8 @@ RB.LibDeflate = LibStub("LibDeflate", true)
 
 local LSM = RB.LSM
 
-------------------------------------------------------------
--- LIBSHAREDMEDIA INTEGRATION
-------------------------------------------------------------
-local function InitLSM()
-    LSM:Register(LSM.MediaType.BACKGROUND, "SUI BG Bevelled", [[Interface\AddOns\SuaviUI\assets\textures\bevelled.png]])
-    LSM:Register(LSM.MediaType.BACKGROUND, "SUI BG Bevelled Grey", [[Interface\AddOns\SuaviUI\assets\textures\bevelled-grey.png]])
-
-    LSM:Register(LSM.MediaType.STATUSBAR, "SUI FG Fade Left", [[Interface\AddOns\SuaviUI\assets\textures\fade-left.png]])
-    LSM:Register(LSM.MediaType.STATUSBAR, "SUI FG Fade Bottom", [[Interface\AddOns\SuaviUI\assets\textures\fade-bottom.png]])
-    LSM:Register(LSM.MediaType.STATUSBAR, "SUI FG Fade Top", [[Interface\AddOns\SuaviUI\assets\textures\fade-top.png]])
-    LSM:Register(LSM.MediaType.STATUSBAR, "SUI FG Solid", [[Interface\AddOns\SuaviUI\assets\textures\solid.png]])
-    LSM:Register(LSM.MediaType.STATUSBAR, "None", [[Interface\AddOns\SuaviUI\assets\textures\transparent.png]])
-
-    LSM:Register(LSM.MediaType.BORDER, "SUI Border Blizzard Classic", [[Interface\AddOns\SuaviUI\assets\textures\blizzard-classic.png]])
-    LSM:Register(LSM.MediaType.BORDER, "SUI Border Blizzard Classic Thin", [[Interface\AddOns\SuaviUI\assets\textures\blizzard-classic-thin.png]])
-
-    LSM:Register(LSM.MediaType.FONT, "Friz Quadrata TT", [[Fonts\FRIZQT___CYR.TTF]])
-    LSM:Register(LSM.MediaType.FONT, "Morpheus", [[Fonts\MORPHEUS_CYR.TTF]])
-    LSM:Register(LSM.MediaType.FONT, "Arial Narrow", [[Fonts\ARIALN.TTF]])
-    LSM:Register(LSM.MediaType.FONT, "Skurri", [[Fonts\SKURRI_CYR.TTF]])
-end
-InitLSM()
+-- NOTE: All media registration is now consolidated in utils/media.lua
+-- This file only contains resource bar configuration constants
 
 ------------------------------------------------------------
 -- PROFILE-AWARE RESOURCE BAR STORAGE
