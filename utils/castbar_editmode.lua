@@ -283,7 +283,6 @@ local function BuildCastbarSettings(unitKey)
         order = order,
         name = "Bar Texture",
         kind = LEM.SettingType.Dropdown,
-        useOldStyle = true,
         values = GetTextureList(),
         default = "Solid",
         get = function(layoutName)
@@ -343,7 +342,6 @@ local function BuildCastbarSettings(unitKey)
         order = order,
         name = "Lock To",
         kind = LEM.SettingType.Dropdown,
-        useOldStyle = true,
         values = isPlayer and PLAYER_ANCHOR_OPTIONS or ANCHOR_OPTIONS,
         default = "none",
         get = function(layoutName)
@@ -597,7 +595,6 @@ local function BuildCastbarSettings(unitKey)
         order = order,
         name = "Icon Anchor",
         kind = LEM.SettingType.Dropdown,
-        useOldStyle = true,
         values = NINE_POINT_ANCHOR_OPTIONS,
         default = "LEFT",
         get = function(layoutName)
@@ -753,7 +750,6 @@ local function BuildCastbarSettings(unitKey)
         order = order,
         name = "Spell Text Anchor",
         kind = LEM.SettingType.Dropdown,
-        useOldStyle = true,
         values = NINE_POINT_ANCHOR_OPTIONS,
         default = "LEFT",
         get = function(layoutName)
@@ -847,7 +843,6 @@ local function BuildCastbarSettings(unitKey)
         order = order,
         name = "Time Text Anchor",
         kind = LEM.SettingType.Dropdown,
-        useOldStyle = true,
         values = NINE_POINT_ANCHOR_OPTIONS,
         default = "RIGHT",
         get = function(layoutName)
@@ -975,7 +970,6 @@ local function BuildCastbarSettings(unitKey)
             order = order,
             name = "Level Text Anchor",
             kind = LEM.SettingType.Dropdown,
-            useOldStyle = true,
             values = NINE_POINT_ANCHOR_OPTIONS,
             default = "CENTER",
             get = function(layoutName)
