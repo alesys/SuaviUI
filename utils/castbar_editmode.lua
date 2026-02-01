@@ -1229,7 +1229,6 @@ function CB_EditMode:Initialize()
                     if LEM and LEM:IsInEditMode() then
                         local settings = GetCastSettings(unitKey)
                         if settings and settings.enabled ~= false then
-                            castbar:EnableMouse(true)
                             castbar:Show()
                             
                             -- Set up preview animation
@@ -1272,7 +1271,6 @@ function CB_EditMode:Initialize()
                 if castbar then
                     local settings = GetCastSettings(unitKey)
                     if settings and settings.enabled ~= false then
-                        castbar:EnableMouse(true)
                         castbar:Show()
                         
                         -- Set up preview animation data so OnUpdate doesn't hide it
