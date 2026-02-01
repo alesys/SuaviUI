@@ -1216,11 +1216,31 @@ function CB_EditMode:Initialize()
     local SUI_Castbar = ns.SUI_Castbar
     if SUI_Castbar then
         hooksecurefunc(SUI_Castbar, "CreateCastbar", function(self, unitFrame, unit, unitKey)
-            -- Register newly created castbar
+            -- Register newly created castbar (or re-register after recreation)
             if unitKey and self.castbars and self.castbars[unitKey] then
                 local castbar = self.castbars[unitKey]
-                if castbar and castbar.statusBar and not CB_EditMode.registeredFrames[unitKey] then
+                if castbar and castbar.statusBar then
+                    -- Unregister old frame if it exists (recreation case)
+                    if CB_EditMode.registeredFrames[unitKey] then
+                        CB_EditMode:UnregisterFrame(unitKey)
+                    end
+                    -- Register the new frame
                     CB_EditMode:RegisterFrame(unitKey, castbar)
+                    
+                    -- If Edit Mode is active, ensure the castbar is visible
+                    local isEditModeActive = EditModeManagerFrame and EditModeManagerFrame:IsShown()
+                    if isEditModeActive then
+                        castbar:EnableMouse(true)
+                        castbar:Show()
+                        castbar.isPreviewSimulation = true
+                        castbar.previewStartTime = GetTime()
+                        castbar.previewEndTime = GetTime() + 3
+                        castbar.previewMaxValue = 3
+                        castbar.previewValue = 0
+                        if castbar._editModeOverlay then
+                            castbar._editModeOverlay:Show()
+                        end
+                    end
                 end
             end
         end)
