@@ -9,12 +9,14 @@ local ADDON_NAME, ns = ...
 ---------------------------------------------------------------------------
 -- LIBRARY REFERENCES
 ---------------------------------------------------------------------------
-local LEM = LibStub("LibEQOLEditMode-1.0", true)
+local LEM = ns.LEM  -- LibEQOLEditMode (loaded in init.lua)
 local LSM = LibStub("LibSharedMedia-3.0", true)
 
--- Early exit if library not available
+-- Wait for LEM to be available
 if not LEM then
-    return
+    C_Timer.After(1, function()
+        LEM = ns.LEM
+    end)
 end
 
 ---------------------------------------------------------------------------
@@ -1207,7 +1209,10 @@ end
 ---------------------------------------------------------------------------
 
 function CB_EditMode:Initialize()
-    if not LEM then return end
+    if not LEM then
+        LEM = ns.LEM
+        if not LEM then return end
+    end
     
     -- Try to register frames immediately
     self:RegisterAllFrames()
