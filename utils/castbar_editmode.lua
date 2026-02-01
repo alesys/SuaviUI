@@ -1419,83 +1419,122 @@ function CB_EditMode:ShowDebugStatus()
     local window = CreateDebugWindow()
     local lines = {}
     
-    table.insert(lines, "=== SuaviUI Castbar Edit Mode Status (FIXED ISSUES) ===")
-    table.insert(lines, "Last Updated: Jan 31, 2026")
+    table.insert(lines, "=== SuaviUI Castbar Edit Mode Debug ===")
+    table.insert(lines, "Generated: " .. date("%Y-%m-%d %H:%M:%S"))
     table.insert(lines, "")
-    table.insert(lines, "[FIXES APPLIED]")
-    table.insert(lines, "✓ Frame reference table mismatch (SUI_Castbar.castbars)")
-    table.insert(lines, "✓ _suiCastbarUnit set on frame creation")
-    table.insert(lines, "✓ Preview mode triggering in Edit Mode")
-    table.insert(lines, "✓ Visual overlay borders for frame identification")
-    table.insert(lines, "")
-    table.insert(lines, "=== Initialization Status ===")
-    table.insert(lines, "")
+    
+    table.insert(lines, "=== LEM Status ===")
     table.insert(lines, "LibEQOLEditMode: " .. (LEM and "Loaded ✓" or "NOT LOADED ✗"))
     table.insert(lines, "LEM:IsInEditMode(): " .. (LEM and LEM:IsInEditMode() and "YES ✓" or "NO"))
-    table.insert(lines, "ns.SUI_Castbar: " .. (ns.SUI_Castbar and "EXISTS ✓" or "NIL ✗"))
+    table.insert(lines, "EditModeManagerFrame:IsShown(): " .. (EditModeManagerFrame and EditModeManagerFrame:IsShown() and "YES ✓" or "NO"))
     
-    if ns.SUI_Castbar then
-        table.insert(lines, "ns.SUI_Castbar.castbars: " .. (ns.SUI_Castbar.castbars and "EXISTS ✓" or "NIL ✗"))
-        
-        if ns.SUI_Castbar.castbars then
-            table.insert(lines, "")
-            table.insert(lines, "=== Registered Castbars ===")
-            for unitKey, castbar in pairs(ns.SUI_Castbar.castbars) do
-                local name = castbar:GetName() or "UNNAMED"
-                local hasStatusBar = castbar.statusBar and "✓" or "✗"
-                local isShown = castbar:IsShown() and "SHOWN" or "HIDDEN"
-                local width, height = castbar:GetSize()
-                local mouseEnabled = castbar:IsMouseEnabled() and "✓" or "✗"
-                local hasOverlay = castbar._editModeOverlay and "✓" or "✗"
-                
-                table.insert(lines, "")
-                table.insert(lines, string.format("[%s] %s", unitKey:upper(), name))
-                table.insert(lines, string.format("  StatusBar: %s  Visible: %s  Size: %.0fx%.0f", hasStatusBar, isShown, width or 0, height or 0))
-                table.insert(lines, string.format("  Mouse Enabled: %s  Edit Overlay: %s", mouseEnabled, hasOverlay))
-                
-                -- Check if LEM has registered this frame
-                local hasLEMReg = CB_EditMode.registeredFrames[unitKey] and "✓" or "✗"
-                table.insert(lines, string.format("  LEM Registered: %s", hasLEMReg))
+    -- Check LEM internal state
+    if LEM then
+        local lemState = LEM.State or (LEM.internal and LEM.internal.State)
+        if lemState then
+            table.insert(lines, "LEM.State available: YES ✓")
+            local dragPredCount = 0
+            if lemState.dragPredicates then
+                for _ in pairs(lemState.dragPredicates) do dragPredCount = dragPredCount + 1 end
+            end
+            table.insert(lines, "  dragPredicates count: " .. dragPredCount)
+            
+            local selRegCount = 0
+            if lemState.selectionRegistry then
+                for _ in pairs(lemState.selectionRegistry) do selRegCount = selRegCount + 1 end
+            end
+            table.insert(lines, "  selectionRegistry count: " .. selRegCount)
+        else
+            table.insert(lines, "LEM.State available: NO (checking lib.dragPredicates)")
+            if LEM.dragPredicates then
+                local count = 0
+                for _ in pairs(LEM.dragPredicates) do count = count + 1 end
+                table.insert(lines, "  lib.dragPredicates count: " .. count)
             end
         end
     end
     
     table.insert(lines, "")
-    table.insert(lines, "=== CB_EditMode.registeredFrames ===")
-    local regCount = 0
-    for unitKey, frame in pairs(CB_EditMode.registeredFrames) do
-        regCount = regCount + 1
-        local name = frame:GetName() or "unnamed"
-        local labelSet = frame.editModeName and "✓" or "✗"
-        local unitKeySet = frame._suiCastbarUnit and "✓" or "✗"
-        table.insert(lines, string.format("  [%s] %s (Label:%s, UnitKey:%s)", unitKey:upper(), name, labelSet, unitKeySet))
-    end
-    if regCount == 0 then
-        table.insert(lines, "  (none registered yet - run /suicbeditmode force to register)")
+    table.insert(lines, "=== Registered Castbars ===")
+    
+    local SUI_Castbar = ns.SUI_Castbar
+    if SUI_Castbar and SUI_Castbar.castbars then
+        for unitKey, castbar in pairs(SUI_Castbar.castbars) do
+            local name = castbar:GetName() or "UNNAMED"
+            local hasStatusBar = castbar.statusBar and "✓" or "✗"
+            local isShown = castbar:IsShown() and "SHOWN" or "HIDDEN"
+            local width, height = castbar:GetSize()
+            local mouseEnabled = castbar:IsMouseEnabled() and "✓" or "✗"
+            
+            table.insert(lines, "")
+            table.insert(lines, string.format("[%s] %s", unitKey:upper(), name))
+            table.insert(lines, string.format("  Size: %.0fx%.0f  Visible: %s  Mouse: %s", width or 0, height or 0, isShown, mouseEnabled))
+            
+            -- Check our registration
+            local ourReg = CB_EditMode.registeredFrames[unitKey] and "✓" or "✗"
+            table.insert(lines, string.format("  CB_EditMode registered: %s", ourReg))
+            
+            -- Check LEM internal registration
+            if LEM then
+                local lemState = LEM.State or (LEM.internal and LEM.internal.State)
+                local dragPreds = (lemState and lemState.dragPredicates) or LEM.dragPredicates
+                local selReg = lemState and lemState.selectionRegistry
+                
+                if dragPreds then
+                    local hasDragPred = dragPreds[castbar] ~= nil
+                    table.insert(lines, string.format("  LEM dragPredicate set: %s", hasDragPred and "✓" or "✗"))
+                    
+                    if hasDragPred then
+                        local pred = dragPreds[castbar]
+                        local predType = type(pred)
+                        table.insert(lines, string.format("  Predicate type: %s", predType))
+                        
+                        if predType == "function" then
+                            local ok, result = pcall(pred, LEM.activeLayoutName or "Unknown")
+                            if ok then
+                                table.insert(lines, string.format("  Predicate returns: %s", tostring(result)))
+                            else
+                                table.insert(lines, string.format("  Predicate ERROR: %s", tostring(result)))
+                            end
+                        else
+                            table.insert(lines, string.format("  Predicate value: %s", tostring(pred)))
+                        end
+                    end
+                end
+                
+                if selReg then
+                    local hasSelection = selReg[castbar] ~= nil
+                    table.insert(lines, string.format("  LEM selectionRegistry: %s", hasSelection and "✓" or "✗"))
+                    if hasSelection then
+                        local sel = selReg[castbar]
+                        table.insert(lines, string.format("    Selection shown: %s", sel:IsShown() and "YES" or "NO"))
+                        table.insert(lines, string.format("    Selection mouse: %s", sel:IsMouseEnabled() and "YES" or "NO"))
+                    end
+                end
+            end
+            
+            -- Check cast settings
+            local castSettings = GetCastSettings(unitKey)
+            if castSettings then
+                table.insert(lines, string.format("  Settings found: ✓"))
+                table.insert(lines, string.format("  anchor = %s", tostring(castSettings.anchor)))
+            else
+                table.insert(lines, string.format("  Settings found: ✗ (nil!)"))
+            end
+        end
     else
-        table.insert(lines, string.format("  Total: %d frames", regCount))
+        table.insert(lines, "No castbars found in ns.SUI_Castbar.castbars")
     end
     
     table.insert(lines, "")
-    table.insert(lines, "=== How to Use in Edit Mode ===")
-    table.insert(lines, "1. Open Edit Mode (/editmode)")
-    table.insert(lines, "2. Castbars should show with blue borders and preview casts")
-    table.insert(lines, "3. Click and drag castbars to reposition")
-    table.insert(lines, "4. Right-click to open settings panel")
-    table.insert(lines, "5. Exit Edit Mode when done (/editmode)")
-    table.insert(lines, "")
     table.insert(lines, "=== Commands ===")
     table.insert(lines, "/suicbeditmode status - Show this window")
-    table.insert(lines, "/suicbeditmode register - Manual registration")
-    table.insert(lines, "/suicbeditmode force - Force re-register with debug")
+    table.insert(lines, "/suicbeditmode force - Force re-register")
     
     window.editBox:SetText(table.concat(lines, "\n"))
     window:Show()
     
-    -- Also print key status to chat
-    print("|cFF56D1FFSuaviUI Castbar Edit Mode:|r")
-    print("  Registered: " .. regCount .. " castbars")
-    print("  Use /suicbeditmode status for details")
+    print("|cFF56D1FFSuaviUI:|r Debug window opened. Check castbar drag info above.")
 end
 
 -- Debug command
