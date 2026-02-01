@@ -1220,58 +1220,8 @@ function CB_EditMode:Initialize()
             -- Register newly created castbar
             if unitKey and self.castbars and self.castbars[unitKey] then
                 local castbar = self.castbars[unitKey]
-                if castbar and castbar.statusBar then
-                    -- Boss frames (boss1-boss5) all register under "boss" key
-                    local regKey = unitKey:match("^boss%d+$") and "boss" or unitKey
-                    
-                    -- Always re-register (handles refresh case where frame is recreated)
-                    -- For boss frames, only register if not already registered
-                    local shouldRegister = regKey ~= "boss" or not CB_EditMode.registeredFrames["boss"]
-                    
-                    if shouldRegister then
-                        CB_EditMode.registeredFrames[regKey] = nil  -- Clear old registration
-                        CB_EditMode:RegisterFrame(regKey, castbar)
-                    end
-                    
-                    -- Create overlay for ALL castbars (even boss2-5 which share registration)
-                    if not castbar._editModeOverlay then
-                        local overlay = CreateFrame("Frame", nil, castbar, "BackdropTemplate")
-                        overlay:SetAllPoints(castbar)
-                        overlay:SetFrameLevel(castbar:GetFrameLevel() + 1)
-                        overlay:SetBackdrop({
-                            edgeFile = "Interface\\Buttons\\WHITE8x8",
-                            edgeSize = 2,
-                        })
-                        overlay:SetBackdropBorderColor(0.3, 0.8, 1, 0.6)
-                        overlay:Hide()
-                        castbar._editModeOverlay = overlay
-                    end
-                    
-                    -- If in Edit Mode, show the castbar and set up preview
-                    if LEM and LEM:IsInEditMode() then
-                        local settings = GetCastSettings(regKey)
-                        if settings and settings.enabled ~= false then
-                            castbar:Show()
-                            
-                            -- Set up preview animation
-                            castbar.isPreviewSimulation = true
-                            castbar.previewStartTime = GetTime()
-                            castbar.previewEndTime = GetTime() + 3
-                            castbar.previewMaxValue = 3
-                            castbar.previewValue = 0
-                            
-                            -- Set OnUpdate handler
-                            if castbar.castbarOnUpdate or castbar.playerOnUpdate then
-                                local onUpdate = castbar.castbarOnUpdate or castbar.playerOnUpdate
-                                castbar:SetScript("OnUpdate", onUpdate)
-                            end
-                            
-                            -- Show overlay
-                            if castbar._editModeOverlay then
-                                castbar._editModeOverlay:Show()
-                            end
-                        end
-                    end
+                if castbar and castbar.statusBar and not CB_EditMode.registeredFrames[unitKey] then
+                    CB_EditMode:RegisterFrame(unitKey, castbar)
                 end
             end
         end)
@@ -1293,6 +1243,7 @@ function CB_EditMode:Initialize()
                 if castbar then
                     local settings = GetCastSettings(unitKey)
                     if settings and settings.enabled ~= false then
+                        castbar:EnableMouse(true)
                         castbar:Show()
                         
                         -- Set up preview animation data so OnUpdate doesn't hide it
