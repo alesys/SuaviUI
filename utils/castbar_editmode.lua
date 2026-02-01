@@ -1273,20 +1273,26 @@ function CB_EditMode:Initialize()
                 if castbar then
                     local settings = GetCastSettings(unitKey)
                     if settings and settings.enabled ~= false then
-                        castbar:EnableMouse(true)
-                        castbar:Show()
-                        
-                        -- Set up preview animation data so OnUpdate doesn't hide it
-                        castbar.isPreviewSimulation = true
-                        castbar.previewStartTime = GetTime()
-                        castbar.previewEndTime = GetTime() + 3
-                        castbar.previewMaxValue = 3
-                        castbar.previewValue = 0
-                        
-                        -- Set OnUpdate to keep castbar visible
-                        if castbar.castbarOnUpdate or castbar.playerOnUpdate then
-                            local onUpdate = castbar.castbarOnUpdate or castbar.playerOnUpdate
-                            castbar:SetScript("OnUpdate", onUpdate)
+                        -- Use mixin methods if available (new architecture)
+                        if castbar._castbarMixin then
+                            castbar._castbarMixin:ApplyVisibilitySettings()
+                        else
+                            -- Legacy fallback
+                            castbar:EnableMouse(true)
+                            castbar:Show()
+                            
+                            -- Set up preview animation data so OnUpdate doesn't hide it
+                            castbar.isPreviewSimulation = true
+                            castbar.previewStartTime = GetTime()
+                            castbar.previewEndTime = GetTime() + 3
+                            castbar.previewMaxValue = 3
+                            castbar.previewValue = 0
+                            
+                            -- Set OnUpdate to keep castbar visible
+                            if castbar.castbarOnUpdate or castbar.playerOnUpdate then
+                                local onUpdate = castbar.castbarOnUpdate or castbar.playerOnUpdate
+                                castbar:SetScript("OnUpdate", onUpdate)
+                            end
                         end
                     end
                 end
@@ -1308,10 +1314,17 @@ function CB_EditMode:Initialize()
             if SUI_Castbar and SUI_Castbar.castbars then
                 for unitKey, castbar in pairs(SUI_Castbar.castbars) do
                     if castbar then
-                        castbar:SetScript("OnUpdate", nil)
-                        -- Hide if not actively casting
-                        if not UnitCastingInfo(castbar.unit) and not UnitChannelInfo(castbar.unit) then
-                            castbar:Hide()
+                        -- Use mixin methods if available (new architecture)
+                        if castbar._castbarMixin then
+                            castbar._castbarMixin:StopPreviewMode()
+                            castbar._castbarMixin:ApplyVisibilitySettings()
+                        else
+                            -- Legacy fallback
+                            castbar:SetScript("OnUpdate", nil)
+                            -- Hide if not actively casting
+                            if not UnitCastingInfo(castbar.unit) and not UnitChannelInfo(castbar.unit) then
+                                castbar:Hide()
+                            end
                         end
                     end
                 end
