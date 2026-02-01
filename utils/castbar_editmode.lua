@@ -1150,15 +1150,17 @@ function CB_EditMode:RegisterFrame(unitKey, frame)
         -- Disable position reset when locked to anchor
         LEM:SetFrameResetVisible(frame, function(layoutName)
             local st = GetCastSettings(unitKey)
-            -- If anchor is nil or "none", allow reset (free positioning mode)
-            return st and (st.anchor == nil or st.anchor == "none")
+            -- If settings not found or anchor is nil/"none", allow reset (free positioning mode)
+            if not st then return true end
+            return st.anchor == nil or st.anchor == "none"
         end)
         
         -- Disable dragging when locked to anchor
         LEM:SetFrameDragEnabled(frame, function(layoutName)
             local st = GetCastSettings(unitKey)
-            -- If anchor is nil or "none", allow dragging (free positioning mode)
-            return st and (st.anchor == nil or st.anchor == "none")
+            -- If settings not found or anchor is nil/"none", allow dragging (free positioning mode)
+            if not st then return true end
+            return st.anchor == nil or st.anchor == "none"
         end)
     end)
     
