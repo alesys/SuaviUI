@@ -1233,6 +1233,20 @@ function CB_EditMode:Initialize()
                         CB_EditMode:RegisterFrame(regKey, castbar)
                     end
                     
+                    -- Create overlay for ALL castbars (even boss2-5 which share registration)
+                    if not castbar._editModeOverlay then
+                        local overlay = CreateFrame("Frame", nil, castbar, "BackdropTemplate")
+                        overlay:SetAllPoints(castbar)
+                        overlay:SetFrameLevel(castbar:GetFrameLevel() + 1)
+                        overlay:SetBackdrop({
+                            edgeFile = "Interface\\Buttons\\WHITE8x8",
+                            edgeSize = 2,
+                        })
+                        overlay:SetBackdropBorderColor(0.3, 0.8, 1, 0.6)
+                        overlay:Hide()
+                        castbar._editModeOverlay = overlay
+                    end
+                    
                     -- If in Edit Mode, show the castbar and set up preview
                     if LEM and LEM:IsInEditMode() then
                         local settings = GetCastSettings(regKey)
