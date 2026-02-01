@@ -14,6 +14,22 @@ if not LEM then
     return
 end
 
+-- Anchor value constants (LEM stores the text, not the value)
+local ANCHOR_NONE = "None (Free Position)"
+local ANCHOR_ESSENTIAL = "Essential CDM"
+local ANCHOR_UTILITY = "Utility CDM"
+local ANCHOR_PRIMARY = "Primary Resource Bar"
+local ANCHOR_SECONDARY = "Secondary Resource Bar"
+
+-- Helper to check if frame is freely positionable (not anchored)
+-- Handles both short values ("disabled") and text values ("None (Free Position)")
+local function IsFrameFreelyPositioned(anchorTo)
+    if not anchorTo then return true end
+    if anchorTo == "disabled" then return true end
+    if anchorTo == ANCHOR_NONE then return true end  -- Handle legacy text storage
+    return false
+end
+
 ---------------------------------------------------------------------------
 -- MODULE TABLE
 ---------------------------------------------------------------------------
@@ -144,10 +160,7 @@ local function BuildUnitFrameSettings(unitKey)
         isEnabled = function(layoutName, layoutIndex)
             -- Disabled if anchored (player/target)
             local s = GetUnitSettings(unitKey)
-            if s and s.anchorTo and s.anchorTo ~= "disabled" then
-                return false
-            end
-            return true
+            return IsFrameFreelyPositioned(s and s.anchorTo)
         end,
     })
     order = order + 1
@@ -177,10 +190,7 @@ local function BuildUnitFrameSettings(unitKey)
         end,
         isEnabled = function(layoutName, layoutIndex)
             local s = GetUnitSettings(unitKey)
-            if s and s.anchorTo and s.anchorTo ~= "disabled" then
-                return false
-            end
-            return true
+            return IsFrameFreelyPositioned(s and s.anchorTo)
         end,
     })
     order = order + 1
@@ -305,28 +315,52 @@ local function BuildUnitFrameSettings(unitKey)
         order = order + 1
         
         -- Anchor To dropdown
+        -- LEM stores the text, so we map between stored values and display text
+        local ANCHOR_VALUE_TO_TEXT = {
+            ["disabled"] = ANCHOR_NONE,
+            ["essential"] = ANCHOR_ESSENTIAL,
+            ["utility"] = ANCHOR_UTILITY,
+            ["primary"] = ANCHOR_PRIMARY,
+            ["secondary"] = ANCHOR_SECONDARY,
+            -- Also handle if text was previously stored
+            [ANCHOR_NONE] = ANCHOR_NONE,
+            [ANCHOR_ESSENTIAL] = ANCHOR_ESSENTIAL,
+            [ANCHOR_UTILITY] = ANCHOR_UTILITY,
+            [ANCHOR_PRIMARY] = ANCHOR_PRIMARY,
+            [ANCHOR_SECONDARY] = ANCHOR_SECONDARY,
+        }
+        local ANCHOR_TEXT_TO_VALUE = {
+            [ANCHOR_NONE] = "disabled",
+            [ANCHOR_ESSENTIAL] = "essential",
+            [ANCHOR_UTILITY] = "utility",
+            [ANCHOR_PRIMARY] = "primary",
+            [ANCHOR_SECONDARY] = "secondary",
+        }
+        
         table.insert(settings, {
             parentId = "CATEGORY_ANCHOR_" .. unitKey,
             order = order,
             name = "Anchor To",
             kind = LEM.SettingType.Dropdown,
-            default = "disabled",
+            default = ANCHOR_NONE,
             useOldStyle = true,
             values = {
-                { text = "Disabled", value = "disabled" },
-                { text = "Essential CDM", value = "essential" },
-                { text = "Utility CDM", value = "utility" },
-                { text = "Primary Resource Bar", value = "primary" },
-                { text = "Secondary Resource Bar", value = "secondary" },
+                { text = ANCHOR_NONE, value = ANCHOR_NONE },
+                { text = ANCHOR_ESSENTIAL, value = ANCHOR_ESSENTIAL },
+                { text = ANCHOR_UTILITY, value = ANCHOR_UTILITY },
+                { text = ANCHOR_PRIMARY, value = ANCHOR_PRIMARY },
+                { text = ANCHOR_SECONDARY, value = ANCHOR_SECONDARY },
             },
             get = function(layoutName, layoutIndex)
                 local s = GetUnitSettings(unitKey)
-                return s and s.anchorTo or "disabled"
+                local storedVal = s and s.anchorTo or "disabled"
+                return ANCHOR_VALUE_TO_TEXT[storedVal] or ANCHOR_NONE
             end,
             set = function(layoutName, value, layoutIndex)
                 local s = GetUnitSettings(unitKey)
                 if s then
-                    s.anchorTo = value
+                    -- Convert text back to short value for storage
+                    s.anchorTo = ANCHOR_TEXT_TO_VALUE[value] or "disabled"
                     RefreshUnitFrame(unitKey)
                     UpdateAnchoredFrames()
                 end
@@ -358,7 +392,7 @@ local function BuildUnitFrameSettings(unitKey)
             end,
             isEnabled = function(layoutName, layoutIndex)
                 local s = GetUnitSettings(unitKey)
-                return s and s.anchorTo and s.anchorTo ~= "disabled"
+                return not IsFrameFreelyPositioned(s and s.anchorTo)
             end,
         })
         order = order + 1
@@ -387,7 +421,7 @@ local function BuildUnitFrameSettings(unitKey)
             end,
             isEnabled = function(layoutName, layoutIndex)
                 local s = GetUnitSettings(unitKey)
-                return s and s.anchorTo and s.anchorTo ~= "disabled"
+                return not IsFrameFreelyPositioned(s and s.anchorTo)
             end,
         })
         order = order + 1
@@ -1940,7 +1974,7 @@ local function OnPositionChanged(frame, layoutName, point, x, y)
     if not s then return end
     
     -- Don't save position if anchored
-    if s.anchorTo and s.anchorTo ~= "disabled" then
+    if not IsFrameFreelyPositioned(s.anchorTo) then
         return
     end
     
@@ -1984,19 +2018,19 @@ function UF_EditMode:RegisterFrame(unitKey, frame)
         local settings = BuildUnitFrameSettings(unitKey)
         LEM:AddFrameSettings(frame, settings)
         
-        -- Disable position reset for anchored frames
+        -- Disable position reset for anchored frames (only when actively anchored, not "disabled")
         if unitKey == "player" or unitKey == "target" then
             LEM:SetFrameResetVisible(frame, function(layoutName)
                 local st = GetUnitSettings(unitKey)
-                return not (st and st.anchorTo and st.anchorTo ~= "disabled")
+                return IsFrameFreelyPositioned(st and st.anchorTo)
             end)
         end
         
-        -- Disable dragging for anchored frames
+        -- Disable dragging for anchored frames (only when actively anchored, not "disabled")
         if unitKey == "player" or unitKey == "target" then
             LEM:SetFrameDragEnabled(frame, function(layoutName)
                 local st = GetUnitSettings(unitKey)
-                return not (st and st.anchorTo and st.anchorTo ~= "disabled")
+                return IsFrameFreelyPositioned(st and st.anchorTo)
             end)
         end
     end)
@@ -2080,6 +2114,13 @@ function UF_EditMode:Initialize()
     
     -- Register callbacks for Edit Mode events
     LEM:RegisterCallback("enter", function()
+        -- Ensure frames are registered before Edit Mode shows them
+        -- This fixes the issue where frames don't appear until clicking another element
+        if not self._framesRegistered then
+            self:RegisterAllFrames()
+            self._framesRegistered = true
+        end
+        
         -- Refresh all frame settings when entering Edit Mode
         for unitKey, frame in pairs(self.registeredFrames) do
             if LEM.RefreshFrameSettings then

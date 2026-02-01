@@ -191,7 +191,7 @@ end
 ---------------------------------------------------------------------------
 -- FONT PATH (uses bundled Suavi font for consistent panel formatting)
 ---------------------------------------------------------------------------
-local FONT_PATH = LSM:Fetch("font", "Suavi") or [[Interface\AddOns\SuaviUI\assets\Suavi.ttf]]
+local FONT_PATH = LSM:Fetch("font", "Suavi") or [[Interface\AddOns\SuaviUI\assets\fonts\Suavi.ttf]]
 GUI.FONT_PATH = FONT_PATH
 
 -- Helper for future configurability

@@ -3738,7 +3738,7 @@ function SUICore:CreateMinimapButton()
     -- Create DataBroker object
     local dataObj = LDB:NewDataObject(ADDON_NAME, {
         type = "launcher",
-        icon = "Interface\\AddOns\\SuaviUI\\assets\\suaviLogo.tga",
+        icon = "Interface\\AddOns\\SuaviUI\\assets\\textures\\suaviLogo.tga",
         label = "Suavi UI",
         OnClick = function(clickedframe, button)
             if button == "LeftButton" then
@@ -4698,7 +4698,7 @@ function SUI:GetGlobalFont()
         fontName = SUICore.db.profile.general.font or fontName
     end
 
-    return LSM:Fetch("font", fontName) or [[Interface\AddOns\SuaviUI\assets\Suavi.ttf]]
+    return LSM:Fetch("font", fontName) or [[Interface\AddOns\SuaviUI\assets\fonts\Suavi.ttf]]
 end
 
 function SUI:GetGlobalTexture()
@@ -4772,7 +4772,7 @@ end
 -- ============================================================================
 
 -- Fallback to bundled Suavi font (always available, loaded early in media.lua)
-local SUAVI_FONT_PATH = [[Interface\AddOns\SuaviUI\assets\Suavi.ttf]]
+local SUAVI_FONT_PATH = [[Interface\AddOns\SuaviUI\assets\fonts\Suavi.ttf]]
 
 -- Font objects to override (preserves original size/flags, only changes font file)
 local BLIZZARD_FONT_OBJECTS = {

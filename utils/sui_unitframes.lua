@@ -59,12 +59,55 @@ local PREVIEW_AURAS = {
 }
 
 ---------------------------------------------------------------------------
+-- HELPER: Anchor type handling for frame positioning
+---------------------------------------------------------------------------
+-- Anchor type constants (map text values to anchor targets)
+local ANCHOR_MAP = {
+    -- Text values (from LEM dropdown)
+    ["Essential CDM"] = "essential",
+    ["Utility CDM"] = "utility", 
+    ["Primary Resource Bar"] = "primary",
+    ["Secondary Resource Bar"] = "secondary",
+    -- Legacy short values
+    ["essential"] = "essential",
+    ["utility"] = "utility",
+    ["primary"] = "primary",
+    ["secondary"] = "secondary",
+}
+
+-- Helper to check if anchor value means "free position" (not anchored)
+local function IsAnchorFree(anchorVal)
+    return not anchorVal 
+        or anchorVal == "disabled" 
+        or anchorVal == "None (Free Position)"
+end
+
+-- Helper: Get normalized anchor type
+local function NormalizeAnchorType(anchorType)
+    return anchorType and ANCHOR_MAP[anchorType]
+end
+
+---------------------------------------------------------------------------
 -- HELPER: Health percent with 12.01 API compatibility
 -- API signature changed: old (unit, scaleTo100) -> new (unit, usePredicted, curve)
 ---------------------------------------------------------------------------
 local tocVersion = tonumber((select(4, GetBuildInfo()))) or 0
 
 local function GetHealthPct(unit, usePredicted)
+    -- Manual calculation - most reliable across all versions
+    if UnitHealth and UnitHealthMax then
+        local cur = UnitHealth(unit)
+        local max = UnitHealthMax(unit)
+        -- Use pcall for BOTH the comparison and calculation to handle secret values
+        local ok, pct = pcall(function() 
+            if max and max > 0 then
+                return (cur / max) * 100 
+            end
+            return nil
+        end)
+        if ok and pct then return pct end
+    end
+    -- Fallback to API if manual calculation failed
     if tocVersion >= 120000 and type(UnitHealthPercent) == "function" then
         local ok, pct
         -- 12.01+: Use curve parameter (new API)
@@ -77,16 +120,6 @@ local function GetHealthPct(unit, usePredicted)
         end
         if ok and pct ~= nil then
             return pct
-        end
-    end
-    -- Manual calculation fallback
-    if UnitHealth and UnitHealthMax then
-        local cur = UnitHealth(unit)
-        local max = UnitHealthMax(unit)
-        if cur and max and max > 0 then
-            -- Use pcall to handle Midnight secret values from UnitHealth()
-            local ok, pct = pcall(function() return (cur / max) * 100 end)
-            if ok then return pct end
         end
     end
     return nil
@@ -234,7 +267,7 @@ local function GetAbsorbTexturePath(textureName)
     if not name or name == "" then
         name = "Suavistripes"
     end
-    return LSM:Fetch("statusbar", name) or "Interface\\AddOns\\SuaviUI\\assets\\absorb_stripe"
+    return LSM:Fetch("statusbar", name) or "Interface\\AddOns\\SuaviUI\\assets\\textures\\absorb_stripe"
 end
 
 ---------------------------------------------------------------------------
@@ -602,6 +635,31 @@ local function UpdateHealth(frame)
     frame.healthBar:SetMinMaxValues(0, maxHP or 1)
     frame.healthBar:SetValue(hp or 0)
     
+    -- Calculate percentage from the SAME hp/maxHP we just fetched (ensures consistency)
+    -- Use pcall to handle secret values in arithmetic operations
+    local hpPct = nil
+    local ok, result = pcall(function()
+        if maxHP and maxHP > 0 then
+            return (hp / maxHP) * 100
+        end
+        return nil
+    end)
+    if ok and result then
+        hpPct = result
+    elseif tocVersion >= 120000 and type(UnitHealthPercent) == "function" then
+        -- Fallback to API if manual calculation failed (secret values)
+        local apiOk, apiPct
+        if CurveConstants and CurveConstants.ScaleTo100 then
+            apiOk, apiPct = pcall(UnitHealthPercent, unit, false, CurveConstants.ScaleTo100)
+        end
+        if not apiOk or apiPct == nil then
+            apiOk, apiPct = pcall(UnitHealthPercent, unit, false)
+        end
+        if apiOk and apiPct ~= nil then
+            hpPct = apiPct
+        end
+    end
+    
     -- Update health text using new display style system
     if frame.healthText then
         local settings = GetUnitSettings(frame.unitKey)
@@ -632,7 +690,6 @@ local function UpdateHealth(frame)
             local divider = settings and settings.healthDivider or " | "
 
             if hp then
-                local hpPct = GetHealthPct(unit, false)
                 local healthStr = FormatHealthText(hp, hpPct, displayStyle, divider, maxHP)
                 frame.healthText:SetText(healthStr)
                 frame.healthText:Show()
@@ -2518,10 +2575,15 @@ local function UpdateAuras(frame)
                 iconPoint, framePoint, borderOffsetX = "TOPLEFT", "BOTTOMLEFT", 1
             elseif debuffAnchor == "BOTTOMRIGHT" then
                 iconPoint, framePoint, borderOffsetX = "TOPRIGHT", "BOTTOMRIGHT", -1
+            else
+                -- Default fallback for invalid anchors
+                iconPoint, framePoint, borderOffsetX = "BOTTOMLEFT", "TOPLEFT", 1
             end
 
             icon:ClearAllPoints()
-            icon:SetPoint(iconPoint, frame, framePoint, xPos + (borderOffsetX or 0), yPos)
+            if iconPoint and framePoint then
+                icon:SetPoint(iconPoint, frame, framePoint, xPos + (borderOffsetX or 0), yPos)
+            end
             icon:Show()
             
             debuffIndex = debuffIndex + 1
@@ -2594,10 +2656,15 @@ local function UpdateAuras(frame)
                 iconPoint, framePoint, borderOffsetX = "TOPLEFT", "BOTTOMLEFT", 1
             elseif buffAnchor == "BOTTOMRIGHT" then
                 iconPoint, framePoint, borderOffsetX = "TOPRIGHT", "BOTTOMRIGHT", -1
+            else
+                -- Default fallback for invalid anchors
+                iconPoint, framePoint, borderOffsetX = "BOTTOMLEFT", "TOPLEFT", 1
             end
 
             icon:ClearAllPoints()
-            icon:SetPoint(iconPoint, frame, framePoint, xPos + (borderOffsetX or 0), yPos)
+            if iconPoint and framePoint then
+                icon:SetPoint(iconPoint, frame, framePoint, xPos + (borderOffsetX or 0), yPos)
+            end
             icon:Show()
 
             buffIndex = buffIndex + 1
@@ -4052,9 +4119,19 @@ function SUI_UF:EnableEditMode()
         local settings = GetUnitSettings(settingsKey)
         if settings and frame.editOverlay.infoText then
             local label = frame.editOverlay.unitLabel or unitKey
-            local isAnchored = settings.anchorTo and settings.anchorTo ~= "disabled"
+            local isAnchored = not IsAnchorFree(settings.anchorTo)
             if isAnchored and (settingsKey == "player" or settingsKey == "target") then
-                local anchorNames = {essential = "Essential", utility = "Utility", primary = "Primary", secondary = "Secondary"}
+                -- Display the anchor name (strip "CDM" or "Resource Bar" for brevity)
+                local anchorNames = {
+                    ["essential"] = "Essential", 
+                    ["utility"] = "Utility", 
+                    ["primary"] = "Primary", 
+                    ["secondary"] = "Secondary",
+                    ["Essential CDM"] = "Essential",
+                    ["Utility CDM"] = "Utility",
+                    ["Primary Resource Bar"] = "Primary",
+                    ["Secondary Resource Bar"] = "Secondary",
+                }
                 local anchorName = anchorNames[settings.anchorTo] or settings.anchorTo
                 frame.editOverlay.infoText:SetText(label .. "  (Locked to " .. anchorName .. ")")
             else
@@ -4528,6 +4605,23 @@ function SUI_UF:Initialize()
     -- Hide Blizzard default frames first
     self:HideBlizzardFrames()
     
+    -- Migrate any text-based anchorTo values to short values
+    local ANCHOR_TEXT_TO_SHORT = {
+        ["None (Free Position)"] = "disabled",
+        ["Essential CDM"] = "essential",
+        ["Utility CDM"] = "utility",
+        ["Primary Resource Bar"] = "primary",
+        ["Secondary Resource Bar"] = "secondary",
+    }
+    for _, unitKey in ipairs({"player", "target"}) do
+        if db[unitKey] and db[unitKey].anchorTo then
+            local converted = ANCHOR_TEXT_TO_SHORT[db[unitKey].anchorTo]
+            if converted then
+                db[unitKey].anchorTo = converted
+            end
+        end
+    end
+    
     -- Create player frame
     if db.player and db.player.enabled then
         self.frames.player = CreateUnitFrame("player", "player")
@@ -4623,7 +4717,9 @@ end
 ---------------------------------------------------------------------------
 -- BLIZZARD EDIT MODE INTEGRATION
 ---------------------------------------------------------------------------
--- Hook Blizzard's Edit Mode to trigger SUI's edit mode when user enters via Esc > Edit Mode
+-- Hook Blizzard's Edit Mode to work with LEM-registered unit frames
+-- Note: The old EnableEditMode() with arrow overlays is only for /sui editmode
+-- Blizzard Edit Mode uses LibEQOLEditMode for native integration (see unitframes_editmode.lua)
 function SUI_UF:HookBlizzardEditMode()
     if not EditModeManagerFrame then return end
     if self._blizzEditModeHooked then return end
@@ -4634,17 +4730,31 @@ function SUI_UF:HookBlizzardEditMode()
 
     hooksecurefunc(EditModeManagerFrame, "EnterEditMode", function()
         if InCombatLockdown() then return end
-        if self.editModeActive then return end  -- Already active via /sui editmode
         self.triggeredByBlizzEditMode = true
-        self:EnableEditMode()
+        -- Don't run old EnableEditMode() - LEM handles the Blizzard Edit Mode UI
+        -- Just mark edit mode as active and ensure frames are visible
+        self.editModeActive = true
+        
+        -- Unregister state drivers so unit frames stay visible during edit mode
+        for unitKey, frame in pairs(self.frames) do
+            UnregisterStateDriver(frame, "visibility")
+            frame:Show()
+            -- Show preview data so frames are visible
+            self:ShowPreview(unitKey)
+        end
+        
+        -- Hide Blizzard's selection frames to prevent visual conflicts
+        self:HideBlizzardSelectionFrames()
     end)
 
     hooksecurefunc(EditModeManagerFrame, "ExitEditMode", function()
         if InCombatLockdown() then return end
-        if not self.editModeActive then return end
         if not self.triggeredByBlizzEditMode then return end  -- Don't exit if user used /sui editmode
         self.triggeredByBlizzEditMode = false
-        self:DisableEditMode()
+        self.editModeActive = false
+        
+        -- Restore state drivers for visibility
+        self:RefreshAll()
     end)
 end
 
@@ -4816,14 +4926,15 @@ _G.SuaviUI_Castbars = SUI_UF.castbars
 
 -- Helper: Get anchor frame by type
 local function GetAnchorFrame(anchorType)
-    if anchorType == "essential" then
+    local normalized = NormalizeAnchorType(anchorType)
+    if normalized == "essential" then
         return _G["EssentialCooldownViewer"]
-    elseif anchorType == "utility" then
+    elseif normalized == "utility" then
         return _G["UtilityCooldownViewer"]
-    elseif anchorType == "primary" then
+    elseif normalized == "primary" then
         local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
         return SUICore and SUICore.powerBar
-    elseif anchorType == "secondary" then
+    elseif normalized == "secondary" then
         local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
         return SUICore and SUICore.secondaryPowerBar
     end
@@ -4835,7 +4946,8 @@ local function GetAnchorDimensions(anchorFrame, anchorType)
     if not anchorFrame then return nil end
 
     local width, height
-    if anchorType == "essential" or anchorType == "utility" then
+    local normalized = NormalizeAnchorType(anchorType)
+    if normalized == "essential" or normalized == "utility" then
         -- CDM viewers store width in custom property
         width = anchorFrame.__cdmRow1Width or anchorFrame:GetWidth()
         height = anchorFrame.__cdmTotalHeight or anchorFrame:GetHeight()
@@ -4872,7 +4984,7 @@ _G.SuaviUI_UpdateAnchoredUnitFrames = function()
     -- Update Player (anchors to LEFT edge of anchor frame)
     local playerSettings = db.player
     local playerAnchorType = playerSettings and playerSettings.anchorTo
-    if playerAnchorType and playerAnchorType ~= "disabled" and SUI_UF.frames.player then
+    if not IsAnchorFree(playerAnchorType) and SUI_UF.frames.player then
         local anchorFrame = GetAnchorFrame(playerAnchorType)
         if anchorFrame and anchorFrame:IsShown() then
             local anchor = GetAnchorDimensions(anchorFrame, playerAnchorType)
@@ -4904,7 +5016,7 @@ _G.SuaviUI_UpdateAnchoredUnitFrames = function()
     -- Update Target (anchors to RIGHT edge of anchor frame)
     local targetSettings = db.target
     local targetAnchorType = targetSettings and targetSettings.anchorTo
-    if targetAnchorType and targetAnchorType ~= "disabled" and SUI_UF.frames.target then
+    if not IsAnchorFree(targetAnchorType) and SUI_UF.frames.target then
         local anchorFrame = GetAnchorFrame(targetAnchorType)
         if anchorFrame and anchorFrame:IsShown() then
             local anchor = GetAnchorDimensions(anchorFrame, targetAnchorType)

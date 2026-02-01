@@ -475,6 +475,21 @@ local function ApplyExtraButtonSettings(buttonType)
     if not settings.fadeEnabled then
         blizzFrame:SetAlpha(1)
     end
+    
+    -- Handle "Always Show" for positioning purposes
+    -- Show holder when: Edit Mode active OR Always Show enabled
+    if holder then
+        if settings._editModeActive or settings.alwaysShow then
+            holder:Show()
+            -- Also make the Blizzard frame visible if in Edit Mode
+            if settings._editModeActive then
+                blizzFrame:Show()
+            end
+        else
+            -- Normal visibility management by Blizzard
+            -- Don't explicitly hide - let Blizzard control it
+        end
+    end
 end
 
 -- Flag to prevent recursive SetPoint hooks
@@ -565,11 +580,31 @@ local function InitializeExtraButtons()
     extraActionHolder, extraActionMover = CreateExtraButtonHolder("extraActionButton", "Extra Action Button")
     zoneAbilityHolder, zoneAbilityMover = CreateExtraButtonHolder("zoneAbility", "Zone Ability")
 
+    -- Expose holders globally for Edit Mode registration
+    _G.SUI_extraActionButtonHolder = extraActionHolder
+    _G.SUI_zoneAbilityHolder = zoneAbilityHolder
+
     -- Apply settings with delay to ensure Blizzard frames exist
     C_Timer.After(0.5, function()
         ApplyExtraButtonSettings("extraActionButton")
         ApplyExtraButtonSettings("zoneAbility")
         HookExtraButtonPositioning()
+        
+        -- Register with Edit Mode if available
+        C_Timer.After(1.5, function()
+            if _G.SuaviUI_AB_EditMode_Register then
+                local extraSettings = GetExtraButtonDB("extraActionButton")
+                local zoneSettings = GetExtraButtonDB("zoneAbility")
+                
+                if extraActionHolder and extraSettings and extraSettings.enabled then
+                    _G.SuaviUI_AB_EditMode_Register("extraActionButton", extraActionHolder)
+                end
+                
+                if zoneAbilityHolder and zoneSettings and zoneSettings.enabled then
+                    _G.SuaviUI_AB_EditMode_Register("zoneAbility", zoneAbilityHolder)
+                end
+            end
+        end)
     end)
 end
 
@@ -583,9 +618,19 @@ local function RefreshExtraButtons()
     ApplyExtraButtonSettings("zoneAbility")
 end
 
--- Expose global functions for options panel
+-- Refresh a specific button (called from Edit Mode)
+local function RefreshExtraButton(buttonType)
+    if InCombatLockdown() then
+        ActionBars.pendingExtraButtonRefresh = true
+        return
+    end
+    ApplyExtraButtonSettings(buttonType)
+end
+
+-- Expose global functions for options panel and Edit Mode
 _G.SuaviUI_ToggleExtraButtonMovers = ToggleExtraButtonMovers
 _G.SuaviUI_RefreshExtraButtons = RefreshExtraButtons
+_G.SuaviUI_RefreshExtraButton = RefreshExtraButton
 
 -- Strip WoW color codes from text
 local function StripColorCodes(text)

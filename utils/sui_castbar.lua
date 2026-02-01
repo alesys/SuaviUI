@@ -7,6 +7,7 @@
 local ADDON_NAME, ns = ...
 local SUICore = ns.Addon
 local LSM = LibStub("LibSharedMedia-3.0")
+local LEM = LibStub("LibEQOLEditMode-1.0", true)
 local IsSecretValue = function(v) return ns.Utils and ns.Utils.IsSecretValue and ns.Utils.IsSecretValue(v) or false end
 
 ---------------------------------------------------------------------------
@@ -37,6 +38,20 @@ end
 
 local function GetFontPath()
     return Helpers.GetFontPath and Helpers.GetFontPath() or "Fonts\\FRIZQT__.TTF"
+end
+
+-- Track Edit Mode state
+local isInEditMode = false
+
+-- Helper to check if Edit Mode is active
+local function IsEditModeActive()
+    return isInEditMode
+end
+
+-- Register for Edit Mode callbacks to track state accurately
+if LEM then
+    LEM:RegisterCallback("enter", function() isInEditMode = true end)
+    LEM:RegisterCallback("exit", function() isInEditMode = false end)
 end
 
 local function GetFontOutline()
@@ -668,7 +683,14 @@ local function SimulateCast(castbar, castSettings, unitKey, bossIndex)
     
     ClearEmpoweredState(castbar)
     
-    if castSettings.anchor == "none" then
+    -- Check if Edit Mode is active (LEM handles dragging in Edit Mode)
+    local isEditModeActive = false
+    if LEM and LEM.IsInEditMode then
+        isEditModeActive = LEM:IsInEditMode()
+    end
+    
+    if castSettings.anchor == "none" and not isEditModeActive then
+        -- Old-style manual dragging (only when NOT in Edit Mode)
         castbar:SetMovable(true)
         castbar:EnableMouse(true)
         castbar:RegisterForDrag("LeftButton")
@@ -696,8 +718,14 @@ local function SimulateCast(castbar, castSettings, unitKey, bossIndex)
             end
         end)
     else
+        -- Edit Mode is active OR anchored to something - disable manual dragging
         castbar:SetMovable(false)
-        castbar:EnableMouse(false)
+        -- Keep mouse enabled if in Edit Mode (LEM needs it)
+        if isEditModeActive then
+            castbar:EnableMouse(true)
+        else
+            castbar:EnableMouse(false)
+        end
         castbar:SetScript("OnDragStart", nil)
         castbar:SetScript("OnDragStop", nil)
     end
@@ -718,7 +746,14 @@ local function ClearPreviewSimulation(castbar)
     castbar.previewIconTexture = nil
     
     castbar:SetMovable(false)
-    castbar:EnableMouse(false)
+    -- Keep mouse enabled if in Edit Mode
+    local isEditModeActive = false
+    if LEM and LEM.IsInEditMode then
+        isEditModeActive = LEM:IsInEditMode()
+    end
+    if not isEditModeActive then
+        castbar:EnableMouse(false)
+    end
     castbar:SetScript("OnDragStart", nil)
     castbar:SetScript("OnDragStop", nil)
     
@@ -963,7 +998,9 @@ function SUI_Castbar:CreateCastbar(unitFrame, unit, unitKey)
     local iconBorderSize = Scale(castSettings.iconBorderSize or 1)
     local fontSize = castSettings.fontSize or 12
     
-    local anchorFrame = CreateAnchorFrame(nil, UIParent)
+    -- Create named frame for Edit Mode registration
+    local frameName = "SUI_Castbar_" .. unitKey:gsub("^%l", string.upper)
+    local anchorFrame = CreateAnchorFrame(frameName, UIParent)
     anchorFrame:SetSize(1, barHeight)
 
     -- Apply HUD layer priority
@@ -1438,6 +1475,20 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
     
     -- Unified Cast function
     function castbar:Cast(spellID, isEmpowerEvent)
+        -- In Edit Mode without an actual cast, create a preview
+        local castInfo, channelInfo = UnitCastingInfo(self.unit), UnitChannelInfo(self.unit)
+        
+        if not castInfo and not channelInfo and IsEditModeActive() then
+            self.startTime = GetTime()
+            self.endTime = GetTime() + 3  -- 3 second preview cast
+            self.isChanneled = false
+            self.isEmpowered = false
+            self.notInterruptible = false
+            self:Show()
+            self:SetScript("OnUpdate", self.castbarOnUpdate)
+            return
+        end
+        
         -- Get cast information (now includes durationObj and hasSecretTiming)
         local spellName, text, texture, startTimeMS, endTimeMS, notInterruptible, unitSpellID, isChanneled, channelStages, durationObj, hasSecretTiming = GetCastInfo(self, self.unit)
 
@@ -1560,34 +1611,43 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
         UNIT_SPELLCAST_START = function(self, spellID) self:Cast(spellID, false) end,
         UNIT_SPELLCAST_CHANNEL_START = function(self, spellID) self:Cast(spellID, false) end,
         
-        -- Cast end events - hide immediately without re-querying APIs
+        -- Cast end events - hide immediately without re-querying APIs (unless in edit mode)
         UNIT_SPELLCAST_STOP = function(self, spellID)
             if isPlayer then ClearEmpoweredState(self) end
             self.timerDriven = false
             self.durationObj = nil
             self:SetScript("OnUpdate", nil)
-            self:Hide()
+            -- Don't hide castbars when in Edit Mode - they need to stay visible for positioning
+            if not IsEditModeActive() then
+                self:Hide()
+            end
         end,
         UNIT_SPELLCAST_CHANNEL_STOP = function(self, spellID)
             if isPlayer then ClearEmpoweredState(self) end
             self.timerDriven = false
             self.durationObj = nil
             self:SetScript("OnUpdate", nil)
-            self:Hide()
+            if not IsEditModeActive() then
+                self:Hide()
+            end
         end,
         UNIT_SPELLCAST_FAILED = function(self, spellID)
             if isPlayer then ClearEmpoweredState(self) end
             self.timerDriven = false
             self.durationObj = nil
             self:SetScript("OnUpdate", nil)
-            self:Hide()
+            if not IsEditModeActive() then
+                self:Hide()
+            end
         end,
         UNIT_SPELLCAST_INTERRUPTED = function(self, spellID)
             if isPlayer then ClearEmpoweredState(self) end
             self.timerDriven = false
             self.durationObj = nil
             self:SetScript("OnUpdate", nil)
-            self:Hide()
+            if not IsEditModeActive() then
+                self:Hide()
+            end
         end,
         
         -- Interruptible state changes
@@ -1616,10 +1676,12 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
                 ClearEmpoweredState(self)
                 self:Cast(spellID, false)
             else
-                -- Cast ended (cancelled, interrupted, or completed) - hide immediately
+                -- Cast ended (cancelled, interrupted, or completed) - hide immediately (unless in edit mode)
                 ClearEmpoweredState(self)
                 self:SetScript("OnUpdate", nil)
-                self:Hide()
+                if not IsEditModeActive() then
+                    self:Hide()
+                end
             end
         end
     end
@@ -1745,6 +1807,20 @@ function SUI_Castbar:SetupBossCastbar(castbar, unit, bossIndex, castSettings)
     
     -- Cast function for player
     function castbar:Cast(spellID, isEmpowerEvent)
+        -- In Edit Mode without an actual cast, create a preview
+        local castInfo, channelInfo = UnitCastingInfo(self.unit), UnitChannelInfo(self.unit)
+        
+        if not castInfo and not channelInfo and IsEditModeActive() then
+            self.startTime = GetTime()
+            self.endTime = GetTime() + 3  -- 3 second preview cast
+            self.isChanneled = false
+            self.isEmpowered = false
+            self.notInterruptible = false
+            self:Show()
+            self:SetScript("OnUpdate", self.playerOnUpdate)
+            return
+        end
+        
         -- Check if actually casting
         local spellName, text, texture, startTimeMS, endTimeMS, _, _, notInterruptible, unitSpellID = UnitCastingInfo(self.unit)
         local isChanneled = false

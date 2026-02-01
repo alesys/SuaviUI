@@ -123,7 +123,7 @@ local function GetFontPath()
         return SUI:GetGlobalFont()
     end
     -- Fallback to bundled Suavi font
-    return [[Interface\AddOns\SuaviUI\assets\Suavi.ttf]]
+    return [[Interface\AddOns\SuaviUI\assets\fonts\Suavi.ttf]]
 end
 
 ---------------------------------------------------------------------------

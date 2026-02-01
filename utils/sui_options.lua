@@ -123,6 +123,7 @@ local function GetTextureList()
         for _, name in ipairs(LSM:List("statusbar")) do
             table.insert(textures, {value = name, text = name})
         end
+        table.sort(textures, function(a, b) return a.text < b.text end)
     else
         textures = {{value = "Solid", text = "Solid"}}
     end
@@ -5752,6 +5753,201 @@ local function CreateCooldownViewersPage(parent)
     utilityHighlightCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - FORM_ROW
 
+    -- =====================================================
+    -- TRACKED BAR STYLING (Buff Duration Bars)
+    -- =====================================================
+    y = y - 10 -- Section spacing
+    local trackedHeader = GUI:CreateSectionHeader(content, "TRACKED BAR STYLING")
+    trackedHeader:SetPoint("TOPLEFT", PADDING, y)
+    y = y - trackedHeader.gap
+
+    local trackedDesc = GUI:CreateLabel(content, "Controls the appearance of buff duration bars for spells under 'Tracked Bars' of your CDM.", 11, C.textMuted)
+    trackedDesc:SetPoint("TOPLEFT", PADDING, y)
+    trackedDesc:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    trackedDesc:SetJustifyH("LEFT")
+    trackedDesc:SetWordWrap(true)
+    trackedDesc:SetHeight(24)
+    y = y - 34
+
+    -- Refresh function for tracked bars
+    local function RefreshTrackedBars()
+        if _G.SuaviUI_RefreshBuffBar then
+            _G.SuaviUI_RefreshBuffBar()
+        end
+    end
+
+    -- Ensure trackedBar settings exist with defaults
+    if not db.ncdm then db.ncdm = {} end
+    if not db.ncdm.trackedBar then db.ncdm.trackedBar = {} end
+    local trackedData = db.ncdm.trackedBar
+    if trackedData.enabled == nil then trackedData.enabled = true end
+    if trackedData.hideIcon == nil then trackedData.hideIcon = false end
+    if trackedData.barHeight == nil then trackedData.barHeight = 24 end
+    if trackedData.barWidth == nil then trackedData.barWidth = 200 end
+    if trackedData.texture == nil then trackedData.texture = "Suavitex v5" end
+    if trackedData.useClassColor == nil then trackedData.useClassColor = true end
+    if trackedData.barColor == nil then trackedData.barColor = {0.204, 0.827, 0.6, 1} end
+    if trackedData.barOpacity == nil then trackedData.barOpacity = 1.0 end
+    if trackedData.borderSize == nil then trackedData.borderSize = 1 end
+    if trackedData.bgColor == nil then trackedData.bgColor = {0, 0, 0, 1} end
+    if trackedData.bgOpacity == nil then trackedData.bgOpacity = 0.7 end
+    if trackedData.textSize == nil then trackedData.textSize = 12 end
+    if trackedData.spacing == nil then trackedData.spacing = 4 end
+    if trackedData.growUp == nil then trackedData.growUp = true end
+    if trackedData.hideText == nil then trackedData.hideText = false end
+    if trackedData.orientation == nil then trackedData.orientation = "horizontal" end
+    if trackedData.fillDirection == nil then trackedData.fillDirection = "up" end
+    if trackedData.iconPosition == nil then trackedData.iconPosition = "top" end
+    if trackedData.showTextOnVertical == nil then trackedData.showTextOnVertical = false end
+
+    -- Enable toggle
+    local trackedEnable = GUI:CreateFormCheckbox(content, "Enable Tracked Bar Styling", "enabled", trackedData, RefreshTrackedBars)
+    trackedEnable:SetPoint("TOPLEFT", PADDING, y)
+    trackedEnable:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
+    -- Hide Icon toggle
+    local hideIconCheck = GUI:CreateFormCheckbox(content, "Hide Icon", "hideIcon", trackedData, RefreshTrackedBars)
+    hideIconCheck:SetPoint("TOPLEFT", PADDING, y)
+    hideIconCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
+    -- Bar Height
+    local trackedHeightSlider = GUI:CreateFormSlider(content, "Bar Height", 2, 48, 1, "barHeight", trackedData, RefreshTrackedBars)
+    trackedHeightSlider:SetPoint("TOPLEFT", PADDING, y)
+    trackedHeightSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - SLIDER_HEIGHT
+
+    -- Bar Width
+    local trackedWidthSlider = GUI:CreateFormSlider(content, "Bar Width", 100, 400, 1, "barWidth", trackedData, RefreshTrackedBars)
+    trackedWidthSlider:SetPoint("TOPLEFT", PADDING, y)
+    trackedWidthSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - SLIDER_HEIGHT
+
+    -- Bar Texture
+    local trackedTextureDropdown = GUI:CreateFormDropdown(content, "Bar Texture", GetTextureList(), "texture", trackedData, RefreshTrackedBars)
+    trackedTextureDropdown:SetPoint("TOPLEFT", PADDING, y)
+    trackedTextureDropdown:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
+    -- Forward reference for orientation change callback
+    local updateVerticalStates
+
+    -- Bar Orientation
+    local orientationDropdown = GUI:CreateFormDropdown(content, "Bar Orientation", {
+        {value = "horizontal", text = "Horizontal"},
+        {value = "vertical", text = "Vertical"},
+    }, "orientation", trackedData, function()
+        RefreshTrackedBars()
+        if updateVerticalStates then updateVerticalStates() end
+    end)
+    orientationDropdown:SetPoint("TOPLEFT", PADDING, y)
+    orientationDropdown:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
+    -- Stack Direction
+    local growthDropdown = GUI:CreateFormDropdown(content, "Stack Direction", {
+        {value = true, text = "Up / Right"},
+        {value = false, text = "Down / Left"},
+    }, "growUp", trackedData, RefreshTrackedBars)
+    growthDropdown:SetPoint("TOPLEFT", PADDING, y)
+    growthDropdown:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
+    local stackTip = GUI:CreateLabel(content, "Up/Down for horizontal bars, Right/Left for vertical bars.", 10, C.textMuted)
+    stackTip:SetPoint("TOPLEFT", PADDING, y + 4)
+    stackTip:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    stackTip:SetJustifyH("LEFT")
+    y = y - 18
+
+    -- Fill Direction (Vertical only)
+    local fillDropdown = GUI:CreateFormDropdown(content, "Fill Direction (Vertical)", {
+        {value = "up", text = "Fill Up"},
+        {value = "down", text = "Fill Down"},
+    }, "fillDirection", trackedData, RefreshTrackedBars)
+    fillDropdown:SetPoint("TOPLEFT", PADDING, y)
+    fillDropdown:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
+    -- Icon Position (Vertical only)
+    local iconPosDropdown = GUI:CreateFormDropdown(content, "Icon Position (Vertical)", {
+        {value = "top", text = "Top"},
+        {value = "bottom", text = "Bottom"},
+    }, "iconPosition", trackedData, RefreshTrackedBars)
+    iconPosDropdown:SetPoint("TOPLEFT", PADDING, y)
+    iconPosDropdown:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
+    -- Show Text (Vertical only)
+    local showTextVerticalCheck = GUI:CreateFormCheckbox(content, "Show Text (Vertical)", "showTextOnVertical", trackedData, RefreshTrackedBars)
+    showTextVerticalCheck:SetPoint("TOPLEFT", PADDING, y)
+    showTextVerticalCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
+    -- UX: Dim vertical-only options when horizontal
+    updateVerticalStates = function()
+        local isVertical = trackedData.orientation == "vertical"
+        local alpha = isVertical and 1.0 or 0.4
+        fillDropdown:SetAlpha(alpha)
+        iconPosDropdown:SetAlpha(alpha)
+        showTextVerticalCheck:SetAlpha(alpha)
+    end
+    updateVerticalStates()  -- Initial state
+
+    -- Use Class Color
+    local trackedClassColorCheck = GUI:CreateFormCheckbox(content, "Use Class Color", "useClassColor", trackedData, RefreshTrackedBars)
+    trackedClassColorCheck:SetPoint("TOPLEFT", PADDING, y)
+    trackedClassColorCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
+    -- Bar Color (fallback)
+    local trackedBarColorPicker = GUI:CreateFormColorPicker(content, "Bar Color (Fallback)", "barColor", trackedData, RefreshTrackedBars)
+    trackedBarColorPicker:SetPoint("TOPLEFT", PADDING, y)
+    trackedBarColorPicker:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
+    -- Bar Opacity
+    local trackedBarOpacitySlider = GUI:CreateFormSlider(content, "Bar Opacity", 0, 1, 0.05, "barOpacity", trackedData, RefreshTrackedBars)
+    trackedBarOpacitySlider:SetPoint("TOPLEFT", PADDING, y)
+    trackedBarOpacitySlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - SLIDER_HEIGHT
+
+    -- Border Size
+    local trackedBorderSlider = GUI:CreateFormSlider(content, "Border Size", 0, 4, 1, "borderSize", trackedData, RefreshTrackedBars)
+    trackedBorderSlider:SetPoint("TOPLEFT", PADDING, y)
+    trackedBorderSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - SLIDER_HEIGHT
+
+    -- Background Color
+    local trackedBgColorPicker = GUI:CreateFormColorPicker(content, "Background Color", "bgColor", trackedData, RefreshTrackedBars)
+    trackedBgColorPicker:SetPoint("TOPLEFT", PADDING, y)
+    trackedBgColorPicker:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
+    -- Background Opacity
+    local trackedBgOpacitySlider = GUI:CreateFormSlider(content, "Background Opacity", 0, 1, 0.1, "bgOpacity", trackedData, RefreshTrackedBars)
+    trackedBgOpacitySlider:SetPoint("TOPLEFT", PADDING, y)
+    trackedBgOpacitySlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - SLIDER_HEIGHT
+
+    -- Text Size
+    local trackedTextSlider = GUI:CreateFormSlider(content, "Text Size", 8, 24, 1, "textSize", trackedData, RefreshTrackedBars)
+    trackedTextSlider:SetPoint("TOPLEFT", PADDING, y)
+    trackedTextSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - SLIDER_HEIGHT
+
+    -- Hide Text
+    local hideTextCheck = GUI:CreateFormCheckbox(content, "Hide Text", "hideText", trackedData, RefreshTrackedBars)
+    hideTextCheck:SetPoint("TOPLEFT", PADDING, y)
+    hideTextCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
+    -- Bar Spacing
+    local trackedSpacingSlider = GUI:CreateFormSlider(content, "Bar Spacing", 0, 20, 1, "spacing", trackedData, RefreshTrackedBars)
+    trackedSpacingSlider:SetPoint("TOPLEFT", PADDING, y)
+    trackedSpacingSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - SLIDER_HEIGHT
+
     content:SetHeight(math.abs(y) + 50)
 end
 
@@ -8467,34 +8663,35 @@ local function CreateUnitFramesPage(parent)
 
             -- Forward declarations for sliders
             local anchorGapSlider, anchorYOffsetSlider
+            
+            -- Helper to check if frame is freely positioned
+            local function IsAnchorFree(anchorVal)
+                return not anchorVal 
+                    or anchorVal == "disabled" 
+                    or anchorVal == "None (Free Position)"
+            end
 
             -- Helper function to update slider enabled states
             local function UpdateAnchorSliderStates()
-                local isAnchored = unitDB.anchorTo and unitDB.anchorTo ~= "disabled"
+                local isAnchored = not IsAnchorFree(unitDB.anchorTo)
                 if isAnchored then
-                    anchorGapSlider:SetAlpha(1)
-                    anchorGapSlider:EnableMouse(true)
-                    anchorYOffsetSlider:SetAlpha(1)
-                    anchorYOffsetSlider:EnableMouse(true)
-                    offsetXSlider:SetAlpha(0.4)
-                    offsetXSlider:EnableMouse(false)
-                    offsetYSlider:SetAlpha(0.4)
-                    offsetYSlider:EnableMouse(false)
+                    -- Anchored: enable anchor sliders, disable offset sliders
+                    if anchorGapSlider.SetEnabled then anchorGapSlider:SetEnabled(true) end
+                    if anchorYOffsetSlider.SetEnabled then anchorYOffsetSlider:SetEnabled(true) end
+                    if offsetXSlider.SetEnabled then offsetXSlider:SetEnabled(false) end
+                    if offsetYSlider.SetEnabled then offsetYSlider:SetEnabled(false) end
                 else
-                    anchorGapSlider:SetAlpha(0.4)
-                    anchorGapSlider:EnableMouse(false)
-                    anchorYOffsetSlider:SetAlpha(0.4)
-                    anchorYOffsetSlider:EnableMouse(false)
-                    offsetXSlider:SetAlpha(1)
-                    offsetXSlider:EnableMouse(true)
-                    offsetYSlider:SetAlpha(1)
-                    offsetYSlider:EnableMouse(true)
+                    -- Not anchored: disable anchor sliders, enable offset sliders
+                    if anchorGapSlider.SetEnabled then anchorGapSlider:SetEnabled(false) end
+                    if anchorYOffsetSlider.SetEnabled then anchorYOffsetSlider:SetEnabled(false) end
+                    if offsetXSlider.SetEnabled then offsetXSlider:SetEnabled(true) end
+                    if offsetYSlider.SetEnabled then offsetYSlider:SetEnabled(true) end
                 end
             end
 
             -- Anchor dropdown with 5 options
             local anchorOptions = {
-                {value = "disabled", text = "Disabled"},
+                {value = "disabled", text = "None (Free Position)"},
                 {value = "essential", text = "Essential CDM"},
                 {value = "utility", text = "Utility CDM"},
                 {value = "primary", text = "Primary Resource Bar"},
@@ -11814,7 +12011,7 @@ local function CreateCreditsPage(parent)
     local logo = content:CreateTexture(nil, "ARTWORK")
     logo:SetPoint("TOP", content, "TOP", 0, y)
     logo:SetSize(128, 128)
-    logo:SetTexture("Interface\\AddOns\\SuaviUI\\assets\\suaviLogo")
+    logo:SetTexture("Interface\\AddOns\\SuaviUI\\assets\\textures\\suaviLogo")
     y = y - 140
 
     -- Title

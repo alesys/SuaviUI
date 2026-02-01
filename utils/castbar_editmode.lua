@@ -9,14 +9,12 @@ local ADDON_NAME, ns = ...
 ---------------------------------------------------------------------------
 -- LIBRARY REFERENCES
 ---------------------------------------------------------------------------
-local LEM = ns.LEM  -- LibEQOLEditMode (loaded in init.lua)
+local LEM = LibStub("LibEQOLEditMode-1.0", true)
 local LSM = LibStub("LibSharedMedia-3.0", true)
 
--- Wait for LEM to be available
+-- Early exit if library not available
 if not LEM then
-    C_Timer.After(1, function()
-        LEM = ns.LEM
-    end)
+    return
 end
 
 ---------------------------------------------------------------------------
@@ -277,7 +275,8 @@ local function BuildCastbarSettings(unitKey)
         order = order,
         name = "Bar Texture",
         kind = LEM.SettingType.Dropdown,
-        options = GetTextureList(),
+        useOldStyle = true,
+        values = GetTextureList(),
         default = "Solid",
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
@@ -335,7 +334,8 @@ local function BuildCastbarSettings(unitKey)
         order = order,
         name = "Lock To",
         kind = LEM.SettingType.Dropdown,
-        options = isPlayer and PLAYER_ANCHOR_OPTIONS or ANCHOR_OPTIONS,
+        useOldStyle = true,
+        values = isPlayer and PLAYER_ANCHOR_OPTIONS or ANCHOR_OPTIONS,
         default = "none",
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
@@ -580,7 +580,8 @@ local function BuildCastbarSettings(unitKey)
         order = order,
         name = "Icon Anchor",
         kind = LEM.SettingType.Dropdown,
-        options = NINE_POINT_ANCHOR_OPTIONS,
+        useOldStyle = true,
+        values = NINE_POINT_ANCHOR_OPTIONS,
         default = "LEFT",
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
@@ -731,7 +732,8 @@ local function BuildCastbarSettings(unitKey)
         order = order,
         name = "Spell Text Anchor",
         kind = LEM.SettingType.Dropdown,
-        options = NINE_POINT_ANCHOR_OPTIONS,
+        useOldStyle = true,
+        values = NINE_POINT_ANCHOR_OPTIONS,
         default = "LEFT",
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
@@ -822,7 +824,8 @@ local function BuildCastbarSettings(unitKey)
         order = order,
         name = "Time Text Anchor",
         kind = LEM.SettingType.Dropdown,
-        options = NINE_POINT_ANCHOR_OPTIONS,
+        useOldStyle = true,
+        values = NINE_POINT_ANCHOR_OPTIONS,
         default = "RIGHT",
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
@@ -947,7 +950,8 @@ local function BuildCastbarSettings(unitKey)
             order = order,
             name = "Level Text Anchor",
             kind = LEM.SettingType.Dropdown,
-            options = NINE_POINT_ANCHOR_OPTIONS,
+            useOldStyle = true,
+            values = NINE_POINT_ANCHOR_OPTIONS,
             default = "CENTER",
             get = function(layoutName)
                 local s = GetCastSettings(unitKey)
@@ -1131,6 +1135,20 @@ function CB_EditMode:RegisterFrame(unitKey, frame)
     
     if success then
         self.registeredFrames[unitKey] = frame
+        
+        -- Add visual indicator overlay for Edit Mode visibility
+        if not frame._editModeOverlay then
+            local overlay = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+            overlay:SetAllPoints(frame)
+            overlay:SetFrameLevel(frame:GetFrameLevel() + 1)
+            overlay:SetBackdrop({
+                edgeFile = "Interface\\Buttons\\WHITE8x8",
+                edgeSize = 2,
+            })
+            overlay:SetBackdropBorderColor(0.3, 0.8, 1, 0.6)  -- Light blue border for visual feedback
+            overlay:Hide()  -- Hidden by default, shown when Edit Mode is active/dragging
+            frame._editModeOverlay = overlay
+        end
     end
 end
 
@@ -1148,10 +1166,11 @@ end
 
 -- Register all available castbars
 function CB_EditMode:RegisterAllFrames()
-    local SUI_UF = ns.SUI_UnitFrames
-    if not SUI_UF or not SUI_UF.castbars then return end
+    -- FIXED: Use correct reference table (SUI_Castbar.castbars, NOT SUI_UnitFrames.castbars)
+    local SUI_Castbar = ns.SUI_Castbar
+    if not SUI_Castbar or not SUI_Castbar.castbars then return end
     
-    for unitKey, castbar in pairs(SUI_UF.castbars) do
+    for unitKey, castbar in pairs(SUI_Castbar.castbars) do
         if castbar and castbar.statusBar then
             -- Boss frames share settings, only register once
             if unitKey:match("^boss%d+$") then
@@ -1170,66 +1189,86 @@ end
 ---------------------------------------------------------------------------
 
 function CB_EditMode:Initialize()
-    if not LEM then
-        LEM = ns.LEM
-        if not LEM then return end
-    end
+    if not LEM then return end
     
     -- Try to register frames immediately
     self:RegisterAllFrames()
     
-    -- Also hook into frame creation for late-loaded castbars
-    local SUI_UF = ns.SUI_UnitFrames
-    if SUI_UF then
-        hooksecurefunc(SUI_UF, "RefreshFrame", function(_, unitKey)
-            C_Timer.After(0.1, function()
-                if SUI_UF.castbars and SUI_UF.castbars[unitKey] then
-                    local castbar = SUI_UF.castbars[unitKey]
-                    if castbar and castbar.statusBar and not CB_EditMode.registeredFrames[unitKey] then
-                        if unitKey:match("^boss%d+$") then
-                            if not CB_EditMode.registeredFrames["boss"] then
-                                CB_EditMode:RegisterFrame("boss", castbar)
-                            end
-                        else
-                            CB_EditMode:RegisterFrame(unitKey, castbar)
-                        end
-                    end
+    -- FIXED: Hook into SUI_Castbar's CreateCastbar method to register frames as they're created
+    -- This ensures frames are registered with proper _suiCastbarUnit BEFORE Edit Mode might need them
+    local SUI_Castbar = ns.SUI_Castbar
+    if SUI_Castbar then
+        hooksecurefunc(SUI_Castbar, "CreateCastbar", function(self, unitFrame, unit, unitKey)
+            -- Register newly created castbar
+            if unitKey and self.castbars and self.castbars[unitKey] then
+                local castbar = self.castbars[unitKey]
+                if castbar and castbar.statusBar and not CB_EditMode.registeredFrames[unitKey] then
+                    CB_EditMode:RegisterFrame(unitKey, castbar)
                 end
-            end)
+            end
         end)
     end
     
     -- Register callbacks for Edit Mode enter/exit
     LEM:RegisterCallback("enter", function()
-        -- Enable preview mode for castbars when entering edit mode
-        local ufdb = GetUFDB()
-        if ufdb then
-            for unitKey, unitDB in pairs(ufdb) do
-                if unitDB.castbar then
-                    unitDB.castbar.previewMode = true
-                end
+        -- Enable edit mode overlay display for visual feedback
+        for unitKey, castbar in pairs(self.registeredFrames) do
+            if castbar._editModeOverlay then
+                castbar._editModeOverlay:Show()
             end
-            -- Refresh all castbars to show preview
-            if ns.SUI_UnitFrames and ns.SUI_UnitFrames.RefreshAll then
-                ns.SUI_UnitFrames:RefreshAll()
+        end
+        
+        -- Immediately show all enabled castbars and set up preview animation
+        local SUI_Castbar = ns.SUI_Castbar
+        if SUI_Castbar and SUI_Castbar.castbars then
+            for unitKey, castbar in pairs(SUI_Castbar.castbars) do
+                if castbar then
+                    local settings = GetCastSettings(unitKey)
+                    if settings and settings.enabled ~= false then
+                        castbar:EnableMouse(true)
+                        castbar:Show()
+                        
+                        -- Set up preview animation data so OnUpdate doesn't hide it
+                        castbar.isPreviewSimulation = true
+                        castbar.previewStartTime = GetTime()
+                        castbar.previewEndTime = GetTime() + 3
+                        castbar.previewMaxValue = 3
+                        castbar.previewValue = 0
+                        
+                        -- Set OnUpdate to keep castbar visible
+                        if castbar.castbarOnUpdate or castbar.playerOnUpdate then
+                            local onUpdate = castbar.castbarOnUpdate or castbar.playerOnUpdate
+                            castbar:SetScript("OnUpdate", onUpdate)
+                        end
+                    end
+                end
             end
         end
     end)
     
     LEM:RegisterCallback("exit", function()
-        -- Disable preview mode for castbars when exiting edit mode
-        local ufdb = GetUFDB()
-        if ufdb then
-            for unitKey, unitDB in pairs(ufdb) do
-                if unitDB.castbar then
-                    unitDB.castbar.previewMode = false
-                end
-            end
-            -- Refresh all castbars to hide preview
-            if ns.SUI_UnitFrames and ns.SUI_UnitFrames.RefreshAll then
-                ns.SUI_UnitFrames:RefreshAll()
+        -- Hide visual overlays
+        for unitKey, castbar in pairs(self.registeredFrames) do
+            if castbar._editModeOverlay then
+                castbar._editModeOverlay:Hide()
             end
         end
+        
+        -- Clear preview state and hide castbars if not actually casting
+        C_Timer.After(0.05, function()
+            local SUI_Castbar = ns.SUI_Castbar
+            if SUI_Castbar and SUI_Castbar.castbars then
+                for unitKey, castbar in pairs(SUI_Castbar.castbars) do
+                    if castbar then
+                        castbar:SetScript("OnUpdate", nil)
+                        -- Hide if not actively casting
+                        if not UnitCastingInfo(castbar.unit) and not UnitChannelInfo(castbar.unit) then
+                            castbar:Hide()
+                        end
+                    end
+                end
+            end
+        end)
     end)
 end
 
@@ -1242,8 +1281,204 @@ initFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 initFrame:SetScript("OnEvent", function(self, event)
     self:UnregisterEvent("PLAYER_ENTERING_WORLD")
     
-    -- Delay to ensure all modules are loaded
-    C_Timer.After(2, function()
+    -- Delay to ensure all modules are loaded (after unit frames init at 3s)
+    C_Timer.After(4, function()
         CB_EditMode:Initialize()
     end)
 end)
+
+-- Debug Window
+local debugWindow = nil
+
+local function CreateDebugWindow()
+    if debugWindow then return debugWindow end
+    
+    local frame = CreateFrame("Frame", "SUI_CastbarDebugWindow", UIParent, "BackdropTemplate")
+    frame:SetSize(500, 400)
+    frame:SetPoint("CENTER")
+    frame:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    frame:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
+    frame:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    frame:RegisterForDrag("LeftButton")
+    frame:SetScript("OnDragStart", frame.StartMoving)
+    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+    frame:SetFrameStrata("DIALOG")
+    frame:SetClampedToScreen(true)
+    
+    -- Title
+    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", 10, -10)
+    title:SetText("|cFF56D1FFSuaviUI|r Castbar Debug")
+    
+    -- Close button
+    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+    closeBtn:SetPoint("TOPRIGHT", -2, -2)
+    closeBtn:SetScript("OnClick", function() frame:Hide() end)
+    
+    -- Scroll frame
+    local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 10, -35)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -30, 40)
+    
+    -- Edit box (for selectable/copyable text)
+    local editBox = CreateFrame("EditBox", nil, scrollFrame)
+    editBox:SetMultiLine(true)
+    editBox:SetFontObject(GameFontHighlightSmall)
+    editBox:SetWidth(scrollFrame:GetWidth() - 10)
+    editBox:SetAutoFocus(false)
+    editBox:EnableMouse(true)
+    editBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    scrollFrame:SetScrollChild(editBox)
+    
+    frame.editBox = editBox
+    
+    -- Copy All button
+    local copyBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    copyBtn:SetSize(100, 22)
+    copyBtn:SetPoint("BOTTOMLEFT", 10, 10)
+    copyBtn:SetText("Select All")
+    copyBtn:SetScript("OnClick", function()
+        editBox:SetFocus()
+        editBox:HighlightText()
+    end)
+    
+    -- Refresh button
+    local refreshBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    refreshBtn:SetSize(100, 22)
+    refreshBtn:SetPoint("LEFT", copyBtn, "RIGHT", 10, 0)
+    refreshBtn:SetText("Refresh")
+    refreshBtn:SetScript("OnClick", function()
+        CB_EditMode:ShowDebugStatus()
+    end)
+    
+    debugWindow = frame
+    return frame
+end
+
+function CB_EditMode:ShowDebugStatus()
+    local window = CreateDebugWindow()
+    local lines = {}
+    
+    table.insert(lines, "=== SuaviUI Castbar Edit Mode Status (FIXED ISSUES) ===")
+    table.insert(lines, "Last Updated: Jan 31, 2026")
+    table.insert(lines, "")
+    table.insert(lines, "[FIXES APPLIED]")
+    table.insert(lines, "✓ Frame reference table mismatch (SUI_Castbar.castbars)")
+    table.insert(lines, "✓ _suiCastbarUnit set on frame creation")
+    table.insert(lines, "✓ Preview mode triggering in Edit Mode")
+    table.insert(lines, "✓ Visual overlay borders for frame identification")
+    table.insert(lines, "")
+    table.insert(lines, "=== Initialization Status ===")
+    table.insert(lines, "")
+    table.insert(lines, "LibEQOLEditMode: " .. (LEM and "Loaded ✓" or "NOT LOADED ✗"))
+    table.insert(lines, "LEM:IsInEditMode(): " .. (LEM and LEM:IsInEditMode() and "YES ✓" or "NO"))
+    table.insert(lines, "ns.SUI_Castbar: " .. (ns.SUI_Castbar and "EXISTS ✓" or "NIL ✗"))
+    
+    if ns.SUI_Castbar then
+        table.insert(lines, "ns.SUI_Castbar.castbars: " .. (ns.SUI_Castbar.castbars and "EXISTS ✓" or "NIL ✗"))
+        
+        if ns.SUI_Castbar.castbars then
+            table.insert(lines, "")
+            table.insert(lines, "=== Registered Castbars ===")
+            for unitKey, castbar in pairs(ns.SUI_Castbar.castbars) do
+                local name = castbar:GetName() or "UNNAMED"
+                local hasStatusBar = castbar.statusBar and "✓" or "✗"
+                local isShown = castbar:IsShown() and "SHOWN" or "HIDDEN"
+                local width, height = castbar:GetSize()
+                local mouseEnabled = castbar:IsMouseEnabled() and "✓" or "✗"
+                local hasOverlay = castbar._editModeOverlay and "✓" or "✗"
+                
+                table.insert(lines, "")
+                table.insert(lines, string.format("[%s] %s", unitKey:upper(), name))
+                table.insert(lines, string.format("  StatusBar: %s  Visible: %s  Size: %.0fx%.0f", hasStatusBar, isShown, width or 0, height or 0))
+                table.insert(lines, string.format("  Mouse Enabled: %s  Edit Overlay: %s", mouseEnabled, hasOverlay))
+                
+                -- Check if LEM has registered this frame
+                local hasLEMReg = CB_EditMode.registeredFrames[unitKey] and "✓" or "✗"
+                table.insert(lines, string.format("  LEM Registered: %s", hasLEMReg))
+            end
+        end
+    end
+    
+    table.insert(lines, "")
+    table.insert(lines, "=== CB_EditMode.registeredFrames ===")
+    local regCount = 0
+    for unitKey, frame in pairs(CB_EditMode.registeredFrames) do
+        regCount = regCount + 1
+        local name = frame:GetName() or "unnamed"
+        local labelSet = frame.editModeName and "✓" or "✗"
+        local unitKeySet = frame._suiCastbarUnit and "✓" or "✗"
+        table.insert(lines, string.format("  [%s] %s (Label:%s, UnitKey:%s)", unitKey:upper(), name, labelSet, unitKeySet))
+    end
+    if regCount == 0 then
+        table.insert(lines, "  (none registered yet - run /suicbeditmode force to register)")
+    else
+        table.insert(lines, string.format("  Total: %d frames", regCount))
+    end
+    
+    table.insert(lines, "")
+    table.insert(lines, "=== How to Use in Edit Mode ===")
+    table.insert(lines, "1. Open Edit Mode (/editmode)")
+    table.insert(lines, "2. Castbars should show with blue borders and preview casts")
+    table.insert(lines, "3. Click and drag castbars to reposition")
+    table.insert(lines, "4. Right-click to open settings panel")
+    table.insert(lines, "5. Exit Edit Mode when done (/editmode)")
+    table.insert(lines, "")
+    table.insert(lines, "=== Commands ===")
+    table.insert(lines, "/suicbeditmode status - Show this window")
+    table.insert(lines, "/suicbeditmode register - Manual registration")
+    table.insert(lines, "/suicbeditmode force - Force re-register with debug")
+    
+    window.editBox:SetText(table.concat(lines, "\n"))
+    window:Show()
+    
+    -- Also print key status to chat
+    print("|cFF56D1FFSuaviUI Castbar Edit Mode:|r")
+    print("  Registered: " .. regCount .. " castbars")
+    print("  Use /suicbeditmode status for details")
+end
+
+-- Debug command
+SLASH_SUICBEDITMODE1 = "/suicbeditmode"
+SlashCmdList["SUICBEDITMODE"] = function(msg)
+    local cmd = msg:lower():trim()
+    
+    if cmd == "register" then
+        CB_EditMode:RegisterAllFrames()
+        print("|cFF56D1FFSuaviUI|r: Castbars registered with Edit Mode")
+    elseif cmd == "status" then
+        CB_EditMode:ShowDebugStatus()
+    elseif cmd == "force" then
+        print("|cFF56D1FFSuaviUI|r: Force registering castbars...")
+        local SUI_UF = ns.SUI_UnitFrames
+        if SUI_UF and SUI_UF.castbars then
+            for unitKey, castbar in pairs(SUI_UF.castbars) do
+                if castbar then
+                    local name = castbar:GetName() or "UNNAMED"
+                    print("  Trying to register: " .. unitKey .. " (" .. name .. ")")
+                    CB_EditMode.registeredFrames[unitKey] = nil  -- Clear existing
+                    CB_EditMode:RegisterFrame(unitKey, castbar)
+                    if CB_EditMode.registeredFrames[unitKey] then
+                        print("    SUCCESS")
+                    else
+                        print("    FAILED")
+                    end
+                end
+            end
+        else
+            print("  ERROR: No castbars found")
+        end
+        CB_EditMode:ShowDebugStatus()
+    else
+        print("|cFF56D1FFSuaviUI|r: Castbar Edit Mode Commands:")
+        print("  /suicbeditmode status - Show debug window")
+        print("  /suicbeditmode register - Manually register all castbars")
+        print("  /suicbeditmode force - Force re-register with debug")
+    end
+end
