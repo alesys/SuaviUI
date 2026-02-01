@@ -1221,13 +1221,21 @@ function CB_EditMode:Initialize()
             if unitKey and self.castbars and self.castbars[unitKey] then
                 local castbar = self.castbars[unitKey]
                 if castbar and castbar.statusBar then
+                    -- Boss frames (boss1-boss5) all register under "boss" key
+                    local regKey = unitKey:match("^boss%d+$") and "boss" or unitKey
+                    
                     -- Always re-register (handles refresh case where frame is recreated)
-                    CB_EditMode.registeredFrames[unitKey] = nil  -- Clear old registration
-                    CB_EditMode:RegisterFrame(unitKey, castbar)
+                    -- For boss frames, only register if not already registered
+                    local shouldRegister = regKey ~= "boss" or not CB_EditMode.registeredFrames["boss"]
+                    
+                    if shouldRegister then
+                        CB_EditMode.registeredFrames[regKey] = nil  -- Clear old registration
+                        CB_EditMode:RegisterFrame(regKey, castbar)
+                    end
                     
                     -- If in Edit Mode, show the castbar and set up preview
                     if LEM and LEM:IsInEditMode() then
-                        local settings = GetCastSettings(unitKey)
+                        local settings = GetCastSettings(regKey)
                         if settings and settings.enabled ~= false then
                             castbar:Show()
                             
