@@ -4753,6 +4753,13 @@ function SUI_UF:HookBlizzardEditMode()
         self.triggeredByBlizzEditMode = false
         self.editModeActive = false
         
+        -- Hide preview mode for all frames (restores real health values)
+        for unitKey, frame in pairs(self.frames) do
+            if self.previewMode[unitKey] then
+                self:HidePreview(unitKey)
+            end
+        end
+        
         -- Restore state drivers for visibility
         self:RefreshAll()
     end)
