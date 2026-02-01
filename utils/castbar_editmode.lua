@@ -9,15 +9,9 @@ local ADDON_NAME, ns = ...
 ---------------------------------------------------------------------------
 -- LIBRARY REFERENCES
 ---------------------------------------------------------------------------
-local LEM = ns.LEM  -- LibEQOLEditMode (loaded in init.lua)
+-- Use LibStub to get LEM directly, same pattern as SenseiClassResourceBar
+local LEM = LibStub("LibEQOLEditMode-1.0", true)
 local LSM = LibStub("LibSharedMedia-3.0", true)
-
--- Wait for LEM to be available
-if not LEM then
-    C_Timer.After(1, function()
-        LEM = ns.LEM
-    end)
-end
 
 ---------------------------------------------------------------------------
 -- MODULE TABLE
@@ -1210,8 +1204,8 @@ end
 
 function CB_EditMode:Initialize()
     if not LEM then
-        LEM = ns.LEM
-        if not LEM then return end
+        print("|cFFFF0000SuaviUI:|r LibEQOLEditMode-1.0 not available - castbar Edit Mode disabled")
+        return
     end
     
     -- Try to register frames immediately
