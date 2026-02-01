@@ -302,6 +302,7 @@ local function BuildCastbarSettings(unitKey)
         minValue = 0,
         maxValue = 5,
         valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.borderSize or 1
@@ -383,6 +384,7 @@ local function BuildCastbarSettings(unitKey)
         minValue = 50,
         maxValue = 2000,
         valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.width or 250
@@ -407,6 +409,7 @@ local function BuildCastbarSettings(unitKey)
         minValue = -500,
         maxValue = 500,
         valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.widthAdjustment or 0
@@ -431,6 +434,7 @@ local function BuildCastbarSettings(unitKey)
         minValue = 4,
         maxValue = 40,
         valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.height or 25
@@ -455,6 +459,7 @@ local function BuildCastbarSettings(unitKey)
         minValue = -3000,
         maxValue = 3000,
         valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.offsetX or 0
@@ -479,6 +484,7 @@ local function BuildCastbarSettings(unitKey)
         minValue = -3000,
         maxValue = 3000,
         valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.offsetY or 0
@@ -536,6 +542,7 @@ local function BuildCastbarSettings(unitKey)
         minValue = 8,
         maxValue = 80,
         valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.iconSize or 25
@@ -560,6 +567,7 @@ local function BuildCastbarSettings(unitKey)
         minValue = 0.5,
         maxValue = 2.0,
         valueStep = 0.1,
+        formatter = function(value) return string.format("%.1f", value) end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.iconScale or 1.0
@@ -607,6 +615,7 @@ local function BuildCastbarSettings(unitKey)
         minValue = -50,
         maxValue = 50,
         valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.iconSpacing or 0
@@ -631,6 +640,7 @@ local function BuildCastbarSettings(unitKey)
         minValue = 0,
         maxValue = 5,
         valueStep = 0.1,
+        formatter = function(value) return string.format("%.1f", value) end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.iconBorderSize or 2
@@ -667,6 +677,7 @@ local function BuildCastbarSettings(unitKey)
         minValue = 8,
         maxValue = 24,
         valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.fontSize or 12
@@ -691,6 +702,7 @@ local function BuildCastbarSettings(unitKey)
         minValue = 0,
         maxValue = 30,
         valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.maxLength or 0
@@ -759,6 +771,7 @@ local function BuildCastbarSettings(unitKey)
         minValue = -200,
         maxValue = 200,
         valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.spellTextOffsetX or 4
@@ -783,6 +796,7 @@ local function BuildCastbarSettings(unitKey)
         minValue = -200,
         maxValue = 200,
         valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.spellTextOffsetY or 0
@@ -851,6 +865,7 @@ local function BuildCastbarSettings(unitKey)
         minValue = -200,
         maxValue = 200,
         valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.timeTextOffsetX or -4
@@ -875,6 +890,7 @@ local function BuildCastbarSettings(unitKey)
         minValue = -200,
         maxValue = 200,
         valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.timeTextOffsetY or 0
@@ -977,6 +993,7 @@ local function BuildCastbarSettings(unitKey)
             minValue = -200,
             maxValue = 200,
             valueStep = 1,
+            formatter = function(value) return string.format("%d", value) end,
             get = function(layoutName)
                 local s = GetCastSettings(unitKey)
                 return s and s.empoweredLevelTextOffsetX or 0
@@ -1001,6 +1018,7 @@ local function BuildCastbarSettings(unitKey)
             minValue = -200,
             maxValue = 200,
             valueStep = 1,
+            formatter = function(value) return string.format("%d", value) end,
             get = function(layoutName)
                 local s = GetCastSettings(unitKey)
                 return s and s.empoweredLevelTextOffsetY or 0
@@ -1202,8 +1220,37 @@ function CB_EditMode:Initialize()
             -- Register newly created castbar
             if unitKey and self.castbars and self.castbars[unitKey] then
                 local castbar = self.castbars[unitKey]
-                if castbar and castbar.statusBar and not CB_EditMode.registeredFrames[unitKey] then
+                if castbar and castbar.statusBar then
+                    -- Always re-register (handles refresh case where frame is recreated)
+                    CB_EditMode.registeredFrames[unitKey] = nil  -- Clear old registration
                     CB_EditMode:RegisterFrame(unitKey, castbar)
+                    
+                    -- If in Edit Mode, show the castbar and set up preview
+                    if LEM and LEM:IsInEditMode() then
+                        local settings = GetCastSettings(unitKey)
+                        if settings and settings.enabled ~= false then
+                            castbar:EnableMouse(true)
+                            castbar:Show()
+                            
+                            -- Set up preview animation
+                            castbar.isPreviewSimulation = true
+                            castbar.previewStartTime = GetTime()
+                            castbar.previewEndTime = GetTime() + 3
+                            castbar.previewMaxValue = 3
+                            castbar.previewValue = 0
+                            
+                            -- Set OnUpdate handler
+                            if castbar.castbarOnUpdate or castbar.playerOnUpdate then
+                                local onUpdate = castbar.castbarOnUpdate or castbar.playerOnUpdate
+                                castbar:SetScript("OnUpdate", onUpdate)
+                            end
+                            
+                            -- Show overlay
+                            if castbar._editModeOverlay then
+                                castbar._editModeOverlay:Show()
+                            end
+                        end
+                    end
                 end
             end
         end)
