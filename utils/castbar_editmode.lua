@@ -133,8 +133,8 @@ local function OnPositionChanged(frame, point, x, y, layoutName)
     local castSettings = GetCastSettings(unitKey)
     if not castSettings then return end
     
-    -- Only update position if anchor is "none" (free positioning)
-    if castSettings.anchor == "none" then
+    -- Only update position if anchor is nil or "none" (free positioning mode)
+    if castSettings.anchor == nil or castSettings.anchor == "none" then
         castSettings.offsetX = math.floor(x + 0.5)
         castSettings.offsetY = math.floor(y + 0.5)
         RefreshCastbar(unitKey)
@@ -353,7 +353,8 @@ local function BuildCastbarSettings(unitKey)
         set = function(layoutName, value)
             local s = GetCastSettings(unitKey)
             if s then
-                local wasNone = (s.anchor == "none")
+                -- Treat nil as "none" for comparison purposes
+                local wasNone = (s.anchor == nil or s.anchor == "none")
                 local isNone = (value == "none")
                 
                 -- Swap offsets between free and locked modes
@@ -1149,13 +1150,15 @@ function CB_EditMode:RegisterFrame(unitKey, frame)
         -- Disable position reset when locked to anchor
         LEM:SetFrameResetVisible(frame, function(layoutName)
             local st = GetCastSettings(unitKey)
-            return st and st.anchor == "none"
+            -- If anchor is nil or "none", allow reset (free positioning mode)
+            return st and (st.anchor == nil or st.anchor == "none")
         end)
         
         -- Disable dragging when locked to anchor
         LEM:SetFrameDragEnabled(frame, function(layoutName)
             local st = GetCastSettings(unitKey)
-            return st and st.anchor == "none"
+            -- If anchor is nil or "none", allow dragging (free positioning mode)
+            return st and (st.anchor == nil or st.anchor == "none")
         end)
     end)
     
