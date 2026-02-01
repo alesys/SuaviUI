@@ -43,11 +43,23 @@ local function GetCastSettings(unitKey)
     return ufdb[unitKey].castbar
 end
 
--- Refresh castbar after settings change
+-- Refresh castbar after settings change - NEW: Uses in-place updates instead of recreation
 local function RefreshCastbar(unitKey)
     local SUI_Castbar = ns.SUI_Castbar
-    local SUI_UF = ns.SUI_UnitFrames
     
+    -- Try to use the new mixin-based refresh (in-place updates)
+    if SUI_Castbar and SUI_Castbar.castbars then
+        local castbar = SUI_Castbar.castbars[unitKey]
+        if castbar and castbar._castbarMixin then
+            -- Use mixin's in-place update methods
+            castbar._castbarMixin:ApplyLayout(nil, true)
+            castbar._castbarMixin:ApplySettings(nil, true)
+            return
+        end
+    end
+    
+    -- Fallback to old recreation method (for legacy castbars)
+    local SUI_UF = ns.SUI_UnitFrames
     if SUI_UF and SUI_UF.RefreshFrame then
         SUI_UF:RefreshFrame(unitKey)
     elseif _G.SuaviUI_RefreshCastbar then

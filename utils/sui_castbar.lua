@@ -82,6 +82,19 @@ local function GetDB()
 end
 
 ---------------------------------------------------------------------------
+-- EXPORT HELPERS FOR CASTBAR MIXIN
+---------------------------------------------------------------------------
+ns.CastbarHelpers = {
+    GetUnitSettings = function(unit) return GetUnitSettings(unit) end,
+    Scale = function(x) return Scale(x) end,
+    GetFontPath = function() return GetFontPath() end,
+    GetFontOutline = function() return GetFontOutline() end,
+    GetTexturePath = function(name) return GetTexturePath(name) end,
+    GetGeneralSettings = function() return GetGeneralSettings() end,
+    GetDB = function() return GetDB() end,
+}
+
+---------------------------------------------------------------------------
 -- SECRET VALUE HANDLING (Midnight 12.0+)
 -- CRITICAL: tostring() on secret values THROWS ERROR
 -- Use _G.ToPlain (WoW API) or pcall(tonumber) instead
@@ -1071,6 +1084,30 @@ function SUI_Castbar:CreateCastbar(unitFrame, unit, unitKey)
         if anchorFrame.castbarOnUpdate then
             anchorFrame:SetScript("OnUpdate", anchorFrame.castbarOnUpdate)
         end
+    end
+    
+    -- Attach CastbarMixin for in-place updates (new architecture)
+    if ns.CastbarMixin then
+        local mixin = Mixin({}, ns.CastbarMixin)
+        mixin.Frame = anchorFrame
+        mixin.unitKey = unitKey
+        mixin.unit = unit
+        mixin.statusBar = anchorFrame.statusBar
+        mixin.bgBar = anchorFrame.bgBar
+        mixin.border = anchorFrame.statusBar and anchorFrame.statusBar.Border
+        mixin.icon = anchorFrame.icon
+        mixin.iconTexture = anchorFrame.iconTexture
+        mixin.iconBorder = anchorFrame.iconBorder
+        mixin.spellText = anchorFrame.spellText
+        mixin.timeText = anchorFrame.timeText
+        mixin.empoweredLevelText = anchorFrame.empoweredLevelText
+        mixin.stageOverlays = anchorFrame.stageOverlays
+        mixin.empoweredStages = anchorFrame.empoweredStages
+        mixin.config = { unitKey = unitKey, unit = unit }
+        
+        -- Store mixin reference on frame for easy access
+        anchorFrame._castbarMixin = mixin
+        anchorFrame._suiCastbarUnit = unitKey
     end
     
     return anchorFrame
@@ -2266,6 +2303,25 @@ function SUI_Castbar:CreateBossCastbar(unitFrame, unit, bossIndex)
         if anchorFrame.bossOnUpdate then
             anchorFrame:SetScript("OnUpdate", anchorFrame.bossOnUpdate)
         end
+    end
+
+    -- Attach CastbarMixin for in-place updates (new architecture)
+    if ns.CastbarMixin then
+        local mixin = Mixin({}, ns.CastbarMixin)
+        mixin.Frame = anchorFrame
+        mixin.unitKey = "boss"
+        mixin.unit = "boss" .. bossIndex
+        mixin.bossIndex = bossIndex
+        mixin.statusBar = anchorFrame.statusBar
+        mixin.iconFrame = anchorFrame.iconFrame
+        mixin.timerText = anchorFrame.timerText
+        mixin.spellNameText = anchorFrame.spellText
+        mixin.sparkTexture = anchorFrame.spark
+        mixin.borderTexture = nil -- Boss castbars may not have border same way
+        mixin.backgroundTexture = anchorFrame.statusBar and anchorFrame.statusBar.background
+        mixin._initialized = true
+        anchorFrame._castbarMixin = mixin
+        anchorFrame._suiCastbarUnit = "boss" .. bossIndex
     end
 
     return anchorFrame

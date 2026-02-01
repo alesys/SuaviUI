@@ -18,6 +18,8 @@
     <Script file="actionbars_editmode.lua"/>
     <!-- Resource Bars Module (Sensei-style architecture) -->
     <Include file="resourcebars/resourcebars.xml"/>
+    <!-- Castbar Mixin (resource bar-style architecture) -->
+    <Script file="CastbarMixin.lua"/>
     <Script file="sui_castbar.lua"/>
     <Script file="sui_unitframes.lua"/>
     <Script file="unitframes_editmode.lua"/>
