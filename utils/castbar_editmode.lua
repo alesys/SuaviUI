@@ -1179,19 +1179,39 @@ end
 function CB_EditMode:RegisterAllFrames()
     -- Use unit frames module to access castbars (they're stored in SUI_UF.castbars)
     local SUI_UF = ns.SUI_UnitFrames
-    if not SUI_UF or not SUI_UF.castbars then return end
+    if not SUI_UF or not SUI_UF.castbars then 
+        print("|cFFFF0000CB_EditMode:|r SUI_UF or SUI_UF.castbars is nil")
+        return 
+    end
     
+    local registeredCount = 0
     for unitKey, castbar in pairs(SUI_UF.castbars) do
         if castbar and castbar.statusBar then
-            -- Boss frames share settings, only register once
+            -- Skip if already registered
+            local skipKey = unitKey
             if unitKey:match("^boss%d+$") then
-                if not self.registeredFrames["boss"] then
-                    self:RegisterFrame("boss", castbar)
-                end
-            else
-                self:RegisterFrame(unitKey, castbar)
+                skipKey = "boss"
             end
+            
+            if not self.registeredFrames[skipKey] then
+                -- Boss frames share settings, only register once
+                if unitKey:match("^boss%d+$") then
+                    if not self.registeredFrames["boss"] then
+                        self:RegisterFrame("boss", castbar)
+                        registeredCount = registeredCount + 1
+                    end
+                else
+                    self:RegisterFrame(unitKey, castbar)
+                    registeredCount = registeredCount + 1
+                end
+            end
+        elseif castbar then
+            print("|cFFFF0000CB_EditMode:|r Castbar for " .. unitKey .. " has no statusBar")
         end
+    end
+    
+    if registeredCount > 0 then
+        print("|cFF56D1FFCastbar Edit Mode:|r Registered " .. registeredCount .. " castbars")
     end
 end
 
@@ -1278,6 +1298,9 @@ function CB_EditMode:Initialize()
                 end
             end
         end
+        
+        -- Register newly created castbars with Edit Mode
+        CB_EditMode:RegisterAllFrames()
         
         -- Show preview for all castbars
         if SUI_UF and SUI_UF.castbars then

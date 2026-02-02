@@ -11662,6 +11662,17 @@ local function CreateCreditsPage(parent)
     sep1:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.5)
     y = y - 30
 
+    -- About This Addon
+    local aboutText = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    aboutText:SetPoint("TOPLEFT", PAD, y)
+    aboutText:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
+    aboutText:SetText("This addon started as a joke that went out of control. When Quazii dropped the development, I took this addon and attempted to make it stable for guildies that bought it. One thing took to another, and now I'm chained to its destiny.")
+    aboutText:SetTextColor(C.textMuted[1], C.textMuted[2], C.textMuted[3], 1)
+    aboutText:SetJustifyH("LEFT")
+    aboutText:SetWordWrap(true)
+    aboutText:SetFont(aboutText:GetFont(), 12, "OUTLINE")
+    y = y - 70
+
     -- Author Section
     local authorHeader = GUI:CreateSectionHeader(content, "Author")
     authorHeader:SetPoint("TOPLEFT", PAD, y)
