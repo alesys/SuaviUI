@@ -3,3 +3,7 @@ SuaviUI.code-workspace
 
 # Release artifacts
 SuaviUI.zip
+
+# macOS metadata files
+.DS_Store
+**/.DS_Store
