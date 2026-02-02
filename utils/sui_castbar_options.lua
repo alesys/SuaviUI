@@ -109,10 +109,15 @@ local function BuildCastbarOptions(tabContent, unitKey, y, PAD, FORM_ROW, Refres
         generalLabel:SetJustifyH("LEFT")
         y = y - 20
 
-        local castEnable = GUI:CreateFormCheckbox(tabContent, "Enable Castbar", "enabled", castDB, RefreshUnit)
-        castEnable:SetPoint("TOPLEFT", PAD, y)
-        castEnable:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
+        local enableInfo = GUI:CreateLabel(tabContent,
+            "Enable/disable Castbars in Edit Mode (sidepanel). The Edit Mode setting takes priority over these options.",
+            11, C.textMuted)
+        enableInfo:SetPoint("TOPLEFT", PAD, y)
+        enableInfo:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        enableInfo:SetJustifyH("LEFT")
+        enableInfo:SetWordWrap(true)
+        enableInfo:SetHeight(28)
+        y = y - 28
 
         local castShowIcon = GUI:CreateFormCheckbox(tabContent, "Show Spell Icon", "showIcon", castDB, RefreshUnit)
         castShowIcon:SetPoint("TOPLEFT", PAD, y)
