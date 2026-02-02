@@ -324,10 +324,36 @@ function AB_EditMode:RegisterFrame(buttonType, holderFrame)
         -- Add settings
         local settings = BuildButtonSettings(buttonType)
         LEM:AddFrameSettings(holderFrame, settings)
+        
+        -- Enable dragging only when customization is enabled
+        LEM:SetFrameDragEnabled(holderFrame, function(layoutName)
+            local st = GetButtonSettings(buttonType)
+            return st and st.enabled or false
+        end)
+        
+        -- Show reset button only when customization is enabled
+        LEM:SetFrameResetVisible(holderFrame, function(layoutName)
+            local st = GetButtonSettings(buttonType)
+            return st and st.enabled or false
+        end)
     end)
     
     if success then
         self.registeredFrames[buttonType] = holderFrame
+        
+        -- Add visual indicator overlay for Edit Mode visibility
+        if not holderFrame._editModeOverlay then
+            local overlay = CreateFrame("Frame", nil, holderFrame, "BackdropTemplate")
+            overlay:SetAllPoints(holderFrame)
+            overlay:SetFrameLevel(holderFrame:GetFrameLevel() + 1)
+            overlay:SetBackdrop({
+                edgeFile = "Interface\\Buttons\\WHITE8x8",
+                edgeSize = 2,
+            })
+            overlay:SetBackdropBorderColor(0.3, 0.8, 1, 0.6)  -- Light blue border for visual feedback
+            overlay:Hide()  -- Hidden by default, shown when Edit Mode is active/dragging
+            holderFrame._editModeOverlay = overlay
+        end
     else
         print("SuaviUI: Failed to register", buttonType, "with Edit Mode:", err)
     end
@@ -380,6 +406,11 @@ function AB_EditMode:Initialize()
     
     -- Hook into Edit Mode enter/exit for any special handling
     LEM:RegisterCallback("enter", function()
+        -- Hide ExtraAbilityContainer (Blizzard default) since we manage buttons separately
+        if _G.ExtraAbilityContainer then
+            _G.ExtraAbilityContainer:Hide()
+        end
+        
         -- Force buttons to show when entering Edit Mode for positioning
         local abdb = GetActionBarsDB()
         if abdb and abdb.bars then
@@ -393,6 +424,11 @@ function AB_EditMode:Initialize()
     end)
     
     LEM:RegisterCallback("exit", function()
+        -- Show ExtraAbilityContainer again when exiting Edit Mode
+        if _G.ExtraAbilityContainer then
+            _G.ExtraAbilityContainer:Show()
+        end
+        
         -- Clear edit mode flag when exiting
         local abdb = GetActionBarsDB()
         if abdb and abdb.bars then
