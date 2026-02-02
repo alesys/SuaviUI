@@ -1,3 +1,9 @@
+------------------------------------------------------------
+-- RESOURCE BAR API HELPERS
+-- Based on SenseiClassResourceBar by Equilateral (EQOL)
+-- Modified for SuaviUI AceDB profile integration
+------------------------------------------------------------
+
 local addonName, SUICore = ...
 
 local RB = SUICore.ResourceBars
@@ -90,11 +96,9 @@ RB.exportBarAsString = function(dbName)
     }
 
     local layoutName = LEM.GetActiveLayoutName() or "Default"
-    if dbName
-        and SuaviUI_ResourceBarsDB
-        and SuaviUI_ResourceBarsDB[dbName]
-        and SuaviUI_ResourceBarsDB[dbName][layoutName] then
-        data.BARS[dbName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or nil
+    local db = RB.GetResourceBarsDB()
+    if dbName and db and db[dbName] and db[dbName][layoutName] then
+        data.BARS[dbName] = db[dbName][layoutName] or nil
     end
 
     return RB.encodeDataAsString(data)
@@ -107,12 +111,12 @@ RB.importBarAsString = function(importString, dbName)
     end
 
     if data.BARS[dbName] then
-        if not SuaviUI_ResourceBarsDB then
-            SuaviUI_ResourceBarsDB = {}
-        end
-
+        local db = RB.GetResourceBarsDB()
         local layoutName = LEM.GetActiveLayoutName() or "Default"
-        SuaviUI_ResourceBarsDB[dbName][layoutName] = data.BARS[dbName]
+        if not db[dbName] then
+            db[dbName] = {}
+        end
+        db[dbName][layoutName] = data.BARS[dbName]
     end
 
     return data
@@ -125,21 +129,23 @@ RB.exportProfileAsString = function(includeBarSettings, includeAddonSettings, la
     }
 
     if includeBarSettings then
+        local db = RB.GetResourceBarsDB()
         local layoutName = layoutNameToExport or LEM.GetActiveLayoutName() or "Default"
         for _, barSettings in pairs(RB.RegisteredBar or {}) do
             if barSettings
                 and barSettings.dbName
-                and SuaviUI_ResourceBarsDB
-                and SuaviUI_ResourceBarsDB[barSettings.dbName]
-                and SuaviUI_ResourceBarsDB[barSettings.dbName][layoutName] then
-                data.BARS[barSettings.dbName] = SuaviUI_ResourceBarsDB[barSettings.dbName][layoutName] or nil
+                and db
+                and db[barSettings.dbName]
+                and db[barSettings.dbName][layoutName] then
+                data.BARS[barSettings.dbName] = db[barSettings.dbName][layoutName] or nil
             end
         end
     end
 
     if includeAddonSettings then
-        if SuaviUI_ResourceBarsDB and SuaviUI_ResourceBarsDB["_Settings"] then
-            data.GLOBAL = SuaviUI_ResourceBarsDB["_Settings"]
+        local db = RB.GetResourceBarsDB()
+        if db and db["_Settings"] then
+            data.GLOBAL = db["_Settings"]
         end
     end
 
@@ -152,25 +158,18 @@ RB.importProfileFromString = function(importString)
         return nil, errMsg or "?"
     end
 
+    local db = RB.GetResourceBarsDB()
     local layoutName = LEM.GetActiveLayoutName() or "Default"
+    
     for dbName, barSettings in pairs(data.BARS or {}) do
-        if not SuaviUI_ResourceBarsDB then
-            SuaviUI_ResourceBarsDB = {}
+        if not db[dbName] then
+            db[dbName] = {}
         end
-
-        if not SuaviUI_ResourceBarsDB[dbName] then
-            SuaviUI_ResourceBarsDB[dbName] = {}
-        end
-
-        SuaviUI_ResourceBarsDB[dbName][layoutName] = barSettings
+        db[dbName][layoutName] = barSettings
     end
 
     if data.GLOBAL then
-        if not SuaviUI_ResourceBarsDB then
-            SuaviUI_ResourceBarsDB = {}
-        end
-
-        SuaviUI_ResourceBarsDB["_Settings"] = data.GLOBAL
+        db["_Settings"] = data.GLOBAL
     end
 
     return data
@@ -179,15 +178,16 @@ end
 RB.getAvailableProfiles = function()
     local profiles = {}
 
-    if not SuaviUI_ResourceBarsDB then
+    local db = RB.GetResourceBarsDB()
+    if not db then
         return profiles
     end
 
     for _, barSettings in pairs(RB.RegisteredBar or {}) do
         if barSettings and barSettings.dbName then
             local dbName = barSettings.dbName
-            if SuaviUI_ResourceBarsDB[dbName] then
-                for layoutName, _ in pairs(SuaviUI_ResourceBarsDB[dbName]) do
+            if db[dbName] then
+                for layoutName, _ in pairs(db[dbName]) do
                     profiles[layoutName] = true
                 end
             end

@@ -65,6 +65,7 @@ Pull requests welcome! Just make sure your code doesn't summon demons. We've had
 
 ## Credits
 
+### People & Inspiration
 - **You** - For having excellent taste in addons
 - **Vella** - For tanking Smolderon to my face
 - **Pataz** - For the support
@@ -72,6 +73,13 @@ Pull requests welcome! Just make sure your code doesn't summon demons. We've had
 - **Quazii** - Original inspiration
 - **ElvUI** - UI framework inspiration
 - **Claudia** - AI-powered development assistant
+- **The WoW Community** - For inspiration and feedback
+
+### Code Attribution
+- **SenseiClassResourceBar** by Equilateral (EQOL) - Core resource bar architecture, class/spec detection logic, and LibEQOLEditMode integration. The resource bar system is based on their excellent work.
+- **CooldownManagerCentered** - Cooldown manager integration reference and width synchronization features
+
+### Libraries & Dependencies
 - **Ace3 Libraries** - AceAddon, AceDB, AceConsole, AceEvent, AceLocale, AceSerializer, AceComm
 - **LibSharedMedia-3.0** - Shared media resources
 - **LibDeflate** - Data compression for import/export
@@ -80,7 +88,8 @@ Pull requests welcome! Just make sure your code doesn't summon demons. We've had
 - **LibKeyBound-1.0** - Keybind management
 - **LibDualSpec-1.0** - Spec-based profile switching
 - **LibOpenRaid** - Raid utility functions
-- **The WoW Community** - For inspiration and feedback
+
+### Special Thanks
 - **Coffee** - The real MVP
 - **Stack Overflow** - You know why
 - **Blizzard** - For making a UI bad enough to inspire this project

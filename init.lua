@@ -64,6 +64,16 @@ SlashCmdList["SUAVIUI_CDM"] = function()
     end
 end
 
+-- Edit Mode shortcut (/em)
+SLASH_SUAVIUI_EM1 = "/em"
+SlashCmdList["SUAVIUI_EM"] = function()
+    if EditModeManagerFrame then
+        ShowUIPanel(EditModeManagerFrame)
+    else
+        print("|cff34D399SuaviUI:|r Edit Mode not available.")
+    end
+end
+
 function SuaviUI:SlashCommandOpen(input)
     if input and input == "debug" then
         self.db.char.debug.reload = true

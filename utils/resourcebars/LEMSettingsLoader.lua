@@ -1,3 +1,9 @@
+------------------------------------------------------------
+-- LEM SETTINGS LOADER
+-- Based on SenseiClassResourceBar by Equilateral (EQOL)
+-- Modified for SuaviUI AceDB profile integration
+------------------------------------------------------------
+
 local addonName, SUICore = ...
 
 local RB = SUICore.ResourceBars
@@ -10,6 +16,23 @@ local L = RB.L
 ------------------------------------------------------------
 
 local LEMSettingsLoaderMixin = {}
+
+-- Helper to get bar data from profile
+local function GetBarData(config, layoutName)
+    local db = RB.GetResourceBarsDB()
+    if not db then return nil end
+    return db[config.dbName] and db[config.dbName][layoutName]
+end
+
+-- Helper to ensure bar data exists and return it
+local function EnsureBarData(config, layoutName, defaults)
+    local db = RB.GetResourceBarsDB()
+    if not db then return nil end
+    
+    db[config.dbName] = db[config.dbName] or {}
+    db[config.dbName][layoutName] = db[config.dbName][layoutName] or CopyTable(defaults)
+    return db[config.dbName][layoutName]
+end
 
 local function BuildLemSettings(bar, defaults)
     local config = bar:GetConfig()
@@ -35,11 +58,12 @@ local function BuildLemSettings(bar, defaults)
             useOldStyle = true,
             values = RB.availableBarVisibilityOptions,
             get = function(layoutName)
-                return (SuaviUI_ResourceBarsDB[config.dbName][layoutName] and SuaviUI_ResourceBarsDB[config.dbName][layoutName].barVisible) or defaults.barVisible
+                local data = GetBarData(config, layoutName)
+                return (data and data.barVisible) or defaults.barVisible
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].barVisible = value
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then data.barVisible = value end
             end,
         },
         {
@@ -51,12 +75,15 @@ local function BuildLemSettings(bar, defaults)
             useOldStyle = true,
             values = RB.availableBarStrataOptions,
             get = function(layoutName)
-                return (SuaviUI_ResourceBarsDB[config.dbName][layoutName] and SuaviUI_ResourceBarsDB[config.dbName][layoutName].barStrata) or defaults.barStrata
+                local data = GetBarData(config, layoutName)
+                return (data and data.barStrata) or defaults.barStrata
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].barStrata = value
-                bar:ApplyLayout(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.barStrata = value
+                    bar:ApplyLayout(layoutName)
+                end
             end,
             tooltip = L["BAR_STRATA_TOOLTIP"],
         },
@@ -67,7 +94,7 @@ local function BuildLemSettings(bar, defaults)
             kind = LEM.SettingType.Checkbox,
             default = defaults.hideWhileMountedOrVehicule,
             get = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 if data and data.hideWhileMountedOrVehicule ~= nil then
                     return data.hideWhileMountedOrVehicule
                 else
@@ -75,8 +102,8 @@ local function BuildLemSettings(bar, defaults)
                 end
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].hideWhileMountedOrVehicule = value
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then data.hideWhileMountedOrVehicule = value end
             end,
             tooltip = L["HIDE_WHILE_MOUNTED_OR_VEHICULE_TOOLTIP"],
         },
@@ -98,13 +125,15 @@ local function BuildLemSettings(bar, defaults)
             valueStep = 1,
             allowInput = true,
             get = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 return data and (data.x ~= nil and RB.rounded(data.x) or defaults.x) or defaults.x
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].x = RB.rounded(value)
-                bar:ApplyLayout(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.x = RB.rounded(value)
+                    bar:ApplyLayout(layoutName)
+                end
             end,
         },
         {
@@ -118,13 +147,15 @@ local function BuildLemSettings(bar, defaults)
             valueStep = 1,
             allowInput = true,
             get = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 return data and (data.y ~= nil and RB.rounded(data.y) or defaults.y) or defaults.y
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].y = RB.rounded(value)
-                bar:ApplyLayout(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.y = RB.rounded(value)
+                    bar:ApplyLayout(layoutName)
+                end
             end,
         },
         {
@@ -136,18 +167,21 @@ local function BuildLemSettings(bar, defaults)
             useOldStyle = true,
             values = RB.availableRelativeFrames(config),
             get = function(layoutName)
-                return (SuaviUI_ResourceBarsDB[config.dbName][layoutName] and SuaviUI_ResourceBarsDB[config.dbName][layoutName].relativeFrame) or defaults.relativeFrame
+                local data = GetBarData(config, layoutName)
+                return (data and data.relativeFrame) or defaults.relativeFrame
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].relativeFrame = value
-                -- Reset position when changing relative frame
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].x = defaults.x
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].y = defaults.y
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].point = defaults.point
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].relativePoint = defaults.relativePoint
-                bar:ApplyLayout(layoutName)
-                LEM.internal:RefreshSettingValues({ L["X_POSITION"], L["Y_POSITION"], L["ANCHOR_POINT"], L["RELATIVE_POINT"] })
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.relativeFrame = value
+                    -- Reset position when changing relative frame
+                    data.x = defaults.x
+                    data.y = defaults.y
+                    data.point = defaults.point
+                    data.relativePoint = defaults.relativePoint
+                    bar:ApplyLayout(layoutName)
+                    LEM.internal:RefreshSettingValues({ L["X_POSITION"], L["Y_POSITION"], L["ANCHOR_POINT"], L["RELATIVE_POINT"] })
+                end
             end,
             tooltip = L["RELATIVE_FRAME_TOOLTIP"],
         },
@@ -160,12 +194,15 @@ local function BuildLemSettings(bar, defaults)
             useOldStyle = true,
             values = RB.availableAnchorPoints,
             get = function(layoutName)
-                return (SuaviUI_ResourceBarsDB[config.dbName][layoutName] and SuaviUI_ResourceBarsDB[config.dbName][layoutName].point) or defaults.point
+                local data = GetBarData(config, layoutName)
+                return (data and data.point) or defaults.point
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].point = value
-                bar:ApplyLayout(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.point = value
+                    bar:ApplyLayout(layoutName)
+                end
             end,
         },
         {
@@ -177,12 +214,15 @@ local function BuildLemSettings(bar, defaults)
             useOldStyle = true,
             values = RB.availableRelativePoints,
             get = function(layoutName)
-                return (SuaviUI_ResourceBarsDB[config.dbName][layoutName] and SuaviUI_ResourceBarsDB[config.dbName][layoutName].relativePoint) or defaults.relativePoint
+                local data = GetBarData(config, layoutName)
+                return (data and data.relativePoint) or defaults.relativePoint
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].relativePoint = value
-                bar:ApplyLayout(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.relativePoint = value
+                    bar:ApplyLayout(layoutName)
+                end
             end,
         },
         {
@@ -203,13 +243,15 @@ local function BuildLemSettings(bar, defaults)
                 return string.format("%d%%", RB.rounded(value, 2) * 100)
             end,
             get = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 return data and (data.scale ~= nil and RB.rounded(data.scale, 2) or defaults.scale) or defaults.scale
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].scale = RB.rounded(value, 2)
-                bar:ApplyLayout(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.scale = RB.rounded(value, 2)
+                    bar:ApplyLayout(layoutName)
+                end
             end,
         },
         {
@@ -221,12 +263,15 @@ local function BuildLemSettings(bar, defaults)
             useOldStyle = true,
             values = RB.availableWidthModes,
             get = function(layoutName)
-                return (SuaviUI_ResourceBarsDB[config.dbName][layoutName] and SuaviUI_ResourceBarsDB[config.dbName][layoutName].widthMode) or defaults.widthMode
+                local data = GetBarData(config, layoutName)
+                return (data and data.widthMode) or defaults.widthMode
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].widthMode = value
-                bar:ApplyLayout(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.widthMode = value
+                    bar:ApplyLayout(layoutName)
+                end
             end,
         },
         {
@@ -240,17 +285,19 @@ local function BuildLemSettings(bar, defaults)
             valueStep = 1,
             allowInput = true,
             get = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 return data and (data.width ~= nil and RB.rounded(data.width) or defaults.width) or defaults.width
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].width = RB.rounded(value)
-                bar:ApplyLayout(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.width = RB.rounded(value)
+                    bar:ApplyLayout(layoutName)
+                end
             end,
             isEnabled = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
-                return data.widthMode == "Manual"
+                local data = GetBarData(config, layoutName)
+                return data and data.widthMode == "Manual"
             end,
         },
         {
@@ -264,17 +311,19 @@ local function BuildLemSettings(bar, defaults)
             valueStep = 1,
             allowInput = true,
             get = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 return data and (data.minWidth ~= nil and RB.rounded(data.minWidth) or defaults.minWidth) or defaults.minWidth
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].minWidth = RB.rounded(value)
-                bar:ApplyLayout(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.minWidth = RB.rounded(value)
+                    bar:ApplyLayout(layoutName)
+                end
             end,
             tooltip = L["MINIMUM_WIDTH_TOOLTIP"],
             isEnabled = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 return data ~= nil and data.widthMode ~= "Manual"
             end,
         },
@@ -289,13 +338,15 @@ local function BuildLemSettings(bar, defaults)
             valueStep = 1,
             allowInput = true,
             get = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 return data and (data.height ~= nil and RB.rounded(data.height) or defaults.height) or defaults.height
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].height = RB.rounded(value)
-                bar:ApplyLayout(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.height = RB.rounded(value)
+                    bar:ApplyLayout(layoutName)
+                end
             end,
         },
         -- BAR SETTINGS CATEGORY
@@ -315,12 +366,15 @@ local function BuildLemSettings(bar, defaults)
             useOldStyle = true,
             values = RB.availableFillDirections,
             get = function(layoutName)
-                return (SuaviUI_ResourceBarsDB[config.dbName][layoutName] and SuaviUI_ResourceBarsDB[config.dbName][layoutName].fillDirection) or defaults.fillDirection
+                local data = GetBarData(config, layoutName)
+                return (data and data.fillDirection) or defaults.fillDirection
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].fillDirection = value
-                bar:ApplyLayout(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.fillDirection = value
+                    bar:ApplyLayout(layoutName)
+                end
             end,
         },
         {
@@ -330,7 +384,7 @@ local function BuildLemSettings(bar, defaults)
             kind = LEM.SettingType.Checkbox,
             default = defaults.fasterUpdates,
             get = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 if data and data.fasterUpdates ~= nil then
                     return data.fasterUpdates
                 else
@@ -338,12 +392,14 @@ local function BuildLemSettings(bar, defaults)
                 end
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].fasterUpdates = value
-                if value then
-                    bar:EnableFasterUpdates()
-                else
-                    bar:DisableFasterUpdates()
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.fasterUpdates = value
+                    if value then
+                        bar:EnableFasterUpdates()
+                    else
+                        bar:DisableFasterUpdates()
+                    end
                 end
             end,
         },
@@ -354,7 +410,7 @@ local function BuildLemSettings(bar, defaults)
             kind = LEM.SettingType.Checkbox,
             default = defaults.smoothProgress,
             get = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 if data and data.smoothProgress ~= nil then
                     return data.smoothProgress
                 else
@@ -362,8 +418,8 @@ local function BuildLemSettings(bar, defaults)
                 end
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].smoothProgress = value
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then data.smoothProgress = value end
             end,
         },
         -- BAR STYLE CATEGORY
@@ -386,7 +442,7 @@ local function BuildLemSettings(bar, defaults)
                 dropdown.texturePool = {}
 
                 local layoutName = LEM.GetActiveLayoutName() or "Default"
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 if not data then return end
 
                 if not dropdown._SUI_Foreground_Dropdown_OnMenuClosed_hooked then
@@ -433,15 +489,18 @@ local function BuildLemSettings(bar, defaults)
                 end
             end,
             get = function(layoutName)
-                return (SuaviUI_ResourceBarsDB[config.dbName][layoutName] and SuaviUI_ResourceBarsDB[config.dbName][layoutName].foregroundStyle) or defaults.foregroundStyle
+                local data = GetBarData(config, layoutName)
+                return (data and data.foregroundStyle) or defaults.foregroundStyle
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].foregroundStyle = value
-                bar:ApplyLayout(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.foregroundStyle = value
+                    bar:ApplyLayout(layoutName)
+                end
             end,
             isEnabled = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 return not data.useResourceAtlas
             end,
         },
@@ -458,7 +517,7 @@ local function BuildLemSettings(bar, defaults)
                 dropdown.texturePool = {}
 
                 local layoutName = LEM.GetActiveLayoutName() or "Default"
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 if not data then return end
 
                 if not dropdown._SUI_Background_Dropdown_OnMenuClosed_hooked then
@@ -505,21 +564,26 @@ local function BuildLemSettings(bar, defaults)
                 end
             end,
             get = function(layoutName)
-                return (SuaviUI_ResourceBarsDB[config.dbName][layoutName] and SuaviUI_ResourceBarsDB[config.dbName][layoutName].backgroundStyle) or defaults.backgroundStyle
+                local data = GetBarData(config, layoutName)
+                return (data and data.backgroundStyle) or defaults.backgroundStyle
             end,
             colorGet = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 return data and data.backgroundColor or defaults.backgroundColor
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].backgroundStyle = value
-                bar:ApplyLayout(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.backgroundStyle = value
+                    bar:ApplyLayout(layoutName)
+                end
             end,
             colorSet = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].backgroundColor = value
-                bar:ApplyBackgroundSettings(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.backgroundColor = value
+                    bar:ApplyBackgroundSettings(layoutName)
+                end
             end,
         },
         {
@@ -529,7 +593,7 @@ local function BuildLemSettings(bar, defaults)
             kind = LEM.SettingType.Checkbox,
             default = defaults.useStatusBarColorForBackgroundColor,
             get = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 if data and data.useStatusBarColorForBackgroundColor ~= nil then
                     return data.useStatusBarColorForBackgroundColor
                 else
@@ -537,9 +601,11 @@ local function BuildLemSettings(bar, defaults)
                 end
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].useStatusBarColorForBackgroundColor = value
-                bar:ApplyBackgroundSettings(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.useStatusBarColorForBackgroundColor = value
+                    bar:ApplyBackgroundSettings(layoutName)
+                end
             end,
         },
         {
@@ -552,21 +618,26 @@ local function BuildLemSettings(bar, defaults)
             useOldStyle = true,
             values = RB.availableMaskAndBorderStyles,
             get = function(layoutName)
-                return (SuaviUI_ResourceBarsDB[config.dbName][layoutName] and SuaviUI_ResourceBarsDB[config.dbName][layoutName].maskAndBorderStyle) or defaults.maskAndBorderStyle
+                local data = GetBarData(config, layoutName)
+                return (data and data.maskAndBorderStyle) or defaults.maskAndBorderStyle
             end,
             colorGet = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 return data and data.borderColor or defaults.borderColor
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].maskAndBorderStyle = value
-                bar:ApplyMaskAndBorderSettings(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.maskAndBorderStyle = value
+                    bar:ApplyMaskAndBorderSettings(layoutName)
+                end
             end,
             colorSet = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].borderColor = value
-                bar:ApplyMaskAndBorderSettings(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.borderColor = value
+                    bar:ApplyMaskAndBorderSettings(layoutName)
+                end
             end,
         },
         -- TEXT SETTINGS CATEGORY
@@ -585,7 +656,7 @@ local function BuildLemSettings(bar, defaults)
             default = defaults.showText,
             colorDefault = defaults.textColor,
             get = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 if data and data.showText ~= nil then
                     return data.showText
                 else
@@ -593,18 +664,22 @@ local function BuildLemSettings(bar, defaults)
                 end
             end,
             colorGet = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 return data and data.textColor or defaults.textColor
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].showText = value
-                bar:ApplyTextVisibilitySettings(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.showText = value
+                    bar:ApplyTextVisibilitySettings(layoutName)
+                end
             end,
             colorSet = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].textColor = value
-                bar:ApplyFontSettings(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.textColor = value
+                    bar:ApplyFontSettings(layoutName)
+                end
             end,
         },
         {
@@ -616,17 +691,20 @@ local function BuildLemSettings(bar, defaults)
             useOldStyle = true,
             values = RB.availableTextFormats,
             get = function(layoutName)
-                return (SuaviUI_ResourceBarsDB[config.dbName][layoutName] and SuaviUI_ResourceBarsDB[config.dbName][layoutName].textFormat) or defaults.textFormat
+                local data = GetBarData(config, layoutName)
+                return (data and data.textFormat) or defaults.textFormat
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].textFormat = value
-                bar:UpdateDisplay(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.textFormat = value
+                    bar:UpdateDisplay(layoutName)
+                end
             end,
             tooltip = L["RESOURCE_NUMBER_FORMAT_TOOLTIP"],
             isEnabled = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
-                return data.showText
+                local data = GetBarData(config, layoutName)
+                return data and data.showText
             end,
         },
         {
@@ -638,16 +716,19 @@ local function BuildLemSettings(bar, defaults)
             useOldStyle = true,
             values = RB.availableTextPrecisions,
             get = function(layoutName)
-                return (SuaviUI_ResourceBarsDB[config.dbName][layoutName] and SuaviUI_ResourceBarsDB[config.dbName][layoutName].textPrecision) or defaults.textPrecision
+                local data = GetBarData(config, layoutName)
+                return (data and data.textPrecision) or defaults.textPrecision
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].textPrecision = value
-                bar:UpdateDisplay(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.textPrecision = value
+                    bar:UpdateDisplay(layoutName)
+                end
             end,
             isEnabled = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
-                return data.showText and RB.textPrecisionAllowedForType[data.textFormat] ~= nil
+                local data = GetBarData(config, layoutName)
+                return data and data.showText and RB.textPrecisionAllowedForType[data.textFormat] ~= nil
             end,
         },
         {
@@ -659,16 +740,19 @@ local function BuildLemSettings(bar, defaults)
             useOldStyle = true,
             values = RB.availableTextAlignmentStyles,
             get = function(layoutName)
-                return (SuaviUI_ResourceBarsDB[config.dbName][layoutName] and SuaviUI_ResourceBarsDB[config.dbName][layoutName].textAlign) or defaults.textAlign
+                local data = GetBarData(config, layoutName)
+                return (data and data.textAlign) or defaults.textAlign
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].textAlign = value
-                bar:ApplyFontSettings(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.textAlign = value
+                    bar:ApplyFontSettings(layoutName)
+                end
             end,
             isEnabled = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
-                return data.showText
+                local data = GetBarData(config, layoutName)
+                return data and data.showText
             end,
         },
         -- FONT CATEGORY
@@ -691,7 +775,7 @@ local function BuildLemSettings(bar, defaults)
                 dropdown.fontPool = {}
 
                 local layoutName = LEM.GetActiveLayoutName() or "Default"
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 if not data then return end
 
                 if not dropdown._SUI_FontFace_Dropdown_OnMenuClosed_hooked then
@@ -741,12 +825,15 @@ local function BuildLemSettings(bar, defaults)
                 end
             end,
             get = function(layoutName)
-                return (SuaviUI_ResourceBarsDB[config.dbName][layoutName] and SuaviUI_ResourceBarsDB[config.dbName][layoutName].font) or defaults.font
+                local data = GetBarData(config, layoutName)
+                return (data and data.font) or defaults.font
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].font = value
-                bar:ApplyFontSettings(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.font = value
+                    bar:ApplyFontSettings(layoutName)
+                end
             end,
         },
         {
@@ -759,13 +846,15 @@ local function BuildLemSettings(bar, defaults)
             maxValue = 50,
             valueStep = 1,
             get = function(layoutName)
-                local data = SuaviUI_ResourceBarsDB[config.dbName][layoutName]
+                local data = GetBarData(config, layoutName)
                 return data and RB.rounded(data.fontSize) or defaults.fontSize
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].fontSize = RB.rounded(value)
-                bar:ApplyFontSettings(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.fontSize = RB.rounded(value)
+                    bar:ApplyFontSettings(layoutName)
+                end
             end,
         },
         {
@@ -777,12 +866,15 @@ local function BuildLemSettings(bar, defaults)
             useOldStyle = true,
             values = RB.availableOutlineStyles,
             get = function(layoutName)
-                return (SuaviUI_ResourceBarsDB[config.dbName][layoutName] and SuaviUI_ResourceBarsDB[config.dbName][layoutName].fontOutline) or defaults.fontOutline
+                local data = GetBarData(config, layoutName)
+                return (data and data.fontOutline) or defaults.fontOutline
             end,
             set = function(layoutName, value)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-                SuaviUI_ResourceBarsDB[config.dbName][layoutName].fontOutline = value
-                bar:ApplyFontSettings(layoutName)
+                local data = EnsureBarData(config, layoutName, defaults)
+                if data then
+                    data.fontOutline = value
+                    bar:ApplyFontSettings(layoutName)
+                end
             end,
         },
     }
@@ -812,29 +904,19 @@ function LEMSettingsLoaderMixin:Init(bar, defaults)
     local frame = bar:GetFrame()
     local config = bar:GetConfig()
 
-    RB.GetResourceBarsDB()
-
-    if not SuaviUI_ResourceBarsDB then
-        SuaviUI_ResourceBarsDB = {}
-    end
-    if not SuaviUI_ResourceBarsDB[config.dbName] then
-        SuaviUI_ResourceBarsDB[config.dbName] = {}
-    end
+    -- Ensure database is initialized
+    local db = RB.GetResourceBarsDB()
 
     local function OnPositionChanged(frame, layoutName, point, x, y)
-        if not SuaviUI_ResourceBarsDB then
-            SuaviUI_ResourceBarsDB = {}
+        local data = EnsureBarData(config, layoutName, defaults)
+        if data then
+            data.point = point
+            data.relativePoint = point
+            data.x = x
+            data.y = y
+            bar:ApplyLayout(layoutName)
+            LEM.internal:RefreshSettingValues({ L["X_POSITION"], L["Y_POSITION"] })
         end
-        if not SuaviUI_ResourceBarsDB[config.dbName] then
-            SuaviUI_ResourceBarsDB[config.dbName] = {}
-        end
-        SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
-        SuaviUI_ResourceBarsDB[config.dbName][layoutName].point = point
-        SuaviUI_ResourceBarsDB[config.dbName][layoutName].relativePoint = point
-        SuaviUI_ResourceBarsDB[config.dbName][layoutName].x = x
-        SuaviUI_ResourceBarsDB[config.dbName][layoutName].y = y
-        bar:ApplyLayout(layoutName)
-        LEM.internal:RefreshSettingValues({ L["X_POSITION"], L["Y_POSITION"] })
     end
 
     LEM:RegisterCallback("enter", function()
@@ -850,13 +932,7 @@ function LEMSettingsLoaderMixin:Init(bar, defaults)
     end)
 
     LEM:RegisterCallback("layout", function(layoutName)
-        if not SuaviUI_ResourceBarsDB then
-            SuaviUI_ResourceBarsDB = {}
-        end
-        if not SuaviUI_ResourceBarsDB[config.dbName] then
-            SuaviUI_ResourceBarsDB[config.dbName] = {}
-        end
-        SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][layoutName] or CopyTable(defaults)
+        local data = EnsureBarData(config, layoutName, defaults)
         bar:OnLayoutChange(layoutName)
         bar:InitCooldownManagerWidthHook(layoutName)
         bar:ApplyVisibilitySettings(layoutName)
@@ -865,14 +941,10 @@ function LEMSettingsLoaderMixin:Init(bar, defaults)
     end)
 
     LEM:RegisterCallback("layoutduplicate", function(_, duplicateIndices, _, _, layoutName)
-        if not SuaviUI_ResourceBarsDB then
-            SuaviUI_ResourceBarsDB = {}
-        end
-        if not SuaviUI_ResourceBarsDB[config.dbName] then
-            SuaviUI_ResourceBarsDB[config.dbName] = {}
-        end
+        local db = RB.GetResourceBarsDB()
         local original = LEM:GetLayouts()[duplicateIndices[1]].name
-        SuaviUI_ResourceBarsDB[config.dbName][layoutName] = SuaviUI_ResourceBarsDB[config.dbName][original] and CopyTable(SuaviUI_ResourceBarsDB[config.dbName][original]) or CopyTable(defaults)
+        local originalData = GetBarData(config, original)
+        db[config.dbName][layoutName] = originalData and CopyTable(originalData) or CopyTable(defaults)
         bar:InitCooldownManagerWidthHook(layoutName)
         bar:ApplyVisibilitySettings(layoutName)
         bar:ApplyLayout(layoutName, true)
@@ -880,14 +952,10 @@ function LEMSettingsLoaderMixin:Init(bar, defaults)
     end)
 
     LEM:RegisterCallback("layoutrenamed", function(oldLayoutName, newLayoutName)
-        if not SuaviUI_ResourceBarsDB then
-            SuaviUI_ResourceBarsDB = {}
-        end
-        if not SuaviUI_ResourceBarsDB[config.dbName] then
-            SuaviUI_ResourceBarsDB[config.dbName] = {}
-        end
-        SuaviUI_ResourceBarsDB[config.dbName][newLayoutName] = SuaviUI_ResourceBarsDB[config.dbName][oldLayoutName] and CopyTable(SuaviUI_ResourceBarsDB[config.dbName][oldLayoutName]) or CopyTable(defaults)
-        SuaviUI_ResourceBarsDB[config.dbName][oldLayoutName] = nil
+        local db = RB.GetResourceBarsDB()
+        local oldData = GetBarData(config, oldLayoutName)
+        db[config.dbName][newLayoutName] = oldData and CopyTable(oldData) or CopyTable(defaults)
+        db[config.dbName][oldLayoutName] = nil
         bar:InitCooldownManagerWidthHook(newLayoutName)
         bar:ApplyVisibilitySettings()
         bar:ApplyLayout()
@@ -895,11 +963,10 @@ function LEMSettingsLoaderMixin:Init(bar, defaults)
     end)
 
     LEM:RegisterCallback("layoutdeleted", function(_, layoutName)
-        if not SuaviUI_ResourceBarsDB then
-            SuaviUI_ResourceBarsDB = {}
+        local db = RB.GetResourceBarsDB()
+        if db[config.dbName] then
+            db[config.dbName][layoutName] = nil
         end
-        SuaviUI_ResourceBarsDB[config.dbName] = SuaviUI_ResourceBarsDB[config.dbName] or {}
-        SuaviUI_ResourceBarsDB[config.dbName][layoutName] = nil
         bar:ApplyVisibilitySettings()
         bar:ApplyLayout()
         bar:UpdateDisplay()

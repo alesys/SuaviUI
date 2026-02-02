@@ -62,9 +62,124 @@ GUI.Colors = {
 
 local C = GUI.Colors
 
+---------------------------------------------------------------------------
+-- LAYOUT SYSTEM - Centralized spacing, sizing, and positioning constants
+---------------------------------------------------------------------------
+-- This system replaces hard-coded "magic numbers" throughout the UI with
+-- semantic constants, making the interface easier to customize and maintain.
+--
+-- Benefits:
+--  • Single source of truth for all dimensions
+--  • Easy theme/size adjustments (change once, update everywhere)
+--  • Self-documenting code (formControlStart vs "180")
+--  • Foundation for future responsive layouts
+--
+-- Usage: Access via L shorthand (e.g., L.toggle.width, L.space.md)
+---------------------------------------------------------------------------
+GUI.Layout = {
+    -- Form layout (label on left, control on right)
+    formLabelWidth = 180,        -- Width allocated for labels
+    formControlStart = 180,      -- X position where controls start
+    formRowHeight = 28,          -- Standard row height
+    formGap = 6,                 -- Gap between label and control
+    
+    -- Widget dimensions
+    checkbox = { 
+        size = 16,               -- Checkbox box size
+        checkSize = 20,          -- Checkmark texture size
+        formSize = 18,           -- Form checkbox size (original style)
+        formCheckSize = 22,      -- Form checkbox checkmark size
+        containerWidth = 300,    -- Standard checkbox container width
+        containerHeight = 20,    -- Standard checkbox container height
+        centeredWidth = 100,     -- Centered checkbox container width
+        centeredHeight = 40,     -- Centered checkbox container height
+    },
+    toggle = { 
+        width = 40,              -- Toggle track width
+        height = 20,             -- Toggle track height
+        thumbSize = 16,          -- Thumb (circle) size
+        thumbInset = 2,          -- Thumb position from track edge
+    },
+    dropdown = { 
+        height = 24,             -- Dropdown button height
+        chevronWidth = 28,       -- Right chevron zone width
+        menuItemHeight = 22,     -- Individual menu item height
+        containerHeight = 60,    -- Standard dropdown container height
+        containerWidth = 200,    -- Default dropdown container width
+        inset = 35,              -- Horizontal inset for standard dropdowns
+        offsetY = -16,           -- Standard dropdown vertical offset
+        fullWidthContainerHeight = 45, -- Full-width dropdown container height
+        fullWidthYOffset = -18,  -- Full-width dropdown vertical offset
+    },
+    colorPicker = { 
+        size = 24,               -- Standard color swatch size
+        sizeSmall = 16,          -- Compact color swatch size
+        containerWidth = 200,    -- Standard color picker container width
+        containerHeight = 20,    -- Standard color picker container height
+        centeredWidth = 100,     -- Centered color picker container width
+        centeredHeight = 40,     -- Centered color picker container height
+        formWidth = 50,          -- Form color picker swatch width
+        formHeight = 18,         -- Form color picker swatch height
+    },
+    slider = { 
+        height = 6,              -- Form slider track height
+        thumbWidth = 14,         -- Form slider thumb width
+        thumbHeight = 14,        -- Form slider thumb height
+        rightInset = 70,         -- Space reserved for value input on right
+    },
+    
+    -- Spacing scale (Tailwind-inspired)
+    space = {
+        xs = 4,                  -- Extra small spacing
+        sm = 6,                  -- Small spacing (label offsets)
+        md = 10,                 -- Medium spacing (general padding)
+        lg = 15,                 -- Large spacing (section gaps)
+        xl = 20,                 -- Extra large spacing
+        xxl = 30,                -- Double extra large
+    },
+    
+    -- Typography
+    font = {
+        tiny = 10,               -- Muted/small text
+        small = 11,              -- Descriptions, secondary text
+        normal = 12,             -- Standard labels and controls
+        large = 14,              -- Headers, titles
+    },
+    
+    -- Panel constraints
+    panel = {
+        defaultWidth = 750,      -- Default panel width
+        minWidth = 600,          -- Minimum resizable width
+        maxWidth = 1000,         -- Maximum resizable width
+        minHeight = 400,         -- Minimum resizable height
+        maxHeight = 1200,        -- Maximum resizable height
+        padding = 10,            -- Standard edge padding
+        paddingDouble = 20,      -- Double padding (left + right)
+    },
+    
+    -- Tab system
+    tabs = {
+        perRow = 5,              -- Tabs per row in main grid
+        height = 22,             -- Tab button height
+        spacing = 2,             -- Gap between tab buttons
+        startY = -35,            -- Top offset for tab container
+    },
+    
+    -- Sub-tab system
+    subTabs = {
+        height = 24,             -- Sub-tab button height
+        spacing = 4,             -- Gap between sub-tab buttons
+        separatorSpacing = 15,   -- Extra gap after separator tabs
+        containerHeight = 28,    -- Sub-tab container height
+        defaultWidth = 90,       -- Default button width before relayout
+    },
+}
+
+local L = GUI.Layout  -- Shorthand for layout constants
+
 -- Panel dimensions (used for widget sizing)
-GUI.PANEL_WIDTH = 750
-GUI.CONTENT_WIDTH = 710  -- Panel width minus padding (20 each side)
+GUI.PANEL_WIDTH = L.panel.defaultWidth
+GUI.CONTENT_WIDTH = L.panel.defaultWidth - L.panel.paddingDouble
 
 -- Settings Registry for search functionality
 GUI.SettingsRegistry = {}
@@ -228,7 +343,7 @@ function GUI:CreateLabel(parent, text, size, color, anchor, x, y)
         parent._hasContent = true
     end
     local label = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(label, size or 12, "", color or C.text)
+    SetFont(label, size or L.font.normal, "", color or C.text)
     label:SetText(text or "")
     if anchor then
         label:SetPoint(anchor, parent, anchor, x or 0, y or 0)
@@ -254,7 +369,7 @@ function GUI:CreateButton(parent, text, width, height, onClick)
 
     -- Button text (off-white, not accent)
     local btnText = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    btnText:SetFont(GetFontPath(), 12, "")
+    btnText:SetFont(GetFontPath(), L.font.normal, "")
     btnText:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
     btnText:SetPoint("CENTER", 0, 0)
     btnText:SetText(text or "Button")
@@ -683,11 +798,11 @@ end
 ---------------------------------------------------------------------------
 function GUI:CreateColorPicker(parent, label, dbKey, dbTable, onChange)
     local container = CreateFrame("Frame", nil, parent)
-    container:SetSize(200, 20)
+    container:SetSize(L.colorPicker.containerWidth, L.colorPicker.containerHeight)
     
     -- Color swatch button (same size as checkbox: 16x16)
     local swatch = CreateFrame("Button", nil, container, "BackdropTemplate")
-    swatch:SetSize(16, 16)
+    swatch:SetSize(L.colorPicker.sizeSmall, L.colorPicker.sizeSmall)
     swatch:SetPoint("LEFT", 0, 0)
     swatch:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
@@ -698,9 +813,9 @@ function GUI:CreateColorPicker(parent, label, dbKey, dbTable, onChange)
     
     -- Label (same font size as checkbox: 12)
     local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(text, 12, "", C.text)
+    SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Color")
-    text:SetPoint("LEFT", swatch, "RIGHT", 6, 0)
+    text:SetPoint("LEFT", swatch, "RIGHT", L.space.sm, 0)
     
     container.swatch = swatch
     container.label = text
@@ -773,18 +888,18 @@ end
 ---------------------------------------------------------------------------
 function GUI:CreateSubTabs(parent, tabs)
     local container = CreateFrame("Frame", nil, parent)
-    container:SetHeight(28)
+    container:SetHeight(L.subTabs.containerHeight)
     
     local tabButtons = {}
     local tabContents = {}
-    local buttonWidth = 90
-    local spacing = 2
+    local buttonWidth = L.subTabs.defaultWidth
+    local spacing = L.subTabs.spacing
     
     for i, tabInfo in ipairs(tabs) do
         -- Tab button
         local btn = CreateFrame("Button", nil, container, "BackdropTemplate")
-        btn:SetSize(buttonWidth, 24)
-        btn:SetPoint("TOPLEFT", 10 + (i-1) * (buttonWidth + spacing), 0)
+        btn:SetSize(buttonWidth, L.subTabs.height)
+        btn:SetPoint("TOPLEFT", L.space.md + (i-1) * (buttonWidth + spacing), 0)
         btn:SetBackdrop({
             bgFile = "Interface\\Buttons\\WHITE8x8",
             edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -794,7 +909,7 @@ function GUI:CreateSubTabs(parent, tabs)
         btn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
         
         btn.text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        SetFont(btn.text, 10, "", C.text)
+        SetFont(btn.text, L.font.tiny, "", C.text)
         btn.text:SetText(tabInfo.name)
         btn.text:SetPoint("CENTER", 0, 0)
         
@@ -821,8 +936,8 @@ function GUI:CreateSubTabs(parent, tabs)
         local containerWidth = container:GetWidth()
         if containerWidth < 1 then return end  -- Not sized yet
 
-        local separatorSpacing = 15  -- Extra spacing after tabs with isSeparator
-        local availableWidth = containerWidth - 20  -- 10px padding each side
+        local separatorSpacing = L.subTabs.separatorSpacing  -- Extra spacing after tabs with isSeparator
+        local availableWidth = containerWidth - (L.space.md * 2)  -- Padding each side
 
         -- Count separators to account for extra spacing
         local separatorCount = 0
@@ -858,14 +973,14 @@ function GUI:CreateSubTabs(parent, tabs)
                 -- ACTIVE: Dark background with thick mint border highlight + mint text
                 pcall(btn.SetBackdropColor, btn, 0.12, 0.18, 0.18, 1)  -- Slightly tinted dark bg
                 pcall(btn.SetBackdropBorderColor, btn, unpack(C.accent))
-                btn.text:SetFont(GetFontPath(), 10, "")
+                btn.text:SetFont(GetFontPath(), L.font.tiny, "")
                 btn.text:SetTextColor(unpack(C.accent))  -- Mint colored text - easy to read
                 tabContents[i]:Show()
             else
                 -- INACTIVE: Standard dark look
                 pcall(btn.SetBackdropColor, btn, 0.15, 0.15, 0.15, 1)
                 pcall(btn.SetBackdropBorderColor, btn, 0.3, 0.3, 0.3, 1)
-                btn.text:SetFont(GetFontPath(), 10, "")
+                btn.text:SetFont(GetFontPath(), L.font.tiny, "")
                 btn.text:SetTextColor(unpack(C.text))
                 tabContents[i]:Hide()
             end
@@ -907,7 +1022,7 @@ end
 ---------------------------------------------------------------------------
 function GUI:CreateDescription(parent, text, color)
     local desc = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(desc, 11, "", color or C.textMuted)
+    SetFont(desc, L.font.small, "", color or C.textMuted)
     desc:SetText(text)
     desc:SetJustifyH("LEFT")
     desc:SetWordWrap(true)
@@ -919,10 +1034,10 @@ end
 ---------------------------------------------------------------------------
 function GUI:CreateCheckbox(parent, label, dbKey, dbTable, onChange)
     local container = CreateFrame("Frame", nil, parent)
-    container:SetSize(300, 20)
+    container:SetSize(L.checkbox.containerWidth, L.checkbox.containerHeight)
     
     local box = CreateFrame("Button", nil, container, "BackdropTemplate")
-    box:SetSize(16, 16)
+    box:SetSize(L.checkbox.size, L.checkbox.size)
     box:SetPoint("LEFT", 0, 0)
     box:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
@@ -936,15 +1051,15 @@ function GUI:CreateCheckbox(parent, label, dbKey, dbTable, onChange)
     box.check = box:CreateTexture(nil, "OVERLAY")
     box.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
     box.check:SetPoint("CENTER", 0, 0)
-    box.check:SetSize(20, 20)
+    box.check:SetSize(L.checkbox.checkSize, L.checkbox.checkSize)
     box.check:SetVertexColor(C.accent[1], C.accent[2], C.accent[3], 1)  -- Theme accent
     box.check:SetDesaturated(true)  -- Remove yellow, then apply accent
     box.check:Hide()
     
     local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(text, 12, "", C.text)  -- Bumped from 11 to 12
+    SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Option")
-    text:SetPoint("LEFT", box, "RIGHT", 6, 0)
+    text:SetPoint("LEFT", box, "RIGHT", L.space.sm, 0)
     
     container.box = box
     container.label = text
@@ -991,17 +1106,17 @@ end
 ---------------------------------------------------------------------------
 function GUI:CreateCheckboxCentered(parent, label, dbKey, dbTable, onChange)
     local container = CreateFrame("Frame", nil, parent)
-    container:SetSize(100, 40)  -- Taller to fit label above
+    container:SetSize(L.checkbox.centeredWidth, L.checkbox.centeredHeight)  -- Taller to fit label above
     
     -- Label on top, centered
     local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(text, 11, "", C.accentLight)  -- Mint like slider labels
+    SetFont(text, L.font.small, "", C.accentLight)  -- Mint like slider labels
     text:SetText(label or "Option")
     text:SetPoint("TOP", container, "TOP", 0, 0)
     
     -- Checkbox box below label, centered
     local box = CreateFrame("Button", nil, container, "BackdropTemplate")
-    box:SetSize(16, 16)
+    box:SetSize(L.checkbox.size, L.checkbox.size)
     box:SetPoint("TOP", text, "BOTTOM", 0, -4)
     box:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
@@ -1015,7 +1130,7 @@ function GUI:CreateCheckboxCentered(parent, label, dbKey, dbTable, onChange)
     box.check = box:CreateTexture(nil, "OVERLAY")
     box.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
     box.check:SetPoint("CENTER", 0, 0)
-    box.check:SetSize(20, 20)
+    box.check:SetSize(L.checkbox.checkSize, L.checkbox.checkSize)
     box.check:SetVertexColor(C.accent[1], C.accent[2], C.accent[3], 1)
     box.check:SetDesaturated(true)
     box.check:Hide()
@@ -1065,17 +1180,17 @@ end
 ---------------------------------------------------------------------------
 function GUI:CreateColorPickerCentered(parent, label, dbKey, dbTable, onChange)
     local container = CreateFrame("Frame", nil, parent)
-    container:SetSize(100, 40)  -- Taller to fit label above
+    container:SetSize(L.colorPicker.centeredWidth, L.colorPicker.centeredHeight)  -- Taller to fit label above
     
     -- Label on top, centered (mint like slider labels)
     local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(text, 11, "", C.accentLight)
+    SetFont(text, L.font.small, "", C.accentLight)
     text:SetText(label or "Color")
     text:SetPoint("TOP", container, "TOP", 0, 0)
     
     -- Color swatch below label, centered
     local swatch = CreateFrame("Button", nil, container, "BackdropTemplate")
-    swatch:SetSize(16, 16)
+    swatch:SetSize(L.colorPicker.sizeSmall, L.colorPicker.sizeSmall)
     swatch:SetPoint("TOP", text, "BOTTOM", 0, -4)
     swatch:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
@@ -1151,10 +1266,10 @@ end
 ---------------------------------------------------------------------------
 function GUI:CreateCheckboxInverted(parent, label, dbKey, dbTable, onChange)
     local container = CreateFrame("Frame", nil, parent)
-    container:SetSize(300, 20)
+    container:SetSize(L.checkbox.containerWidth, L.checkbox.containerHeight)
     
     local box = CreateFrame("Button", nil, container, "BackdropTemplate")
-    box:SetSize(16, 16)
+    box:SetSize(L.checkbox.size, L.checkbox.size)
     box:SetPoint("LEFT", 0, 0)
     box:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
@@ -1167,15 +1282,15 @@ function GUI:CreateCheckboxInverted(parent, label, dbKey, dbTable, onChange)
     box.check = box:CreateTexture(nil, "OVERLAY")
     box.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
     box.check:SetPoint("CENTER", 0, 0)
-    box.check:SetSize(20, 20)
+    box.check:SetSize(L.checkbox.checkSize, L.checkbox.checkSize)
     box.check:SetVertexColor(C.accent[1], C.accent[2], C.accent[3], 1)
     box.check:SetDesaturated(true)
     box.check:Hide()
     
     local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(text, 12, "", C.text)
+    SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Option")
-    text:SetPoint("LEFT", box, "RIGHT", 6, 0)
+    text:SetPoint("LEFT", box, "RIGHT", L.space.sm, 0)
     
     container.box = box
     container.label = text
@@ -1280,7 +1395,7 @@ function GUI:CreateSlider(parent, label, min, max, step, dbKey, dbTable, onChang
 
     -- Thumb frame (white circle with border)
     local thumbFrame = CreateFrame("Frame", nil, slider, "BackdropTemplate")
-    thumbFrame:SetSize(14, 14)
+    thumbFrame:SetSize(L.slider.thumbWidth, L.slider.thumbHeight)
     thumbFrame:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -1483,29 +1598,29 @@ end
 ---------------------------------------------------------------------------
 -- WIDGET: DROPDOWN (Matches slider width with same 35px inset, same height for alignment)
 ---------------------------------------------------------------------------
-local CHEVRON_ZONE_WIDTH = 28
+local CHEVRON_ZONE_WIDTH = L.dropdown.chevronWidth
 local CHEVRON_BG_ALPHA = 0.15
 local CHEVRON_BG_ALPHA_HOVER = 0.25
 local CHEVRON_TEXT_ALPHA = 0.7
 
 function GUI:CreateDropdown(parent, label, options, dbKey, dbTable, onChange)
     local container = CreateFrame("Frame", nil, parent)
-    container:SetHeight(60)  -- Match slider height for vertical alignment
-    container:SetWidth(200)  -- Default width, can be overridden by SetWidth()
+    container:SetHeight(L.dropdown.containerHeight)  -- Match slider height for vertical alignment
+    container:SetWidth(L.dropdown.containerWidth)  -- Default width, can be overridden by SetWidth()
 
     -- Label on top (if provided) - mint green like slider labels, centered
     if label and label ~= "" then
         local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        SetFont(text, 11, "", C.accentLight)  -- Mint green like other labels
+        SetFont(text, L.font.small, "", C.accentLight)  -- Mint green like other labels
         text:SetText(label)
         text:SetPoint("TOP", container, "TOP", 0, 0)  -- Centered
     end
 
     -- Dropdown button (same width as slider track - inset 35px on each side)
     local dropdown = CreateFrame("Button", nil, container, "BackdropTemplate")
-    dropdown:SetHeight(24)  -- Increased from 20 for better tap target
-    dropdown:SetPoint("TOPLEFT", container, "TOPLEFT", 35, -16)
-    dropdown:SetPoint("RIGHT", container, "RIGHT", -35, 0)
+    dropdown:SetHeight(L.dropdown.height)  -- Increased from 20 for better tap target
+    dropdown:SetPoint("TOPLEFT", container, "TOPLEFT", L.dropdown.inset, L.dropdown.offsetY)
+    dropdown:SetPoint("RIGHT", container, "RIGHT", -L.dropdown.inset, 0)
     dropdown:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -1551,7 +1666,7 @@ function GUI:CreateDropdown(parent, label, options, dbKey, dbTable, onChange)
 
     -- Selected text - centered, accounting for chevron zone
     dropdown.selected = dropdown:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(dropdown.selected, 11, "", C.text)
+    SetFont(dropdown.selected, L.font.small, "", C.text)
     dropdown.selected:SetPoint("LEFT", 8, 0)
     dropdown.selected:SetPoint("RIGHT", chevronZone, "LEFT", -5, 0)
     dropdown.selected:SetJustifyH("CENTER")
@@ -1632,7 +1747,7 @@ function GUI:CreateDropdown(parent, label, options, dbKey, dbTable, onChange)
     menuFrame:Hide()
     
     local menuButtons = {}
-    local buttonHeight = 22
+    local buttonHeight = L.dropdown.menuItemHeight
     
     for i, opt in ipairs(container.options) do
         local btn = CreateFrame("Button", nil, menuFrame, "BackdropTemplate")
@@ -1641,7 +1756,7 @@ function GUI:CreateDropdown(parent, label, options, dbKey, dbTable, onChange)
         btn:SetPoint("TOPRIGHT", -2, -2 - (i-1) * buttonHeight)
         
         btn.text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        SetFont(btn.text, 11, "", C.text)
+        SetFont(btn.text, L.font.small, "", C.text)
         btn.text:SetText(opt.text)
         btn.text:SetPoint("LEFT", 8, 0)
         
@@ -1743,21 +1858,21 @@ end
 ---------------------------------------------------------------------------
 function GUI:CreateDropdownFullWidth(parent, label, options, dbKey, dbTable, onChange)
     local container = CreateFrame("Frame", nil, parent)
-    container:SetHeight(45)  -- Compact height for full-width dropdowns
-    container:SetWidth(200)  -- Default width, can be overridden by SetWidth()
+    container:SetHeight(L.dropdown.fullWidthContainerHeight)  -- Compact height for full-width dropdowns
+    container:SetWidth(L.dropdown.containerWidth)  -- Default width, can be overridden by SetWidth()
 
     -- Label on top (if provided) - mint green, centered
     if label and label ~= "" then
         local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        SetFont(text, 11, "", C.accentLight)
+        SetFont(text, L.font.small, "", C.accentLight)
         text:SetText(label)
         text:SetPoint("TOP", container, "TOP", 0, 0)
     end
 
     -- Dropdown button (full width, no inset)
     local dropdown = CreateFrame("Button", nil, container, "BackdropTemplate")
-    dropdown:SetHeight(24)
-    dropdown:SetPoint("TOPLEFT", container, "TOPLEFT", 0, -18)
+    dropdown:SetHeight(L.dropdown.height)
+    dropdown:SetPoint("TOPLEFT", container, "TOPLEFT", 0, L.dropdown.fullWidthYOffset)
     dropdown:SetPoint("RIGHT", container, "RIGHT", 0, 0)
     dropdown:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
@@ -1804,7 +1919,7 @@ function GUI:CreateDropdownFullWidth(parent, label, options, dbKey, dbTable, onC
 
     -- Selected text - centered, accounting for chevron zone
     dropdown.selected = dropdown:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(dropdown.selected, 11, "", C.text)
+    SetFont(dropdown.selected, L.font.small, "", C.text)
     dropdown.selected:SetPoint("LEFT", 10, 0)
     dropdown.selected:SetPoint("RIGHT", chevronZone, "LEFT", -5, 0)
     dropdown.selected:SetJustifyH("CENTER")
@@ -1880,7 +1995,7 @@ function GUI:CreateDropdownFullWidth(parent, label, options, dbKey, dbTable, onC
     menuFrame:SetFrameStrata("TOOLTIP")
     menuFrame:Hide()
     
-    local buttonHeight = 22
+    local buttonHeight = L.dropdown.menuItemHeight
     for i, opt in ipairs(container.options) do
         local btn = CreateFrame("Button", nil, menuFrame, "BackdropTemplate")
         btn:SetHeight(buttonHeight)
@@ -1888,7 +2003,7 @@ function GUI:CreateDropdownFullWidth(parent, label, options, dbKey, dbTable, onC
         btn:SetPoint("TOPRIGHT", -2, -2 - (i-1) * buttonHeight)
         
         btn.text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        SetFont(btn.text, 11, "", C.text)
+        SetFont(btn.text, L.font.small, "", C.text)
         btn.text:SetText(opt.text)
         btn.text:SetPoint("LEFT", 8, 0)
         
@@ -1955,29 +2070,27 @@ end
 -- FORM WIDGETS (Label on left, widget on right)
 ---------------------------------------------------------------------------
 
-local FORM_ROW_HEIGHT = 28
-
 ---------------------------------------------------------------------------
 -- WIDGET: iOS-STYLE TOGGLE SWITCH (Premium)
--- Track: 40x20px, fully rounded
+-- Track: Fully rounded pill shape
 -- OFF: Dark grey track, white circle on left
--- ON: Mint track, white circle slides to right
+-- ON: Accent track, white circle slides to right
 ---------------------------------------------------------------------------
 function GUI:CreateFormToggle(parent, label, dbKey, dbTable, onChange, registryInfo)
     if parent._hasContent ~= nil then parent._hasContent = true end
     local container = CreateFrame("Frame", nil, parent)
-    container:SetHeight(FORM_ROW_HEIGHT)
+    container:SetHeight(L.formRowHeight)
 
     -- Label on left (off-white text)
     local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(text, 12, "", C.text)
+    SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Option")
     text:SetPoint("LEFT", 0, 0)
 
     -- Toggle track (the pill-shaped background)
     local track = CreateFrame("Button", nil, container, "BackdropTemplate")
-    track:SetSize(40, 20)
-    track:SetPoint("LEFT", container, "LEFT", 180, 0)
+    track:SetSize(L.toggle.width, L.toggle.height)
+    track:SetPoint("LEFT", container, "LEFT", L.formControlStart, 0)
     track:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -1986,7 +2099,7 @@ function GUI:CreateFormToggle(parent, label, dbKey, dbTable, onChange, registryI
 
     -- Thumb (the sliding circle)
     local thumb = CreateFrame("Frame", nil, track, "BackdropTemplate")
-    thumb:SetSize(16, 16)
+    thumb:SetSize(L.toggle.thumbSize, L.toggle.thumbSize)
     thumb:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -2007,17 +2120,17 @@ function GUI:CreateFormToggle(parent, label, dbKey, dbTable, onChange, registryI
 
     local function UpdateVisual(val)
         if val then
-            -- ON state: Mint track, thumb on right
+            -- ON state: Accent track, thumb on right
             track:SetBackdropColor(C.accent[1], C.accent[2], C.accent[3], 1)
             track:SetBackdropBorderColor(C.accent[1] * 0.8, C.accent[2] * 0.8, C.accent[3] * 0.8, 1)
             thumb:ClearAllPoints()
-            thumb:SetPoint("RIGHT", track, "RIGHT", -2, 0)
+            thumb:SetPoint("RIGHT", track, "RIGHT", -L.toggle.thumbInset, 0)
         else
             -- OFF state: Dark grey track, thumb on left
             track:SetBackdropColor(C.toggleOff[1], C.toggleOff[2], C.toggleOff[3], 1)
             track:SetBackdropBorderColor(0.12, 0.14, 0.18, 1)
             thumb:ClearAllPoints()
-            thumb:SetPoint("LEFT", track, "LEFT", 2, 0)
+            thumb:SetPoint("LEFT", track, "LEFT", L.toggle.thumbInset, 0)
         end
     end
 
@@ -2096,18 +2209,18 @@ end
 function GUI:CreateFormToggleInverted(parent, label, dbKey, dbTable, onChange)
     if parent._hasContent ~= nil then parent._hasContent = true end
     local container = CreateFrame("Frame", nil, parent)
-    container:SetHeight(FORM_ROW_HEIGHT)
+    container:SetHeight(L.formRowHeight)
 
     -- Label on left (off-white text)
     local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(text, 12, "", C.text)
+    SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Option")
     text:SetPoint("LEFT", 0, 0)
 
     -- Toggle track
     local track = CreateFrame("Button", nil, container, "BackdropTemplate")
-    track:SetSize(40, 20)
-    track:SetPoint("LEFT", container, "LEFT", 180, 0)
+    track:SetSize(L.toggle.width, L.toggle.height)
+    track:SetPoint("LEFT", container, "LEFT", L.formControlStart, 0)
     track:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -2116,7 +2229,7 @@ function GUI:CreateFormToggleInverted(parent, label, dbKey, dbTable, onChange)
 
     -- Thumb
     local thumb = CreateFrame("Frame", nil, track, "BackdropTemplate")
-    thumb:SetSize(16, 16)
+    thumb:SetSize(L.toggle.thumbSize, L.toggle.thumbSize)
     thumb:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -2145,12 +2258,12 @@ function GUI:CreateFormToggleInverted(parent, label, dbKey, dbTable, onChange)
             track:SetBackdropColor(C.accent[1], C.accent[2], C.accent[3], 1)
             track:SetBackdropBorderColor(C.accent[1] * 0.8, C.accent[2] * 0.8, C.accent[3] * 0.8, 1)
             thumb:ClearAllPoints()
-            thumb:SetPoint("RIGHT", track, "RIGHT", -2, 0)
+            thumb:SetPoint("RIGHT", track, "RIGHT", -L.toggle.thumbInset, 0)
         else
             track:SetBackdropColor(C.toggleOff[1], C.toggleOff[2], C.toggleOff[3], 1)
             track:SetBackdropBorderColor(0.12, 0.14, 0.18, 1)
             thumb:ClearAllPoints()
-            thumb:SetPoint("LEFT", track, "LEFT", 2, 0)
+            thumb:SetPoint("LEFT", track, "LEFT", L.toggle.thumbInset, 0)
         end
     end
 
@@ -2211,18 +2324,18 @@ end
 function GUI:CreateFormCheckboxOriginal(parent, label, dbKey, dbTable, onChange)
     if parent._hasContent ~= nil then parent._hasContent = true end
     local container = CreateFrame("Frame", nil, parent)
-    container:SetHeight(FORM_ROW_HEIGHT)
+    container:SetHeight(L.formRowHeight)
 
     -- Label on left (off-white text)
     local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(text, 12, "", C.text)
+    SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Option")
     text:SetPoint("LEFT", 0, 0)
 
     -- Checkbox aligned with other widgets (starts at 180px from left)
     local box = CreateFrame("Button", nil, container, "BackdropTemplate")
-    box:SetSize(18, 18)
-    box:SetPoint("LEFT", container, "LEFT", 180, 0)
+    box:SetSize(L.checkbox.formSize, L.checkbox.formSize)
+    box:SetPoint("LEFT", container, "LEFT", L.formControlStart, 0)
     box:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -2235,7 +2348,7 @@ function GUI:CreateFormCheckboxOriginal(parent, label, dbKey, dbTable, onChange)
     box.check = box:CreateTexture(nil, "OVERLAY")
     box.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
     box.check:SetPoint("CENTER", 0, 0)
-    box.check:SetSize(22, 22)
+    box.check:SetSize(L.checkbox.formCheckSize, L.checkbox.formCheckSize)
     box.check:SetVertexColor(C.accent[1], C.accent[2], C.accent[3], 1)
     box.check:SetDesaturated(true)
     box.check:Hide()
@@ -2299,7 +2412,7 @@ end
 function GUI:CreateFormSlider(parent, label, min, max, step, dbKey, dbTable, onChange, options, registryInfo)
     if parent._hasContent ~= nil then parent._hasContent = true end
     local container = CreateFrame("Frame", nil, parent)
-    container:SetHeight(FORM_ROW_HEIGHT)
+    container:SetHeight(L.formRowHeight)
     container:EnableMouse(true)  -- Block clicks from passing through to frames behind
 
     options = options or {}
@@ -2309,16 +2422,16 @@ function GUI:CreateFormSlider(parent, label, min, max, step, dbKey, dbTable, onC
 
     -- Label on left (off-white text)
     local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(text, 12, "", C.text)
+    SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Setting")
     text:SetPoint("LEFT", 0, 0)
     container.label = text
 
     -- Track container (for the filled + unfilled portions)
     local trackContainer = CreateFrame("Frame", nil, container)
-    trackContainer:SetHeight(6)  -- Thicker track (was 14, now 6 for cleaner look)
-    trackContainer:SetPoint("LEFT", container, "LEFT", 180, 0)
-    trackContainer:SetPoint("RIGHT", container, "RIGHT", -70, 0)
+    trackContainer:SetHeight(L.slider.height)  -- Track height
+    trackContainer:SetPoint("LEFT", container, "LEFT", L.formControlStart, 0)
+    trackContainer:SetPoint("RIGHT", container, "RIGHT", -L.slider.rightInset, 0)
 
     -- Unfilled track (background) - rounded appearance via backdrop
     local trackBg = CreateFrame("Frame", nil, trackContainer, "BackdropTemplate")
@@ -2571,18 +2684,18 @@ end
 function GUI:CreateFormDropdown(parent, label, options, dbKey, dbTable, onChange, registryInfo)
     if parent._hasContent ~= nil then parent._hasContent = true end
     local container = CreateFrame("Frame", nil, parent)
-    container:SetHeight(FORM_ROW_HEIGHT)
+    container:SetHeight(L.formRowHeight)
 
     -- Label on left (off-white text)
     local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(text, 12, "", C.text)
+    SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Setting")
     text:SetPoint("LEFT", 0, 0)
 
     -- Dropdown button (right side)
     local dropdown = CreateFrame("Button", nil, container, "BackdropTemplate")
-    dropdown:SetHeight(24)  -- Increased from 22
-    dropdown:SetPoint("LEFT", container, "LEFT", 180, 0)
+    dropdown:SetHeight(L.dropdown.height)
+    dropdown:SetPoint("LEFT", container, "LEFT", L.formControlStart, 0)
     dropdown:SetPoint("RIGHT", container, "RIGHT", 0, 0)
     dropdown:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
@@ -2629,7 +2742,7 @@ function GUI:CreateFormDropdown(parent, label, options, dbKey, dbTable, onChange
 
     -- Selected text, accounting for chevron zone
     dropdown.selected = dropdown:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(dropdown.selected, 11, "", C.text)
+    SetFont(dropdown.selected, L.font.small, "", C.text)
     dropdown.selected:SetPoint("LEFT", 8, 0)
     dropdown.selected:SetPoint("RIGHT", chevronZone, "LEFT", -5, 0)
     dropdown.selected:SetJustifyH("LEFT")
@@ -2834,18 +2947,18 @@ function GUI:CreateFormColorPicker(parent, label, dbKey, dbTable, onChange, opti
 
     if parent._hasContent ~= nil then parent._hasContent = true end
     local container = CreateFrame("Frame", nil, parent)
-    container:SetHeight(FORM_ROW_HEIGHT)
+    container:SetHeight(L.formRowHeight)
 
     -- Label on left (off-white text)
     local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(text, 12, "", C.text)
+    SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Color")
     text:SetPoint("LEFT", 0, 0)
 
     -- Color swatch aligned with other widgets (starts at 180px from left)
     local swatch = CreateFrame("Button", nil, container, "BackdropTemplate")
-    swatch:SetSize(50, 18)
-    swatch:SetPoint("LEFT", container, "LEFT", 180, 0)
+    swatch:SetSize(L.colorPicker.formWidth, L.colorPicker.formHeight)
+    swatch:SetPoint("LEFT", container, "LEFT", L.formControlStart, 0)
     swatch:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -3260,23 +3373,18 @@ function GUI:CreateMainFrame()
         return self.MainFrame
     end
     
-    local FRAME_WIDTH = GUI.PANEL_WIDTH
     local FRAME_HEIGHT = 850
-    local TAB_BUTTON_HEIGHT = 22
-    local TAB_START_X = 10   -- Start tabs from the left edge
-    local TAB_SPACING = 2
-    local TABS_PER_ROW = 5   -- 5 tabs per row (for 4 rows = 20 tabs max)
-    local PADDING = 20       -- Left + right padding (10 each side)
+    local TAB_START_X = L.space.md   -- Start tabs from the left edge
 
     -- Load saved width first (so tab width calculation uses actual panel width)
-    local savedWidth = SUI.SUICore and SUI.SUICore.db and SUI.SUICore.db.profile.configPanelWidth or FRAME_WIDTH
+    local savedWidth = SUI.SUICore and SUI.SUICore.db and SUI.SUICore.db.profile.configPanelWidth or L.panel.defaultWidth
 
     -- Calculate button width to fit exactly in frame (use savedWidth, not default)
-    local availableWidth = savedWidth - PADDING - (TAB_SPACING * (TABS_PER_ROW - 1))
-    local TAB_BUTTON_WIDTH = math.floor(availableWidth / TABS_PER_ROW)
+    local availableWidth = savedWidth - L.panel.paddingDouble - (L.tabs.spacing * (L.tabs.perRow - 1))
+    local TAB_BUTTON_WIDTH = math.floor(availableWidth / L.tabs.perRow)
     local frame = CreateFrame("Frame", "SuaviUI_Options", UIParent, "BackdropTemplate")
     frame:SetSize(savedWidth, FRAME_HEIGHT)
-    frame:SetPoint("CENTER")
+    frame:SetPoint("RIGHT", -50, 0)  -- Position on the right side
     frame:SetFrameStrata("DIALOG")
     frame:SetFrameLevel(100)
     frame:SetMovable(true)
@@ -3297,19 +3405,14 @@ function GUI:CreateMainFrame()
     function GUI:RelayoutTabs(targetFrame)
         if not targetFrame.tabs or #targetFrame.tabs == 0 then return end
 
-        local PADDING = 20
-        local TAB_SPACING = targetFrame.TAB_SPACING
-        local TABS_PER_ROW = targetFrame.TABS_PER_ROW
-        local TAB_BUTTON_HEIGHT = targetFrame.TAB_BUTTON_HEIGHT
-
-        local availableWidth = targetFrame:GetWidth() - PADDING - (TAB_SPACING * (TABS_PER_ROW - 1))
-        local tabWidth = math.floor(availableWidth / TABS_PER_ROW)
+        local availableWidth = targetFrame:GetWidth() - L.panel.paddingDouble - (L.tabs.spacing * (L.tabs.perRow - 1))
+        local tabWidth = math.floor(availableWidth / L.tabs.perRow)
 
         for i, tab in ipairs(targetFrame.tabs) do
-            local row = math.floor((i - 1) / TABS_PER_ROW)
-            local col = (i - 1) % TABS_PER_ROW
-            local x = col * (tabWidth + TAB_SPACING)
-            local y = -row * (TAB_BUTTON_HEIGHT + TAB_SPACING) - 5
+            local row = math.floor((i - 1) / L.tabs.perRow)
+            local col = (i - 1) % L.tabs.perRow
+            local x = col * (tabWidth + L.tabs.spacing)
+            local y = -row * (L.tabs.height + L.tabs.spacing) - 5
 
             tab:SetWidth(tabWidth)
             tab:ClearAllPoints()
@@ -3394,16 +3497,16 @@ function GUI:CreateMainFrame()
     frame.pages = {}
     frame.activeTab = nil
     frame.TAB_BUTTON_WIDTH = TAB_BUTTON_WIDTH
-    frame.TAB_BUTTON_HEIGHT = TAB_BUTTON_HEIGHT
-    frame.TAB_SPACING = TAB_SPACING
-    frame.TABS_PER_ROW = TABS_PER_ROW
+    frame.TAB_BUTTON_HEIGHT = L.tabs.height
+    frame.TAB_SPACING = L.tabs.spacing
+    frame.TABS_PER_ROW = L.tabs.perRow
     
     ---------------------------------------------------------------------------
     -- BOTTOM PANEL (Action buttons)
     ---------------------------------------------------------------------------
     local bottomPanel = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-    bottomPanel:SetPoint("BOTTOMLEFT", 10, 10)
-    bottomPanel:SetPoint("BOTTOMRIGHT", -10, 10)
+    bottomPanel:SetPoint("BOTTOMLEFT", L.space.md, L.space.md)
+    bottomPanel:SetPoint("BOTTOMRIGHT", -L.space.md, L.space.md)
     bottomPanel:SetHeight(40)
     bottomPanel:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
@@ -3588,10 +3691,6 @@ function GUI:CreateMainFrame()
             self:SetText(string.format("%.2f", scaleSlider:GetValue()))
         end
     end)
-    local MIN_HEIGHT = 400
-    local MAX_HEIGHT = 1200
-    local MIN_WIDTH = 600
-    local MAX_WIDTH = 1000
     
     local resizeHandle = CreateFrame("Button", nil, frame)
     resizeHandle:SetSize(20, 20)
@@ -3654,9 +3753,9 @@ function GUI:CreateMainFrame()
                 local deltaX = currentX - self.startX  -- Drag right = increase width
                 local deltaY = self.startY - currentY  -- Inverted: drag down = increase height
 
-                -- Apply clamped values
-                local newWidth = math.max(MIN_WIDTH, math.min(MAX_WIDTH, self.startWidth + deltaX))
-                local newHeight = math.max(MIN_HEIGHT, math.min(MAX_HEIGHT, self.startHeight + deltaY))
+                -- Apply clamped values using Layout constraints
+                local newWidth = math.max(L.panel.minWidth, math.min(L.panel.maxWidth, self.startWidth + deltaX))
+                local newHeight = math.max(L.panel.minHeight, math.min(L.panel.maxHeight, self.startHeight + deltaY))
 
                 frame:SetSize(newWidth, newHeight)
             end)

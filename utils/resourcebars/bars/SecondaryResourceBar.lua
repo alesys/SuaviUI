@@ -1,8 +1,35 @@
+------------------------------------------------------------
+-- SECONDARY RESOURCE BAR
+-- Based on SenseiClassResourceBar by Equilateral (EQOL)
+-- Modified for SuaviUI AceDB profile integration
+------------------------------------------------------------
+
 local addonName, SUICore = ...
 
 local RB = SUICore.ResourceBars
 local LEM = RB.LEM
 local L = RB.L
+
+------------------------------------------------------------
+-- HELPER FUNCTIONS
+------------------------------------------------------------
+
+local function GetBarData(config, layoutName)
+    local db = RB.GetResourceBarsDB()
+    return db and db[config.dbName] and db[config.dbName][layoutName]
+end
+
+local function EnsureBarData(config, layoutName, defaults)
+    local db = RB.GetResourceBarsDB()
+    if not db then return nil end
+    if not db[config.dbName] then
+        db[config.dbName] = {}
+    end
+    if not db[config.dbName][layoutName] then
+        db[config.dbName][layoutName] = CopyTable(defaults)
+    end
+    return db[config.dbName][layoutName]
+end
 
 ------------------------------------------------------------
 -- DRUID FORM CONSTANTS
@@ -308,11 +335,12 @@ RB.RegisteredBar.SecondaryResourceBar = {
                 hideSummary = true,
                 useOldStyle = true,
                 get = function(layoutName)
-                    return (SuaviUI_ResourceBarsDB[dbName][layoutName] and SuaviUI_ResourceBarsDB[dbName][layoutName].hideManaOnRole) or defaults.hideManaOnRole
+                    local data = GetBarData(config, layoutName)
+                    return (data and data.hideManaOnRole) or defaults.hideManaOnRole
                 end,
                 set = function(layoutName, value)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName].hideManaOnRole = value
+                    local data = EnsureBarData(config, layoutName, defaults)
+                    if data then data.hideManaOnRole = value end
                 end,
             },
             {
@@ -322,7 +350,7 @@ RB.RegisteredBar.SecondaryResourceBar = {
                 kind = LEM.SettingType.Checkbox,
                 default = defaults.hideBlizzardSecondaryResourceUi,
                 get = function(layoutName)
-                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    local data = GetBarData(config, layoutName)
                     if data and data.hideBlizzardSecondaryResourceUi ~= nil then
                         return data.hideBlizzardSecondaryResourceUi
                     else
@@ -330,9 +358,11 @@ RB.RegisteredBar.SecondaryResourceBar = {
                     end
                 end,
                 set = function(layoutName, value)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName].hideBlizzardSecondaryResourceUi = value
-                    bar:HideBlizzardSecondaryResource(layoutName)
+                    local data = EnsureBarData(config, layoutName, defaults)
+                    if data then
+                        data.hideBlizzardSecondaryResourceUi = value
+                        bar:HideBlizzardSecondaryResource(layoutName)
+                    end
                 end,
                 tooltip = L["HIDE_BLIZZARD_UI_SECONDARY_POWER_BAR_TOOLTIP"],
             },
@@ -345,12 +375,15 @@ RB.RegisteredBar.SecondaryResourceBar = {
                 useOldStyle = true,
                 values = RB.availablePositionModeOptions(config),
                 get = function(layoutName)
-                    return (SuaviUI_ResourceBarsDB[dbName][layoutName] and SuaviUI_ResourceBarsDB[dbName][layoutName].positionMode) or defaults.positionMode
+                    local data = GetBarData(config, layoutName)
+                    return (data and data.positionMode) or defaults.positionMode
                 end,
                 set = function(layoutName, value)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName].positionMode = value
-                    bar:ApplyLayout(layoutName)
+                    local data = EnsureBarData(config, layoutName, defaults)
+                    if data then
+                        data.positionMode = value
+                        bar:ApplyLayout(layoutName)
+                    end
                 end,
             },
             {
@@ -366,7 +399,7 @@ RB.RegisteredBar.SecondaryResourceBar = {
                 default = defaults.showTicks,
                 colorDefault = defaults.tickColor,
                 get = function(layoutName)
-                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    local data = GetBarData(config, layoutName)
                     if data and data.showTicks ~= nil then
                         return data.showTicks
                     else
@@ -374,18 +407,22 @@ RB.RegisteredBar.SecondaryResourceBar = {
                     end
                 end,
                 colorGet = function(layoutName)
-                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    local data = GetBarData(config, layoutName)
                     return data and data.tickColor or defaults.tickColor
                 end,
                 set = function(layoutName, value)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName].showTicks = value
-                    bar:UpdateTicksLayout(layoutName)
+                    local data = EnsureBarData(config, layoutName, defaults)
+                    if data then
+                        data.showTicks = value
+                        bar:UpdateTicksLayout(layoutName)
+                    end
                 end,
                 colorSet = function(layoutName, value)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName].tickColor = value
-                    bar:UpdateTicksLayout(layoutName)
+                    local data = EnsureBarData(config, layoutName, defaults)
+                    if data then
+                        data.tickColor = value
+                        bar:UpdateTicksLayout(layoutName)
+                    end
                 end,
             },
             {
@@ -398,17 +435,19 @@ RB.RegisteredBar.SecondaryResourceBar = {
                 maxValue = 5,
                 valueStep = 1,
                 get = function(layoutName)
-                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    local data = GetBarData(config, layoutName)
                     return data and data.tickThickness or defaults.tickThickness
                 end,
                 set = function(layoutName, value)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName].tickThickness = value
-                    bar:UpdateTicksLayout(layoutName)
+                    local data = EnsureBarData(config, layoutName, defaults)
+                    if data then
+                        data.tickThickness = value
+                        bar:UpdateTicksLayout(layoutName)
+                    end
                 end,
                 isEnabled = function(layoutName)
-                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
-                    return data.showTicks
+                    local data = GetBarData(config, layoutName)
+                    return data and data.showTicks
                 end,
             },
             {
@@ -418,7 +457,7 @@ RB.RegisteredBar.SecondaryResourceBar = {
                 kind = LEM.SettingType.Checkbox,
                 default = defaults.useResourceAtlas,
                 get = function(layoutName)
-                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    local data = GetBarData(config, layoutName)
                     if data and data.useResourceAtlas ~= nil then
                         return data.useResourceAtlas
                     else
@@ -426,9 +465,11 @@ RB.RegisteredBar.SecondaryResourceBar = {
                     end
                 end,
                 set = function(layoutName, value)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName].useResourceAtlas = value
-                    bar:ApplyLayout(layoutName)
+                    local data = EnsureBarData(config, layoutName, defaults)
+                    if data then
+                        data.useResourceAtlas = value
+                        bar:ApplyLayout(layoutName)
+                    end
                 end,
             },
             {
@@ -438,7 +479,7 @@ RB.RegisteredBar.SecondaryResourceBar = {
                 kind = LEM.SettingType.Checkbox,
                 default = defaults.showManaAsPercent,
                 get = function(layoutName)
-                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    local data = GetBarData(config, layoutName)
                     if data and data.showManaAsPercent ~= nil then
                         return data.showManaAsPercent
                     else
@@ -446,13 +487,15 @@ RB.RegisteredBar.SecondaryResourceBar = {
                     end
                 end,
                 set = function(layoutName, value)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName].showManaAsPercent = value
-                    bar:UpdateDisplay(layoutName)
+                    local data = EnsureBarData(config, layoutName, defaults)
+                    if data then
+                        data.showManaAsPercent = value
+                        bar:UpdateDisplay(layoutName)
+                    end
                 end,
                 isEnabled = function(layoutName)
-                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
-                    return data.showText
+                    local data = GetBarData(config, layoutName)
+                    return data and data.showText
                 end,
                 tooltip = L["SHOW_MANA_AS_PERCENT_TOOLTIP"],
             },
@@ -469,7 +512,7 @@ RB.RegisteredBar.SecondaryResourceBar = {
                 default = defaults.showFragmentedPowerBarText,
                 colorDefault = defaults.fragmentedPowerBarTextColor,
                 get = function(layoutName)
-                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    local data = GetBarData(config, layoutName)
                     if data and data.showFragmentedPowerBarText ~= nil then
                         return data.showFragmentedPowerBarText
                     else
@@ -477,18 +520,22 @@ RB.RegisteredBar.SecondaryResourceBar = {
                     end
                 end,
                 colorGet = function(layoutName)
-                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    local data = GetBarData(config, layoutName)
                     return data and data.fragmentedPowerBarTextColor or defaults.fragmentedPowerBarTextColor
                 end,
                 set = function(layoutName, value)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName].showFragmentedPowerBarText = value
-                    bar:ApplyTextVisibilitySettings(layoutName)
+                    local data = EnsureBarData(config, layoutName, defaults)
+                    if data then
+                        data.showFragmentedPowerBarText = value
+                        bar:ApplyTextVisibilitySettings(layoutName)
+                    end
                 end,
                 colorSet = function(layoutName, value)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName].fragmentedPowerBarTextColor = value
-                    bar:ApplyFontSettings(layoutName)
+                    local data = EnsureBarData(config, layoutName, defaults)
+                    if data then
+                        data.fragmentedPowerBarTextColor = value
+                        bar:ApplyFontSettings(layoutName)
+                    end
                 end,
             },
             {
@@ -500,16 +547,19 @@ RB.RegisteredBar.SecondaryResourceBar = {
                 useOldStyle = true,
                 values = RB.availableTextPrecisions,
                 get = function(layoutName)
-                    return (SuaviUI_ResourceBarsDB[dbName][layoutName] and SuaviUI_ResourceBarsDB[dbName][layoutName].fragmentedPowerBarTextPrecision) or defaults.fragmentedPowerBarTextPrecision
+                    local data = GetBarData(config, layoutName)
+                    return (data and data.fragmentedPowerBarTextPrecision) or defaults.fragmentedPowerBarTextPrecision
                 end,
                 set = function(layoutName, value)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName].fragmentedPowerBarTextPrecision = value
-                    bar:UpdateDisplay(layoutName)
+                    local data = EnsureBarData(config, layoutName, defaults)
+                    if data then
+                        data.fragmentedPowerBarTextPrecision = value
+                        bar:UpdateDisplay(layoutName)
+                    end
                 end,
                 isEnabled = function(layoutName)
-                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
-                    return data.showFragmentedPowerBarText
+                    local data = GetBarData(config, layoutName)
+                    return data and data.showFragmentedPowerBarText
                 end,
             },
         }

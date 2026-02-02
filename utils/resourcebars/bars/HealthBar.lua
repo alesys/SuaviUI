@@ -1,8 +1,35 @@
+------------------------------------------------------------
+-- HEALTH BAR
+-- Based on SenseiClassResourceBar by Equilateral (EQOL)
+-- Modified for SuaviUI AceDB profile integration
+------------------------------------------------------------
+
 local addonName, SUICore = ...
 
 local RB = SUICore.ResourceBars
 local LEM = RB.LEM
 local L = RB.L
+
+------------------------------------------------------------
+-- HELPER FUNCTIONS
+------------------------------------------------------------
+
+local function GetBarData(config, layoutName)
+    local db = RB.GetResourceBarsDB()
+    return db and db[config.dbName] and db[config.dbName][layoutName]
+end
+
+local function EnsureBarData(config, layoutName, defaults)
+    local db = RB.GetResourceBarsDB()
+    if not db then return nil end
+    if not db[config.dbName] then
+        db[config.dbName] = {}
+    end
+    if not db[config.dbName][layoutName] then
+        db[config.dbName][layoutName] = CopyTable(defaults)
+    end
+    return db[config.dbName][layoutName]
+end
 
 ------------------------------------------------------------
 -- HEALTH BAR MIXIN
@@ -169,11 +196,12 @@ RB.RegisteredBar.HealthBar = {
                 hideSummary = true,
                 useOldStyle = true,
                 get = function(layoutName)
-                    return (SuaviUI_ResourceBarsDB[dbName][layoutName] and SuaviUI_ResourceBarsDB[dbName][layoutName].hideHealthOnRole) or defaults.hideHealthOnRole
+                    local data = GetBarData(config, layoutName)
+                    return (data and data.hideHealthOnRole) or defaults.hideHealthOnRole
                 end,
                 set = function(layoutName, value)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName].hideHealthOnRole = value
+                    local data = EnsureBarData(config, layoutName, defaults)
+                    if data then data.hideHealthOnRole = value end
                 end,
             },
             {
@@ -183,7 +211,7 @@ RB.RegisteredBar.HealthBar = {
                 kind = LEM.SettingType.Checkbox,
                 default = defaults.hideBlizzardPlayerContainerUi,
                 get = function(layoutName)
-                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    local data = GetBarData(config, layoutName)
                     if data and data.hideBlizzardPlayerContainerUi ~= nil then
                         return data.hideBlizzardPlayerContainerUi
                     else
@@ -191,9 +219,11 @@ RB.RegisteredBar.HealthBar = {
                     end
                 end,
                 set = function(layoutName, value)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName].hideBlizzardPlayerContainerUi = value
-                    bar:HideBlizzardPlayerContainer(layoutName)
+                    local data = EnsureBarData(config, layoutName, defaults)
+                    if data then
+                        data.hideBlizzardPlayerContainerUi = value
+                        bar:HideBlizzardPlayerContainer(layoutName)
+                    end
                 end,
                 tooltip = L["HIDE_BLIZZARD_UI_HEALTH_BAR_TOOLTIP"],
             },
@@ -206,12 +236,15 @@ RB.RegisteredBar.HealthBar = {
                 useOldStyle = true,
                 values = RB.availablePositionModeOptions(config),
                 get = function(layoutName)
-                    return (SuaviUI_ResourceBarsDB[dbName][layoutName] and SuaviUI_ResourceBarsDB[dbName][layoutName].positionMode) or defaults.positionMode
+                    local data = GetBarData(config, layoutName)
+                    return (data and data.positionMode) or defaults.positionMode
                 end,
                 set = function(layoutName, value)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName].positionMode = value
-                    bar:ApplyLayout(layoutName)
+                    local data = EnsureBarData(config, layoutName, defaults)
+                    if data then
+                        data.positionMode = value
+                        bar:ApplyLayout(layoutName)
+                    end
                 end,
             },
             {
@@ -221,7 +254,7 @@ RB.RegisteredBar.HealthBar = {
                 kind = LEM.SettingType.Checkbox,
                 default = defaults.useClassColor,
                 get = function(layoutName)
-                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    local data = GetBarData(config, layoutName)
                     if data and data.useClassColor ~= nil then
                         return data.useClassColor
                     else
@@ -229,9 +262,11 @@ RB.RegisteredBar.HealthBar = {
                     end
                 end,
                 set = function(layoutName, value)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName].useClassColor = value
-                    bar:ApplyLayout(layoutName)
+                    local data = EnsureBarData(config, layoutName, defaults)
+                    if data then
+                        data.useClassColor = value
+                        bar:ApplyLayout(layoutName)
+                    end
                 end,
             },
         }

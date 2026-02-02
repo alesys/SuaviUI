@@ -9,7 +9,8 @@ local RB = SUICore.ResourceBars
 function RB:GetOverrideHealthBarColor()
     local color = self:GetHealthBarColor()
 
-    local settings = SuaviUI_ResourceBarsDB and SuaviUI_ResourceBarsDB["_Settings"]
+    local db = RB.GetResourceBarsDB()
+    local settings = db and db["_Settings"]
     local healthColors = settings and settings["HealthColors"]
     local overrideColor = healthColors and healthColors["HEALTH"]
 
@@ -34,7 +35,8 @@ end
 function RB:GetOverrideResourceColor(resource)
     local color, settingKey = self:GetResourceColor(resource)
 
-    local settings = SuaviUI_ResourceBarsDB and SuaviUI_ResourceBarsDB["_Settings"]
+    local db = RB.GetResourceBarsDB()
+    local settings = db and db["_Settings"]
     local powerColors = settings and settings["PowerColors"]
     local overrideColor = powerColors and powerColors[settingKey or resource]
 

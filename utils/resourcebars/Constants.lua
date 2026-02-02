@@ -1,3 +1,9 @@
+------------------------------------------------------------
+-- RESOURCE BAR CONSTANTS & CONFIGURATION
+-- Based on SenseiClassResourceBar by Equilateral (EQOL)
+-- Modified for SuaviUI AceDB profile integration
+------------------------------------------------------------
+
 local addonName, SUICore = ...
 
 -- Ensure ResourceBars namespace exists
@@ -18,15 +24,19 @@ local LSM = RB.LSM
 ------------------------------------------------------------
 -- PROFILE-AWARE RESOURCE BAR STORAGE
 ------------------------------------------------------------
+-- Returns reference to profile.resourceBars (NOT a global SavedVariable)
+-- All resource bar settings stored in AceDB profile for unified export/import
 function RB.GetResourceBarsDB()
-    if SUICore and SUICore.db and SUICore.db.profile then
-        SUICore.db.profile.resourceBars = SUICore.db.profile.resourceBars or {}
-        SuaviUI_ResourceBarsDB = SUICore.db.profile.resourceBars
-        return SuaviUI_ResourceBarsDB
+    local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
+    if not SUICore or not SUICore.db or not SUICore.db.profile then
+        return nil
     end
-
-    SuaviUI_ResourceBarsDB = SuaviUI_ResourceBarsDB or {}
-    return SuaviUI_ResourceBarsDB
+    
+    -- Initialize profile subtable if needed
+    SUICore.db.profile.resourceBars = SUICore.db.profile.resourceBars or {}
+    
+    -- Return direct reference to profile (no aliasing!)
+    return SUICore.db.profile.resourceBars
 end
 
 ------------------------------------------------------------

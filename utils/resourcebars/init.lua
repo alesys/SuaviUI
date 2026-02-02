@@ -1,3 +1,10 @@
+------------------------------------------------------------
+-- RESOURCE BAR INITIALIZATION
+-- Based on SenseiClassResourceBar by Equilateral (EQOL)
+-- Modified for SuaviUI AceDB profile integration
+-- Includes original migration code for SavedVariable → AceDB
+------------------------------------------------------------
+
 local addonName, SUICore = ...
 
 local RB = SUICore.ResourceBars
@@ -47,15 +54,57 @@ end
 -- INITIALIZATION
 ------------------------------------------------------------
 
+-- One-time migration from old SavedVariable to AceDB profile
+local function MigrateOldDatabase()
+    -- Check if old SavedVariable exists
+    if not _G.SuaviUI_ResourceBarsDB then
+        return  -- Nothing to migrate
+    end
+    
+    local db = RB.GetResourceBarsDB()
+    if not db then
+        return  -- Profile not available yet
+    end
+    
+    -- Copy old data to profile
+    for dbName, layouts in pairs(_G.SuaviUI_ResourceBarsDB) do
+        if type(layouts) == "table" then
+            db[dbName] = db[dbName] or {}
+            for layoutName, settings in pairs(layouts) do
+                if type(settings) == "table" and layoutName ~= "_Settings" then
+                    db[dbName][layoutName] = CopyTable(settings)
+                end
+            end
+        end
+    end
+    
+    -- Migrate global settings if they exist
+    if _G.SuaviUI_ResourceBarsDB["_Settings"] then
+        db["_Settings"] = CopyTable(_G.SuaviUI_ResourceBarsDB["_Settings"])
+    end
+    
+    -- Clear old variable (cleanup)
+    _G.SuaviUI_ResourceBarsDB = nil
+    
+    print("|cFF30D1FFSuaviUI:|r Resource bars migrated to profile system.")
+end
+
 local function InitializeResourceBars()
-    -- Ensure database exists (profile-aware)
-    RB.GetResourceBarsDB()
+    -- Run migration first (one-time)
+    MigrateOldDatabase()
+    
+    -- Get profile database
+    local db = RB.GetResourceBarsDB()
+    if not db then
+        print("|cFFFF0000SuaviUI:|r Failed to initialize resource bars - profile not available!")
+        return
+    end
 
     -- Initialize each bar type from RegisteredBar configs
     for barName, config in pairs(RB.RegisteredBar) do
         -- Ensure database table exists for this bar
-        if not SuaviUI_ResourceBarsDB[config.dbName] then
-            SuaviUI_ResourceBarsDB[config.dbName] = {}
+        if not db[config.dbName] then
+            db[config.dbName] = {}
         end
 
         -- Create the bar instance
@@ -66,12 +115,12 @@ local function InitializeResourceBars()
 
         -- Initial layout and visibility
         local layoutName = LEM.GetActiveLayoutName() or "Default"
-        if not SuaviUI_ResourceBarsDB[config.dbName][layoutName] then
+        if not db[config.dbName][layoutName] then
             local defaults = CopyTable(RB.commonDefaults)
             for k, v in pairs(config.defaultValues or {}) do
                 defaults[k] = v
             end
-            SuaviUI_ResourceBarsDB[config.dbName][layoutName] = CopyTable(defaults)
+            db[config.dbName][layoutName] = CopyTable(defaults)
         end
 
         bar:InitCooldownManagerWidthHook(layoutName)
@@ -122,11 +171,22 @@ SlashCmdList["SUIBAR"] = function(msg)
             print(string.format("  %s: %s (resource: %s)", name, bar:IsShown() and "visible" or "hidden", resourceStr))
         end
         -- Debug: show database state
-        print("Database entries:")
-        for dbName, layouts in pairs(SuaviUI_ResourceBarsDB or {}) do
-            print(string.format("  %s: {%s}", dbName, table.concat(RB.getTableKeys(layouts), ", ")))
+        local db = RB.GetResourceBarsDB()
+        if db then
+            print("Database entries:")
+            for dbName, layouts in pairs(db) do
+                print(string.format("  %s: {%s}", dbName, table.concat(RB.getTableKeys(layouts), ", ")))
+            end
+        else
+            print("Database not available (profile not loaded)")
         end
     elseif cmd == "reset" then
+        local db = RB.GetResourceBarsDB()
+        if not db then
+            RB.prettyPrint("Cannot reset - profile not available!")
+            return
+        end
+        
         for name, bar in pairs(RB.barInstances) do
             local config = bar:GetConfig()
             local layoutName = LEM.GetActiveLayoutName() or "Default"
@@ -134,7 +194,7 @@ SlashCmdList["SUIBAR"] = function(msg)
             for k, v in pairs(config.defaultValues or {}) do
                 defaults[k] = v
             end
-            SuaviUI_ResourceBarsDB[config.dbName][layoutName] = CopyTable(defaults)
+            db[config.dbName][layoutName] = CopyTable(defaults)
             bar:ApplyLayout(layoutName, true)
             bar:ApplyVisibilitySettings(layoutName)
         end

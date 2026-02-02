@@ -1,8 +1,35 @@
+------------------------------------------------------------
+-- PRIMARY RESOURCE BAR
+-- Based on SenseiClassResourceBar by Equilateral (EQOL)
+-- Modified for SuaviUI AceDB profile integration
+------------------------------------------------------------
+
 local addonName, SUICore = ...
 
 local RB = SUICore.ResourceBars
 local LEM = RB.LEM
 local L = RB.L
+
+------------------------------------------------------------
+-- HELPER FUNCTIONS
+------------------------------------------------------------
+
+local function GetBarData(config, layoutName)
+    local db = RB.GetResourceBarsDB()
+    return db and db[config.dbName] and db[config.dbName][layoutName]
+end
+
+local function EnsureBarData(config, layoutName, defaults)
+    local db = RB.GetResourceBarsDB()
+    if not db then return nil end
+    if not db[config.dbName] then
+        db[config.dbName] = {}
+    end
+    if not db[config.dbName][layoutName] then
+        db[config.dbName][layoutName] = CopyTable(defaults)
+    end
+    return db[config.dbName][layoutName]
+end
 
 ------------------------------------------------------------
 -- DRUID FORM CONSTANTS
@@ -24,14 +51,11 @@ local PrimaryResourceBarMixin = Mixin({}, RB.PowerBarMixin)
 
 function PrimaryResourceBarMixin:OnLayoutChange(layoutName)
     -- Maelstrom Weapon was previously primary, no longer the case so disable ticks
-    if not SuaviUI_ResourceBarsDB then
+    local db = RB.GetResourceBarsDB()
+    if not db or not db[self.config.dbName] or not db[self.config.dbName][layoutName] then
         return
     end
-    local db = SuaviUI_ResourceBarsDB[self.config.dbName]
-    if not db or not db[layoutName] then
-        return
-    end
-    db[layoutName].showTicks = false
+    db[self.config.dbName][layoutName].showTicks = false
 end
 
 function PrimaryResourceBarMixin:GetResource()
@@ -136,7 +160,8 @@ RB.RegisteredBar.PrimaryResourceBar = {
         useResourceAtlas = false,
     },
     lemSettings = function(bar, defaults)
-        local dbName = bar:GetConfig().dbName
+        local config = bar:GetConfig()
+        local dbName = config.dbName
 
         return {
             {
@@ -149,11 +174,12 @@ RB.RegisteredBar.PrimaryResourceBar = {
                 hideSummary = true,
                 useOldStyle = true,
                 get = function(layoutName)
-                    return (SuaviUI_ResourceBarsDB[dbName][layoutName] and SuaviUI_ResourceBarsDB[dbName][layoutName].hideManaOnRole) or defaults.hideManaOnRole
+                    local data = GetBarData(config, layoutName)
+                    return (data and data.hideManaOnRole) or defaults.hideManaOnRole
                 end,
                 set = function(layoutName, value)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName].hideManaOnRole = value
+                    local data = EnsureBarData(config, layoutName, defaults)
+                    if data then data.hideManaOnRole = value end
                 end,
                 tooltip = L["HIDE_MANA_ON_ROLE_PRIMARY_BAR_TOOLTIP"],
             },
@@ -164,7 +190,7 @@ RB.RegisteredBar.PrimaryResourceBar = {
                 kind = LEM.SettingType.Checkbox,
                 default = defaults.useResourceAtlas,
                 get = function(layoutName)
-                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    local data = GetBarData(config, layoutName)
                     if data and data.useResourceAtlas ~= nil then
                         return data.useResourceAtlas
                     else
@@ -172,9 +198,11 @@ RB.RegisteredBar.PrimaryResourceBar = {
                     end
                 end,
                 set = function(layoutName, value)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName].useResourceAtlas = value
-                    bar:ApplyLayout(layoutName)
+                    local data = EnsureBarData(config, layoutName, defaults)
+                    if data then
+                        data.useResourceAtlas = value
+                        bar:ApplyLayout(layoutName)
+                    end
                 end,
             },
             {
@@ -184,7 +212,7 @@ RB.RegisteredBar.PrimaryResourceBar = {
                 kind = LEM.SettingType.Checkbox,
                 default = defaults.showManaAsPercent,
                 get = function(layoutName)
-                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
+                    local data = GetBarData(config, layoutName)
                     if data and data.showManaAsPercent ~= nil then
                         return data.showManaAsPercent
                     else
@@ -192,13 +220,15 @@ RB.RegisteredBar.PrimaryResourceBar = {
                     end
                 end,
                 set = function(layoutName, value)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName] = SuaviUI_ResourceBarsDB[dbName][layoutName] or CopyTable(defaults)
-                    SuaviUI_ResourceBarsDB[dbName][layoutName].showManaAsPercent = value
-                    bar:UpdateDisplay(layoutName)
+                    local data = EnsureBarData(config, layoutName, defaults)
+                    if data then
+                        data.showManaAsPercent = value
+                        bar:UpdateDisplay(layoutName)
+                    end
                 end,
                 isEnabled = function(layoutName)
-                    local data = SuaviUI_ResourceBarsDB[dbName][layoutName]
-                    return data.showText
+                    local data = GetBarData(config, layoutName)
+                    return data and data.showText
                 end,
                 tooltip = L["SHOW_MANA_AS_PERCENT_TOOLTIP"],
             },
