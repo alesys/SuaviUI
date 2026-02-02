@@ -95,6 +95,30 @@ ns.CastbarHelpers = {
 }
 
 ---------------------------------------------------------------------------
+-- ANCHOR POINT NORMALIZATION
+-- Converts user-friendly anchor text to WoW API format
+---------------------------------------------------------------------------
+local ANCHOR_POINT_MAP = {
+    ["Top Left"] = "TOPLEFT",
+    ["Top"] = "TOP",
+    ["Top Right"] = "TOPRIGHT",
+    ["Left"] = "LEFT",
+    ["Center"] = "CENTER",
+    ["Right"] = "RIGHT",
+    ["Bottom Left"] = "BOTTOMLEFT",
+    ["Bottom"] = "BOTTOM",
+    ["Bottom Right"] = "BOTTOMRIGHT",
+}
+
+local function NormalizeAnchorPoint(anchor)
+    if not anchor then return nil end
+    -- If already uppercase, return as-is
+    if anchor == anchor:upper() then return anchor end
+    -- Otherwise convert from user-friendly format
+    return ANCHOR_POINT_MAP[anchor] or anchor:upper()
+end
+
+---------------------------------------------------------------------------
 -- SECRET VALUE HANDLING (Midnight 12.0+)
 -- CRITICAL: tostring() on secret values THROWS ERROR
 -- Use _G.ToPlain (WoW API) or pcall(tonumber) instead
@@ -437,7 +461,7 @@ local function UpdateIconPosition(anchorFrame, castSettings, iconSize, iconScale
     local baseIconSize = iconSize * iconScale
     iconFrame:SetSize(baseIconSize, baseIconSize)
     iconFrame:ClearAllPoints()
-    local iconAnchor = castSettings.iconAnchor or "TOPLEFT"
+    local iconAnchor = NormalizeAnchorPoint(castSettings.iconAnchor) or "TOPLEFT"
     iconFrame:SetPoint(iconAnchor, anchorFrame, iconAnchor, 0, 0)
 
     local textureToUse = anchorFrame.currentIconTexture or anchorFrame.previewIconTexture
@@ -480,7 +504,7 @@ local function UpdateStatusBarPosition(anchorFrame, castSettings, barHeight, ico
     if ShouldShowIcon(anchorFrame, castSettings) then
         local iconSizePx = iconSize * iconScale
         local iconSpacing = Scale(castSettings.iconSpacing or 0)
-        local iconAnchor = castSettings.iconAnchor or "TOPLEFT"
+        local iconAnchor = NormalizeAnchorPoint(castSettings.iconAnchor) or "TOPLEFT"
         if iconAnchor:find("LEFT") then
             statusBar:SetPoint("TOPLEFT", anchorFrame, "TOPLEFT", iconSizePx + iconSpacing + borderSize, -borderSize)
             statusBar:SetPoint("BOTTOMRIGHT", anchorFrame, "BOTTOMRIGHT", -borderSize, borderSize)
@@ -523,6 +547,7 @@ local function UpdateTextPosition(textElement, statusBar, anchor, offsetX, offse
     
     if show then
         textElement:ClearAllPoints()
+        anchor = NormalizeAnchorPoint(anchor) or "CENTER"
         textElement:SetPoint(anchor, statusBar, anchor, Scale(offsetX), Scale(offsetY))
         textElement:Show()
     else
@@ -1015,6 +1040,10 @@ function SUI_Castbar:CreateCastbar(unitFrame, unit, unitKey)
     local frameName = "SUI_Castbar_" .. unitKey:gsub("^%l", string.upper)
     local anchorFrame = CreateAnchorFrame(frameName, UIParent)
     anchorFrame:SetSize(1, barHeight)
+    
+    -- Enable mouse for Edit Mode dragging
+    anchorFrame:EnableMouse(true)
+    anchorFrame:SetMovable(true)
 
     -- Apply HUD layer priority
     local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
@@ -1672,8 +1701,27 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
             if isPlayer then ClearEmpoweredState(self) end
             self.timerDriven = false
             self.durationObj = nil
-            self:SetScript("OnUpdate", nil)
-            if not IsEditModeActive() then
+            
+            -- Check if preview mode is enabled
+            local settings = GetUnitSettings(self.unitKey)
+            local hasPreview = settings and settings.castbar and settings.castbar.previewMode
+            
+            -- Clear preview simulation if active
+            if self.isPreviewSimulation then
+                ClearPreviewSimulation(self)
+            end
+            
+            if hasPreview then
+                -- Re-start preview simulation after short delay
+                C_Timer.After(0.1, function()
+                    if not UnitCastingInfo(self.unit) and not UnitChannelInfo(self.unit) then
+                        SimulateCast(self, castSettings, self.unitKey)
+                        self:SetScript("OnUpdate", onUpdateHandler)
+                    end
+                end)
+            else
+                -- No preview - hide immediately
+                self:SetScript("OnUpdate", nil)
                 self:Hide()
             end
         end,
@@ -1681,8 +1729,27 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
             if isPlayer then ClearEmpoweredState(self) end
             self.timerDriven = false
             self.durationObj = nil
-            self:SetScript("OnUpdate", nil)
-            if not IsEditModeActive() then
+            
+            -- Check if preview mode is enabled
+            local settings = GetUnitSettings(self.unitKey)
+            local hasPreview = settings and settings.castbar and settings.castbar.previewMode
+            
+            -- Clear preview simulation if active
+            if self.isPreviewSimulation then
+                ClearPreviewSimulation(self)
+            end
+            
+            if hasPreview then
+                -- Re-start preview simulation after short delay
+                C_Timer.After(0.1, function()
+                    if not UnitCastingInfo(self.unit) and not UnitChannelInfo(self.unit) then
+                        SimulateCast(self, castSettings, self.unitKey)
+                        self:SetScript("OnUpdate", onUpdateHandler)
+                    end
+                end)
+            else
+                -- No preview - hide immediately
+                self:SetScript("OnUpdate", nil)
                 self:Hide()
             end
         end,
@@ -2048,6 +2115,10 @@ function SUI_Castbar:CreateBossCastbar(unitFrame, unit, bossIndex)
     -- Create anchor frame (outer frame for positioning/sizing)
     local anchorFrame = CreateAnchorFrame("SUI_Boss" .. bossIndex .. "_Castbar", UIParent)
     anchorFrame:SetSize(castWidth, barHeight)
+    
+    -- Enable mouse for Edit Mode dragging
+    anchorFrame:EnableMouse(true)
+    anchorFrame:SetMovable(true)
     
     -- Anchor to boss unit frame
     local offsetX = Scale(castSettings.offsetX or 0)

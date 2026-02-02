@@ -66,14 +66,16 @@ Pull requests welcome! Just make sure your code doesn't summon demons. We've had
 ## Credits
 
 ### People & Inspiration
+- **Quazii** - Original work and inspiration
 - **You** - For having excellent taste in addons
-- **Vella** - For tanking Smolderon to my face
-- **Pataz** - For the support
-- **Ñora** - Paid for the original addon
-- **Quazii** - Original inspiration
 - **ElvUI** - UI framework inspiration
 - **Claudia** - AI-powered development assistant
 - **The WoW Community** - For inspiration and feedback
+
+### SuaviTesters
+- **Vela** - Testing and feedback
+- **Pataz** - Testing and feedback
+- **Ñora** - Testing and feedback
 
 ### Code Attribution
 - **SenseiClassResourceBar** by Equilateral (EQOL) - Core resource bar architecture, class/spec detection logic, and LibEQOLEditMode integration. The resource bar system is based on their excellent work.
@@ -88,6 +90,9 @@ Pull requests welcome! Just make sure your code doesn't summon demons. We've had
 - **LibKeyBound-1.0** - Keybind management
 - **LibDualSpec-1.0** - Spec-based profile switching
 - **LibOpenRaid** - Raid utility functions
+- **LibEQOL** - Edit Mode wrapper and settings UI framework
+- **LibStub** - Library loader
+- **CallbackHandler-1.0** - Callback registration helper
 
 ### Special Thanks
 - **Coffee** - The real MVP

@@ -128,7 +128,7 @@ local function GetTrackedBarSettings()
         enabled = true,
         barHeight = 24,
         barWidth = 200,
-        texture = "Suavitex v5",
+        texture = "Suavitex v3",
         useClassColor = true,
         barColor = {0.204, 0.827, 0.6, 1},
         barOpacity = 1.0,
@@ -600,7 +600,7 @@ local function ApplyBarStyle(frame, settings)
 
     local barHeight = settings.barHeight or 24
     local barWidth = settings.barWidth or 200
-    local texture = settings.texture or "Suavitex v5"
+    local texture = settings.texture or "Suavitex v3"
     local useClassColor = settings.useClassColor
     local barColor = settings.barColor or {0.204, 0.827, 0.6, 1}
     local barOpacity = settings.barOpacity or 1.0

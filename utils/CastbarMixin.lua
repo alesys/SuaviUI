@@ -51,6 +51,30 @@ local function GetSafeColor(color, fallback)
     return fallback[1], fallback[2], fallback[3], fallback[4] or 1
 end
 
+-- Use constants from the constants module
+local Constants = ns.Constants or {}
+local ANCHOR_POINT_MAP = Constants.ANCHOR_POINT_MAP or {
+    ["Top Left"] = "TOPLEFT",
+    ["Top"] = "TOP",
+    ["Top Right"] = "TOPRIGHT",
+    ["Left"] = "LEFT",
+    ["Center"] = "CENTER",
+    ["Right"] = "RIGHT",
+    ["Bottom Left"] = "BOTTOMLEFT",
+    ["Bottom"] = "BOTTOM",
+    ["Bottom Right"] = "BOTTOMRIGHT",
+}
+
+local function NormalizeAnchorPoint(anchor)
+    if not anchor then return nil end
+    if Constants.NormalizeAnchorPoint then
+        return Constants.NormalizeAnchorPoint(anchor)
+    end
+    -- Fallback if constants not loaded
+    if anchor == anchor:upper() then return anchor end
+    return ANCHOR_POINT_MAP[anchor] or anchor:upper()
+end
+
 ---------------------------------------------------------------------------
 -- INITIALIZATION
 ---------------------------------------------------------------------------
@@ -70,8 +94,8 @@ function CastbarMixin:Init(config)
     -- Create the main frame
     local frameName = "SUI_Castbar_" .. (self.unitKey or "Unknown"):gsub("^%l", string.upper)
     self.Frame = CreateFrame("Frame", frameName, UIParent)
-    self.Frame:SetFrameStrata("MEDIUM")
-    self.Frame:SetFrameLevel(200)
+    self.Frame:SetFrameStrata(Constants.FRAME_STRATA and Constants.FRAME_STRATA.MEDIUM or "MEDIUM")
+    self.Frame:SetFrameLevel(Constants.FRAME_LEVELS and Constants.FRAME_LEVELS.CASTBAR_BASE or 200)
     self.Frame:Hide()
     
     -- Store reference to mixin on frame for callbacks
@@ -285,7 +309,7 @@ function CastbarMixin:ApplyIconLayout(settings, iconSize, iconScale, borderSize)
     iconFrame:SetSize(baseIconSize, baseIconSize)
     iconFrame:ClearAllPoints()
     
-    local iconAnchor = settings.iconAnchor or "TOPLEFT"
+    local iconAnchor = NormalizeAnchorPoint(settings.iconAnchor) or "TOPLEFT"
     iconFrame:SetPoint(iconAnchor, self.Frame, iconAnchor, 0, 0)
     
     -- Update icon border size
@@ -311,7 +335,7 @@ function CastbarMixin:ApplyStatusBarLayout(settings, barHeight, iconSize, iconSc
     if showIcon then
         local iconSizePx = iconSize * iconScale
         local iconSpacing = Scale(settings.iconSpacing or 0)
-        local iconAnchor = settings.iconAnchor or "TOPLEFT"
+        local iconAnchor = NormalizeAnchorPoint(settings.iconAnchor) or "TOPLEFT"
         
         if iconAnchor:find("LEFT") then
             statusBar:SetPoint("TOPLEFT", self.Frame, "TOPLEFT", iconSizePx + iconSpacing + borderSize, -borderSize)
@@ -428,7 +452,7 @@ function CastbarMixin:ApplyTextPositions(settings)
     -- Spell text position
     if self.spellText then
         self.spellText:ClearAllPoints()
-        local anchor = settings.spellTextAnchor or "LEFT"
+        local anchor = NormalizeAnchorPoint(settings.spellTextAnchor) or "LEFT"
         local offsetX = Scale(settings.spellTextOffsetX or 4)
         local offsetY = Scale(settings.spellTextOffsetY or 0)
         self.spellText:SetPoint(anchor, self.statusBar, anchor, offsetX, offsetY)
@@ -438,7 +462,7 @@ function CastbarMixin:ApplyTextPositions(settings)
     -- Time text position
     if self.timeText then
         self.timeText:ClearAllPoints()
-        local anchor = settings.timeTextAnchor or "RIGHT"
+        local anchor = NormalizeAnchorPoint(settings.timeTextAnchor) or "RIGHT"
         local offsetX = Scale(settings.timeTextOffsetX or -4)
         local offsetY = Scale(settings.timeTextOffsetY or 0)
         self.timeText:SetPoint(anchor, self.statusBar, anchor, offsetX, offsetY)
@@ -448,7 +472,7 @@ function CastbarMixin:ApplyTextPositions(settings)
     -- Empowered level text position
     if self.empoweredLevelText then
         self.empoweredLevelText:ClearAllPoints()
-        local anchor = settings.empoweredLevelTextAnchor or "CENTER"
+        local anchor = NormalizeAnchorPoint(settings.empoweredLevelTextAnchor) or "CENTER"
         local offsetX = Scale(settings.empoweredLevelTextOffsetX or 0)
         local offsetY = Scale(settings.empoweredLevelTextOffsetY or 0)
         self.empoweredLevelText:SetPoint(anchor, self.statusBar, anchor, offsetX, offsetY)

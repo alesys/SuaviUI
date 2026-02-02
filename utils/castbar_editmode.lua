@@ -99,7 +99,7 @@ local PLAYER_ANCHOR_OPTIONS = {
     {value = "utility", text = "Utility Cooldowns"},
 }
 
-local NINE_POINT_ANCHOR_OPTIONS = {
+local NINE_POINT_ANCHOR_OPTIONS = (ns.Constants and ns.Constants.ANCHOR_POINT_OPTIONS) or {
     {value = "TOPLEFT", text = "Top Left"},
     {value = "TOP", text = "Top"},
     {value = "TOPRIGHT", text = "Top Right"},
@@ -1160,20 +1160,6 @@ function CB_EditMode:RegisterFrame(unitKey, frame)
     
     if success then
         self.registeredFrames[unitKey] = frame
-        
-        -- Add visual indicator overlay for Edit Mode visibility
-        if not frame._editModeOverlay then
-            local overlay = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-            overlay:SetAllPoints(frame)
-            overlay:SetFrameLevel(frame:GetFrameLevel() + 1)
-            overlay:SetBackdrop({
-                edgeFile = "Interface\\Buttons\\WHITE8x8",
-                edgeSize = 2,
-            })
-            overlay:SetBackdropBorderColor(0.3, 0.8, 1, 0.6)  -- Light blue border for visual feedback
-            overlay:Hide()  -- Hidden by default, shown when Edit Mode is active/dragging
-            frame._editModeOverlay = overlay
-        end
     end
 end
 
@@ -1191,11 +1177,11 @@ end
 
 -- Register all available castbars
 function CB_EditMode:RegisterAllFrames()
-    -- FIXED: Use correct reference table (SUI_Castbar.castbars, NOT SUI_UnitFrames.castbars)
-    local SUI_Castbar = ns.SUI_Castbar
-    if not SUI_Castbar or not SUI_Castbar.castbars then return end
+    -- Use unit frames module to access castbars (they're stored in SUI_UF.castbars)
+    local SUI_UF = ns.SUI_UnitFrames
+    if not SUI_UF or not SUI_UF.castbars then return end
     
-    for unitKey, castbar in pairs(SUI_Castbar.castbars) do
+    for unitKey, castbar in pairs(SUI_UF.castbars) do
         if castbar and castbar.statusBar then
             -- Boss frames share settings, only register once
             if unitKey:match("^boss%d+$") then
@@ -1259,23 +1245,56 @@ function CB_EditMode:Initialize()
     
     -- Register callbacks for Edit Mode enter/exit
     LEM:RegisterCallback("enter", function()
-        -- Enable edit mode overlay display for visual feedback
-        for unitKey, castbar in pairs(self.registeredFrames) do
-            if castbar._editModeOverlay then
-                castbar._editModeOverlay:Show()
+        -- Create temporary preview castbars for Edit Mode if they don't exist
+        local SUI_UF = ns.SUI_UnitFrames
+        local SUI_Castbar = ns.SUI_Castbar
+        
+        if SUI_UF and SUI_Castbar then
+            -- Ensure castbars exist for all enabled units
+            local unitsToPreview = {"player", "target", "focus", "pet"}
+            for _, unitKey in ipairs(unitsToPreview) do
+                local settings = GetCastSettings(unitKey)
+                if settings and settings.enabled ~= false then
+                    -- Create castbar if it doesn't exist
+                    if not SUI_UF.castbars[unitKey] then
+                        local unitFrame = SUI_UF.frames[unitKey]
+                        if unitFrame then
+                            SUI_UF.castbars[unitKey] = SUI_Castbar:CreateCastbar(unitFrame, unitKey, unitKey)
+                        end
+                    end
+                end
+            end
+            
+            -- Preview boss castbars
+            if SUI_UF.frames.boss1 then
+                for i = 1, 5 do
+                    local bossKey = "boss" .. i
+                    local settings = GetCastSettings(bossKey)
+                    if settings and settings.enabled ~= false then
+                        if not SUI_UF.castbars[bossKey] then
+                            SUI_Castbar:CreateBossCastbar(SUI_UF.frames.boss1, "boss" .. i, i)
+                        end
+                    end
+                end
             end
         end
         
-        -- Immediately show all enabled castbars and set up preview animation
-        local SUI_Castbar = ns.SUI_Castbar
-        if SUI_Castbar and SUI_Castbar.castbars then
-            for unitKey, castbar in pairs(SUI_Castbar.castbars) do
+        -- Show preview for all castbars
+        if SUI_UF and SUI_UF.castbars then
+            for unitKey, castbar in pairs(SUI_UF.castbars) do
                 if castbar then
                     local settings = GetCastSettings(unitKey)
                     if settings and settings.enabled ~= false then
                         -- Use mixin methods if available (new architecture)
                         if castbar._castbarMixin then
-                            castbar._castbarMixin:ApplyVisibilitySettings()
+                            -- Force preview visibility in Edit Mode
+                            castbar._castbarMixin:Show()
+                            if castbar._castbarMixin.StartPreviewMode then
+                                castbar._castbarMixin:StartPreviewMode()
+                            end
+                            if castbar._castbarMixin.SetupPreviewOnUpdate then
+                                castbar._castbarMixin:SetupPreviewOnUpdate()
+                            end
                         else
                             -- Legacy fallback
                             castbar:EnableMouse(true)
@@ -1298,21 +1317,15 @@ function CB_EditMode:Initialize()
                 end
             end
         end
+
     end)
     
     LEM:RegisterCallback("exit", function()
-        -- Hide visual overlays
-        for unitKey, castbar in pairs(self.registeredFrames) do
-            if castbar._editModeOverlay then
-                castbar._editModeOverlay:Hide()
-            end
-        end
-        
         -- Clear preview state and hide castbars if not actually casting
         C_Timer.After(0.05, function()
-            local SUI_Castbar = ns.SUI_Castbar
-            if SUI_Castbar and SUI_Castbar.castbars then
-                for unitKey, castbar in pairs(SUI_Castbar.castbars) do
+            local SUI_UF = ns.SUI_UnitFrames
+            if SUI_UF and SUI_UF.castbars then
+                for unitKey, castbar in pairs(SUI_UF.castbars) do
                     if castbar then
                         -- Use mixin methods if available (new architecture)
                         if castbar._castbarMixin then
@@ -1348,6 +1361,38 @@ initFrame:SetScript("OnEvent", function(self, event)
     end)
 end)
 
+-- Debug command to check castbar state
+SLASH_SUICASTDEBUG1 = "/suicastdebug"
+SlashCmdList["SUICASTDEBUG"] = function(msg)
+    local SUI_Castbar = ns.SUI_Castbar
+    if not SUI_Castbar or not SUI_Castbar.castbars then
+        print("|cFFFF0000No castbars found|r")
+        return
+    end
+    
+    print("|cFF56D1FFCastbar Debug Info:|r")
+    for unitKey, castbar in pairs(SUI_Castbar.castbars) do
+        local settings = GetCastSettings(unitKey)
+        local isVisible = castbar:IsShown()
+        local isMouseEnabled = castbar:IsMouseEnabled()
+        local isMovable = castbar:IsMovable()
+        local anchor = settings and settings.anchor or "nil"
+        local enabled = settings and settings.enabled or "nil"
+        local registered = CB_EditMode.registeredFrames[unitKey] and "YES" or "NO"
+        
+        print(string.format("  %s: visible=%s mouse=%s movable=%s anchor=%s enabled=%s registered=%s",
+            unitKey, tostring(isVisible), tostring(isMouseEnabled), tostring(isMovable),
+            tostring(anchor), tostring(enabled), registered))
+    end
+    
+    -- Check if registered frames match
+    print("|cFF56D1FFRegistered Frames:|r")
+    for unitKey, frame in pairs(CB_EditMode.registeredFrames) do
+        local hasUnit = frame._suiCastbarUnit and "YES" or "NO"
+        print(string.format("  %s: hasUnitKey=%s", unitKey, hasUnit))
+    end
+end
+
 -- Debug Window
 local debugWindow = nil
 
@@ -1369,23 +1414,23 @@ local function CreateDebugWindow()
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", frame.StartMoving)
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    frame:SetFrameStrata("DIALOG")
+    frame:SetFrameStrata(ns.Constants and ns.Constants.FRAME_STRATA and ns.Constants.FRAME_STRATA.DIALOG or "DIALOG")
     frame:SetClampedToScreen(true)
     
     -- Title
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 10, -10)
+    title:SetPoint(ns.Constants and ns.Constants.ANCHOR_POINTS and ns.Constants.ANCHOR_POINTS.TOPLEFT or "TOPLEFT", 10, -10)
     title:SetText("|cFF56D1FFSuaviUI|r Castbar Debug")
     
     -- Close button
     local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -2, -2)
+    closeBtn:SetPoint(ns.Constants and ns.Constants.ANCHOR_POINTS and ns.Constants.ANCHOR_POINTS.TOPRIGHT or "TOPRIGHT", -2, -2)
     closeBtn:SetScript("OnClick", function() frame:Hide() end)
     
     -- Scroll frame
     local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 10, -35)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -30, 40)
+    scrollFrame:SetPoint(ns.Constants and ns.Constants.ANCHOR_POINTS and ns.Constants.ANCHOR_POINTS.TOPLEFT or "TOPLEFT", 10, -35)
+    scrollFrame:SetPoint(ns.Constants and ns.Constants.ANCHOR_POINTS and ns.Constants.ANCHOR_POINTS.BOTTOMRIGHT or "BOTTOMRIGHT", -30, 40)
     
     -- Edit box (for selectable/copyable text)
     local editBox = CreateFrame("EditBox", nil, scrollFrame)
@@ -1402,7 +1447,7 @@ local function CreateDebugWindow()
     -- Copy All button
     local copyBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     copyBtn:SetSize(100, 22)
-    copyBtn:SetPoint("BOTTOMLEFT", 10, 10)
+    copyBtn:SetPoint(ns.Constants and ns.Constants.ANCHOR_POINTS and ns.Constants.ANCHOR_POINTS.BOTTOMLEFT or "BOTTOMLEFT", 10, 10)
     copyBtn:SetText("Select All")
     copyBtn:SetScript("OnClick", function()
         editBox:SetFocus()
@@ -1412,7 +1457,7 @@ local function CreateDebugWindow()
     -- Refresh button
     local refreshBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     refreshBtn:SetSize(100, 22)
-    refreshBtn:SetPoint("LEFT", copyBtn, "RIGHT", 10, 0)
+    refreshBtn:SetPoint(ns.Constants and ns.Constants.ANCHOR_POINTS and ns.Constants.ANCHOR_POINTS.LEFT or "LEFT", copyBtn, ns.Constants and ns.Constants.ANCHOR_POINTS and ns.Constants.ANCHOR_POINTS.RIGHT or "RIGHT", 10, 0)
     refreshBtn:SetText("Refresh")
     refreshBtn:SetScript("OnClick", function()
         CB_EditMode:ShowDebugStatus()

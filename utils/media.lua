@@ -49,12 +49,6 @@ LSM:Register(STATUSBAR, "Suavitex Reverse", suaviReverseTexturePath)
 LSM:Register(BACKGROUND, "Suavitex Reverse", suaviReverseTexturePath)
 LSM:Register(BORDER, "Suavitex Reverse", suaviReverseTexturePath)
 
--- Square
-local squareTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\textures\\Square.tga"
-LSM:Register(STATUSBAR, "Suavisquare", squareTexturePath)
-LSM:Register(BACKGROUND, "Suavisquare", squareTexturePath)
-LSM:Register(BORDER, "Suavisquare", squareTexturePath)
-
 -- Suavi v2
 local suaviV2TexturePath = "Interface\\AddOns\\SuaviUI\\assets\\textures\\suavi_v2.tga"
 LSM:Register(STATUSBAR, "Suavitex v2", suaviV2TexturePath)
@@ -76,39 +70,6 @@ local suaviV3InverseTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\textures\
 LSM:Register(STATUSBAR, "Suavitex v3 Inverse", suaviV3InverseTexturePath)
 LSM:Register(BACKGROUND, "Suavitex v3 Inverse", suaviV3InverseTexturePath)
 LSM:Register(BORDER, "Suavitex v3 Inverse", suaviV3InverseTexturePath)
-
--- Suavi v4
-local suaviV4TexturePath = "Interface\\AddOns\\SuaviUI\\assets\\textures\\suavi_v4.tga"
-LSM:Register(STATUSBAR, "Suavitex v4", suaviV4TexturePath)
-LSM:Register(BACKGROUND, "Suavitex v4", suaviV4TexturePath)
-LSM:Register(BORDER, "Suavitex v4", suaviV4TexturePath)
-
-local suaviV4InverseTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\textures\\suavi_v4inverse.tga"
-LSM:Register(STATUSBAR, "Suavitex v4 Inverse", suaviV4InverseTexturePath)
-LSM:Register(BACKGROUND, "Suavitex v4 Inverse", suaviV4InverseTexturePath)
-LSM:Register(BORDER, "Suavitex v4 Inverse", suaviV4InverseTexturePath)
-
--- Suavi v5
-local suaviV5TexturePath = "Interface\\AddOns\\SuaviUI\\assets\\textures\\suavi_v5.tga"
-LSM:Register(STATUSBAR, "Suavitex v5", suaviV5TexturePath)
-LSM:Register(BACKGROUND, "Suavitex v5", suaviV5TexturePath)
-LSM:Register(BORDER, "Suavitex v5", suaviV5TexturePath)
-
-local suaviV5InverseTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\textures\\suavi_v5_inverse.tga"
-LSM:Register(STATUSBAR, "Suavitex v5 Inverse", suaviV5InverseTexturePath)
-LSM:Register(BACKGROUND, "Suavitex v5 Inverse", suaviV5InverseTexturePath)
-LSM:Register(BORDER, "Suavitex v5 Inverse", suaviV5InverseTexturePath)
-
--- Suavi v6
-local suaviV6TexturePath = "Interface\\AddOns\\SuaviUI\\assets\\textures\\suavi_v6.tga"
-LSM:Register(STATUSBAR, "Suavitex v6", suaviV6TexturePath)
-LSM:Register(BACKGROUND, "Suavitex v6", suaviV6TexturePath)
-LSM:Register(BORDER, "Suavitex v6", suaviV6TexturePath)
-
-local suaviV6InverseTexturePath = "Interface\\AddOns\\SuaviUI\\assets\\textures\\suavi_v6inverse.tga"
-LSM:Register(STATUSBAR, "Suavitex v6 Inverse", suaviV6InverseTexturePath)
-LSM:Register(BACKGROUND, "Suavitex v6 Inverse", suaviV6InverseTexturePath)
-LSM:Register(BORDER, "Suavitex v6 Inverse", suaviV6InverseTexturePath)
 
 -- Fade textures (from resourcebars)
 LSM:Register(STATUSBAR, "Suavifade Left", [[Interface\AddOns\SuaviUI\assets\textures\fade-left.png]])

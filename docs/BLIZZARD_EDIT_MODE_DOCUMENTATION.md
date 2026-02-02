@@ -1012,6 +1012,168 @@ end)
 
 ---
 
+### LibEQOL Addon - Detailed Analysis (Bundled Version)
+
+This section documents the SuaviUI-bundled LibEQOL addon in detail, based on the source in libs/LibEQOL/.
+
+#### 1) Package Layout & Load Order
+
+LibEQOL is a multi-module library that loads in this order:
+
+- LibEQOL.toc
+    - Registers the library with WoW, declares metadata, and loads LibStub.
+- LibEQOL.xml
+    - Loads SettingsMode and its controls first, then EditMode, then the umbrella LibEQOL.lua.
+- LibEQOL.lua (umbrella entry)
+    - Creates a global LibEQOL table and exposes module getters.
+
+Load order matters: SettingsMode controls and templates must be present before EditMode builds its settings panels.
+
+#### 2) Umbrella Module (LibEQOL.lua)
+
+Purpose:
+
+- Binds submodules to a single global LibEQOL table.
+- Exposes GetModule("EditMode") and GetModule("SettingsMode").
+
+Key behavior:
+
+- Uses LibStub to fetch LibEQOLEditMode-1.0 and LibEQOLSettingsMode-1.0.
+- Ensures a consistent API surface regardless of which module is requested first.
+
+#### 3) Edit Mode Module (LibEQOLEditMode.lua)
+
+Primary responsibility: Provide a lightweight wrapper around Blizzard Edit Mode with custom frame registration, selection overlays, magnetism integration, and settings UI management.
+
+##### Core State
+
+The module maintains a centralized State table that tracks:
+
+- selectionRegistry: Frame → selection overlay frame.
+- frameHandlers: Frame → position callback.
+- defaultPositions: Frame → defaults table.
+- settingSheets: Frame → settings definition table.
+- buttonSpecs: Frame → settings button definitions.
+- resetToggles / settingsResetToggles: per-frame reset visibility controls.
+- dragPredicates: per-frame drag predicate or boolean.
+- overlayToggleFlags: per-frame overlay toggle state.
+- layout snapshots and per-frame sizing overrides for settings rows.
+
+##### Frame Registration Flow (AddFrame)
+
+When LEM:AddFrame(frame, callback, defaults) is called:
+
+1. Creates a selection overlay using EditModeSystemSelectionTemplate.
+2. Wires input handlers:
+     - OnMouseDown for selection handling and overlap menu.
+     - OnDragStart/OnDragStop to move frames with magnetism.
+     - OnKeyDown/OnKeyUp for keyboard nudging (arrows, with Shift for larger steps).
+3. Injects magnetism helpers into the frame (ensureMagnetismAPI).
+4. Applies defaults (overlay toggle, drag enable, collapse exclusivity, reset visibility, settings layout overrides).
+5. Stores callback and defaults in State.
+6. Lazily creates the settings dialog and hooks EditModeManagerFrame:
+     - OnShow: enter Edit Mode callback chain.
+     - OnHide: exit Edit Mode callback chain.
+     - Hooks layout add/delete events via C_EditMode.
+
+##### Selection & Overlap Handling
+
+- Tracks the active selection and provides an overlap menu when multiple frames occupy the cursor position.
+- Provides a global click handler to dismiss the overlap menu cleanly.
+- Keeps selection visuals in sync with edit mode state and overlay toggles.
+
+##### Callback System
+
+RegisterCallback(event, fn) supports:
+
+- enter, exit
+- layout, layoutadded, layoutdeleted, layoutrenamed, layoutduplicate
+- spec
+
+These callbacks are triggered by Edit Mode lifecycle events and layout updates.
+
+##### Settings Management API
+
+- AddFrameSettings(frame, settings): attaches a settings sheet to the frame.
+- AddFrameSettingsButton(frame, data): adds custom buttons to the settings UI.
+- SetFrameResetVisible / SetFrameSettingsResetVisible: control reset button visibility.
+- SetFrameSettingsMaxHeight: clamp settings panel height per frame.
+- SetFrameDragEnabled: set a predicate or boolean for draggable state.
+- SetFrameCollapseExclusive: enforce exclusive collapsible sections.
+- SetFrameOverlayToggleEnabled: enable or disable overlay toggle logic.
+
+##### Layout Queries
+
+- GetActiveLayoutName / GetActiveLayoutIndex: returns current Edit Mode layout.
+- GetLayouts: returns merged list of default and custom layouts.
+- GetFrameDefaultPosition: returns defaults stored during AddFrame.
+
+##### Internal UI Refresh
+
+The internal dialog refreshers update visibility, enable state, and layout for settings controls. It supports:
+
+- isEnabled predicates per control.
+- collapsed section visibility rules.
+- forced layout recalculation and scrollbar updates.
+
+#### 4) Settings Mode Module (LibEQOLSettingsMode.lua)
+
+Primary responsibility: Provide a structured API on top of Blizzard’s Settings UI, including categories, layout, and control creation with robust tagging and search support.
+
+Key capabilities:
+
+- Category registration and caching with fuzzy lookup helpers.
+- Control creation helpers (headers, text blocks, buttons, keybinds, and more).
+- Search tagging for SettingsPanel search integration.
+- New Feature tag injection based on prefix rules.
+- Notify hooks that propagate Settings.NotifyUpdate for dynamic refresh.
+- Prefix-based variable scoping for large configuration trees.
+
+Selected public helpers include:
+
+- CreateHeader, CreateText, CreateButton, CreateKeybind
+- GetCategory, GetCategoryByName, GetCategoryByID, FindCategory
+- SetVariablePrefix, AttachNotify, SetNewTagResolverForPrefix
+
+#### 5) Custom Settings Controls
+
+LibEQOL extends Settings UI with additional controls and templates:
+
+- MultiDropdown (LibEQOLSettingsMultiDropdown.lua)
+    - Multi-select dropdown with summary text and selection normalization.
+    - Supports array or map selections, ordered options, and custom get/set callbacks.
+    - Optional scroll mode to avoid menu re-init jitter.
+
+- ScrollDropdown (LibEQOLSettingsScrollDropdown.lua)
+    - Virtualized dropdown list with scrollbox support.
+    - Avoids full menu rebuild when selection changes in scroll mode.
+
+- SoundDropdown (LibEQOLSettingsSoundDropdown.lua)
+    - Dropdown with preview button for sound samples.
+    - Supports LibSharedMedia sound lists and custom preview callbacks.
+    - Configurable anchors, sizing, and playback channels.
+
+- ColorOverrides (LibEQOLSettingsColorOverrides.lua)
+    - Renders a list of color swatches with per-entry color picker.
+    - Supports opacity, default resets, and label colorization.
+    - Respects Settings.Defaulted and Settings.CategoryDefaulted events.
+
+Templates are defined in LibEQOLSettingsTemplates.xml and include:
+
+- LibEQOLa0dc638_MultiDropdownTemplate
+- LibEQOLa0dc638_ScrollDropdownTemplate
+- LibEQOLa0dc638_SoundDropdownTemplate
+- LibEQOLa0dc638_ColorOverridesPanel (+ no-header variant)
+
+#### 6) How SuaviUI Uses LibEQOL
+
+- Custom frames are registered via LEM:AddFrame and LEM:AddFrameSettings.
+- Drag and reset behavior is managed through LEM:SetFrameDragEnabled and LEM:SetFrameResetVisible.
+- Edit Mode lifecycle (enter/exit/layout) is handled via LEM:RegisterCallback.
+- The settings framework is used to build rich, searchable panels with minimal boilerplate.
+
+---
+
 ## 10. Real Examples
 
 ### Example 1: SuaviUI Resource Bars

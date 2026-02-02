@@ -5784,7 +5784,7 @@ local function CreateCooldownViewersPage(parent)
     if trackedData.hideIcon == nil then trackedData.hideIcon = false end
     if trackedData.barHeight == nil then trackedData.barHeight = 24 end
     if trackedData.barWidth == nil then trackedData.barWidth = 200 end
-    if trackedData.texture == nil then trackedData.texture = "Suavitex v5" end
+    if trackedData.texture == nil then trackedData.texture = "Suavitex v3" end
     if trackedData.useClassColor == nil then trackedData.useClassColor = true end
     if trackedData.barColor == nil then trackedData.barColor = {0.204, 0.827, 0.6, 1} end
     if trackedData.barOpacity == nil then trackedData.barOpacity = 1.0 end
@@ -12072,18 +12072,32 @@ local function CreateCreditsPage(parent)
     sep2:SetColorTexture(C.border[1], C.border[2], C.border[3], 0.5)
     y = y - 30
 
-    -- SuaviThanks Section
-    local thanksHeader = GUI:CreateSectionHeader(content, "SuaviThanks")
-    thanksHeader:SetPoint("TOPLEFT", PAD, y)
-    y = y - thanksHeader.gap
+    local function AddCreditsSection(titleText, entries)
+        local header = GUI:CreateSectionHeader(content, titleText)
+        header:SetPoint("TOPLEFT", PAD, y)
+        y = y - header.gap
 
-    local thanks = {
-        { name = "Vella", desc = "For tanking Smolderon to my face" },
-        { name = "Pataz", desc = "For the support" },
-        { name = "Ñora", desc = "Paid for the original addon" },
-        { name = "Quazii", desc = "Original inspiration" },
-        { name = "ElvUI", desc = "UI framework inspiration" },
-        { name = "Claudia", desc = "AI-powered development assistant" },
+        for _, entry in ipairs(entries) do
+            local nameText = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            nameText:SetPoint("TOPLEFT", PAD + 10, y)
+            nameText:SetText(entry.name)
+            nameText:SetTextColor(C.accentLight[1], C.accentLight[2], C.accentLight[3], 1)
+
+            local descText = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            descText:SetPoint("LEFT", nameText, "RIGHT", 10, 0)
+            descText:SetText("- " .. entry.desc)
+            descText:SetTextColor(C.textMuted[1], C.textMuted[2], C.textMuted[3], 1)
+            y = y - 22
+        end
+
+        y = y - 20
+    end
+
+    AddCreditsSection("Original Work", {
+        { name = "Quazii", desc = "Original work and inspiration" },
+    })
+
+    AddCreditsSection("Libraries & Dependencies", {
         { name = "Ace3 Libraries", desc = "AceAddon, AceDB, AceConsole, AceEvent, AceLocale, AceSerializer, AceComm" },
         { name = "LibSharedMedia-3.0", desc = "Shared media resources" },
         { name = "LibDeflate", desc = "Data compression for import/export" },
@@ -12092,23 +12106,27 @@ local function CreateCreditsPage(parent)
         { name = "LibKeyBound-1.0", desc = "Keybind management" },
         { name = "LibDualSpec-1.0", desc = "Spec-based profile switching" },
         { name = "LibOpenRaid", desc = "Raid utility functions" },
-        { name = "The WoW Community", desc = "For inspiration and feedback" },
-    }
+        { name = "LibEQOL", desc = "Edit Mode wrapper and settings UI framework" },
+        { name = "LibStub", desc = "Library loader" },
+        { name = "CallbackHandler-1.0", desc = "Callback registration helper" },
+    })
 
-    for _, entry in ipairs(thanks) do
-        local nameText = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        nameText:SetPoint("TOPLEFT", PAD + 10, y)
-        nameText:SetText(entry.name)
-        nameText:SetTextColor(C.accentLight[1], C.accentLight[2], C.accentLight[3], 1)
+    AddCreditsSection("Code References", {
+        { name = "SenseiClassResourceBar", desc = "Resource bar architecture and LibEQOL integration reference" },
+        { name = "CooldownManagerCentered", desc = "Cooldown manager integration reference" },
+    })
 
-        local descText = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        descText:SetPoint("LEFT", nameText, "RIGHT", 10, 0)
-        descText:SetText("- " .. entry.desc)
-        descText:SetTextColor(C.textMuted[1], C.textMuted[2], C.textMuted[3], 1)
-        y = y - 22
-    end
+    AddCreditsSection("SuaviTesters", {
+        { name = "Vela", desc = "Testing and feedback" },
+        { name = "Pataz", desc = "Testing and feedback" },
+        { name = "Ñora", desc = "Testing and feedback" },
+    })
 
-    y = y - 20
+    AddCreditsSection("Special Thanks", {
+        { name = "ElvUI", desc = "UI framework inspiration" },
+        { name = "Claudia", desc = "AI-powered development assistant" },
+        { name = "The WoW Community", desc = "Inspiration and feedback" },
+    })
 
     -- Separator
     local sep3 = content:CreateTexture(nil, "ARTWORK")

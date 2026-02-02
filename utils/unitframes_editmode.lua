@@ -716,7 +716,7 @@ local function BuildUnitFrameSettings(unitKey)
     order = order + 1
     
     -- Name Anchor
-    local anchorOptions = {
+    local anchorOptions = (ns.Constants and ns.Constants.ANCHOR_POINT_OPTIONS) or {
         { text = "Top Left", value = "TOPLEFT" },
         { text = "Top", value = "TOP" },
         { text = "Top Right", value = "TOPRIGHT" },
@@ -733,12 +733,12 @@ local function BuildUnitFrameSettings(unitKey)
         order = order,
         name = "Anchor",
         kind = LEM.SettingType.Dropdown,
-        default = "TOPLEFT",
+        default = ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.TEXT_ANCHOR or "TOPLEFT",
         useOldStyle = true,
         values = anchorOptions,
         get = function(layoutName, layoutIndex)
             local s = GetUnitSettings(unitKey)
-            return s and s.nameAnchor or "TOPLEFT"
+            return s and s.nameAnchor or (ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.TEXT_ANCHOR or "TOPLEFT")
         end,
         set = function(layoutName, value, layoutIndex)
             local s = GetUnitSettings(unitKey)
@@ -1147,12 +1147,12 @@ local function BuildUnitFrameSettings(unitKey)
         order = order,
         name = "Anchor",
         kind = LEM.SettingType.Dropdown,
-        default = "BOTTOMRIGHT",
+        default = ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.POWER_TEXT_ANCHOR or "BOTTOMRIGHT",
         useOldStyle = true,
         values = anchorOptions,
         get = function(layoutName, layoutIndex)
             local s = GetUnitSettings(unitKey)
-            return s and s.powerTextAnchor or "BOTTOMRIGHT"
+            return s and s.powerTextAnchor or (ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.POWER_TEXT_ANCHOR or "BOTTOMRIGHT")
         end,
         set = function(layoutName, value, layoutIndex)
             local s = GetUnitSettings(unitKey)
@@ -1344,7 +1344,7 @@ local function BuildUnitFrameSettings(unitKey)
     order = order + 1
     
     -- Debuff Anchor
-    local auraAnchorOptions = {
+    local auraAnchorOptions = (ns.Constants and ns.Constants.ANCHOR_POINT_OPTIONS) or {
         { text = "Top Left", value = "TOPLEFT" },
         { text = "Top Right", value = "TOPRIGHT" },
         { text = "Bottom Left", value = "BOTTOMLEFT" },
@@ -1356,12 +1356,12 @@ local function BuildUnitFrameSettings(unitKey)
         order = order,
         name = "Anchor",
         kind = LEM.SettingType.Dropdown,
-        default = "TOPLEFT",
+        default = ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.DEBUFF_ANCHOR or "TOPLEFT",
         useOldStyle = true,
         values = auraAnchorOptions,
         get = function(layoutName, layoutIndex)
             local s = GetUnitSettings(unitKey)
-            return s and s.auras and s.auras.debuffAnchor or "TOPLEFT"
+            return s and s.auras and s.auras.debuffAnchor or (ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.DEBUFF_ANCHOR or "TOPLEFT")
         end,
         set = function(layoutName, value, layoutIndex)
             local s = GetUnitSettings(unitKey)
@@ -1597,12 +1597,12 @@ local function BuildUnitFrameSettings(unitKey)
         order = order,
         name = "Anchor",
         kind = LEM.SettingType.Dropdown,
-        default = "BOTTOMLEFT",
+        default = ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.BUFF_ANCHOR or "BOTTOMLEFT",
         useOldStyle = true,
         values = auraAnchorOptions,
         get = function(layoutName, layoutIndex)
             local s = GetUnitSettings(unitKey)
-            return s and s.auras and s.auras.buffAnchor or "BOTTOMLEFT"
+            return s and s.auras and s.auras.buffAnchor or (ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.BUFF_ANCHOR or "BOTTOMLEFT")
         end,
         set = function(layoutName, value, layoutIndex)
             local s = GetUnitSettings(unitKey)
@@ -2112,15 +2112,12 @@ function UF_EditMode:Initialize()
     -- Hook future frame creation
     self:HookFrameCreation()
     
+    local function EnsureRegisteredAndShow()
+        self:RegisterAllFrames()
+    end
+
     -- Register callbacks for Edit Mode events
     LEM:RegisterCallback("enter", function()
-        -- Ensure frames are registered before Edit Mode shows them
-        -- This fixes the issue where frames don't appear until clicking another element
-        if not self._framesRegistered then
-            self:RegisterAllFrames()
-            self._framesRegistered = true
-        end
-        
         -- Refresh all frame settings when entering Edit Mode
         for unitKey, frame in pairs(self.registeredFrames) do
             if LEM.RefreshFrameSettings then
@@ -2129,6 +2126,7 @@ function UF_EditMode:Initialize()
                 end)
             end
         end
+        
     end)
     
     LEM:RegisterCallback("exit", function()
@@ -2140,6 +2138,20 @@ function UF_EditMode:Initialize()
             end)
         end
     end)
+
+    -- Fallback hooks for Edit Mode UI show/hide (covers cases where LEM callbacks don't fire)
+    if EditModeManagerFrame then
+        if EditModeManagerFrame:HasScript("OnShow") then
+            EditModeManagerFrame:HookScript("OnShow", function()
+                EnsureRegisteredAndShow()
+            end)
+        end
+        if EditModeManagerFrame:HasScript("OnHide") then
+            EditModeManagerFrame:HookScript("OnHide", function()
+                -- No-op: selection overlays handled by LibEQOL
+            end)
+        end
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -2188,4 +2200,32 @@ SlashCmdList["SUIUFEDITMODE"] = function(msg)
         print("  /suiufeditmode register - Manually register all unit frames")
         print("  /suiufeditmode status - Show registration status")
     end
+end
+
+-- Debug command: Edit Mode overlay state (library-safe)
+SLASH_SUIEMDEBUG1 = "/suiemdebug"
+SlashCmdList["SUIEMDEBUG"] = function(msg)
+    local isEditModeShown = EditModeManagerFrame and EditModeManagerFrame:IsShown()
+    local isLemEdit = (LEM and LEM.IsInEditMode) and LEM:IsInEditMode() or false
+    print(string.format("|cFF56D1FFSuaviUI|r EditMode: managerShown=%s lemIsEditing=%s", tostring(isEditModeShown), tostring(isLemEdit)))
+
+    local total = 0
+    for unitKey, frame in pairs(UF_EditMode.registeredFrames) do
+        total = total + 1
+        local name = frame and frame.GetName and frame:GetName() or "<unnamed>"
+        local shown = frame and frame.IsShown and frame:IsShown() or false
+        local mouse = frame and frame.IsMouseEnabled and frame:IsMouseEnabled() or false
+        local children = frame and { frame:GetChildren() } or {}
+
+        local selectionChild = false
+        for _, child in ipairs(children) do
+            if child and child.ShowHighlighted and child.Label and child.Text then
+                selectionChild = true
+                break
+            end
+        end
+
+        print(string.format("  %s: name=%s shown=%s mouse=%s children=%d hasSelection=%s", unitKey, tostring(name), tostring(shown), tostring(mouse), #children, tostring(selectionChild)))
+    end
+    print(string.format("  Registered unit frames: %d", total))
 end

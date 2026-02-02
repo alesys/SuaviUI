@@ -256,7 +256,7 @@ local function GetTexturePath(textureName)
     -- If no specific texture, use general default
     if not name or name == "" then
         local general = GetGeneralSettings()
-        name = general and general.texture or "Suavitex v5"
+        name = general and general.texture or "Suavitex v3"
     end
     -- Fallback to Suavisolid if texture not found (handles old profile names)
     return LSM:Fetch("statusbar", name) or LSM:Fetch("statusbar", "Suavisolid") or "Interface\\Buttons\\WHITE8x8"
@@ -4827,6 +4827,17 @@ initFrame:SetScript("OnEvent", function(self, event)
         -- Delay initialization to ensure DB is ready
         C_Timer.After(0.5, function()
             SUI_UF:Initialize()
+            -- Register all frames with Edit Mode immediately after creation
+            if ns.UF_EditMode and ns.UF_EditMode.RegisterAllFrames then
+                C_Timer.After(0.1, function()
+                    ns.UF_EditMode:RegisterAllFrames()
+                end)
+            end
+            if ns.CB_EditMode and ns.CB_EditMode.RegisterAllFrames then
+                C_Timer.After(0.1, function()
+                    ns.CB_EditMode:RegisterAllFrames()
+                end)
+            end
             -- Hook Blizzard Edit Mode after frames are created
             SUI_UF:HookBlizzardEditMode()
             -- Register frames with Clique after creation
@@ -4844,6 +4855,17 @@ initFrame:SetScript("OnEvent", function(self, event)
         if SUI_UF.pendingInitialize then
             SUI_UF.pendingInitialize = false
             SUI_UF:Initialize()
+            -- Register all frames with Edit Mode immediately after creation
+            if ns.UF_EditMode and ns.UF_EditMode.RegisterAllFrames then
+                C_Timer.After(0.1, function()
+                    ns.UF_EditMode:RegisterAllFrames()
+                end)
+            end
+            if ns.CB_EditMode and ns.CB_EditMode.RegisterAllFrames then
+                C_Timer.After(0.1, function()
+                    ns.CB_EditMode:RegisterAllFrames()
+                end)
+            end
             SUI_UF:HookBlizzardEditMode()
             C_Timer.After(0.5, function()
                 SUI_UF:RegisterWithClique()

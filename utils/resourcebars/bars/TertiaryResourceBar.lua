@@ -112,7 +112,8 @@ RB.RegisteredBar.TertiaryResourceBar = {
         return playerClass == "DRUID" or playerClass == "MONK"
     end,
     lemSettings = function(bar, defaults)
-        local dbName = bar:GetConfig().dbName
+        local config = bar:GetConfig()
+        local dbName = config.dbName
 
         return {
             {
