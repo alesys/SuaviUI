@@ -184,6 +184,17 @@ local TEXT_JUSTIFICATION = {
 }
 
 ---------------------------------------------------------------------------
+-- WIDTH MODE CONSTANTS (Single source of truth for width sync modes)
+---------------------------------------------------------------------------
+local WIDTH_MODE = {
+    MANUAL = "Manual",
+    SYNC_UNIT_FRAME = "Sync With Unit Frame",
+    SYNC_ESSENTIAL = "Sync With Essential Cooldowns",
+    SYNC_UTILITY = "Sync With Utility Cooldowns",
+    SYNC_TRACKED_BUFFS = "Sync With Tracked Buffs",
+}
+
+---------------------------------------------------------------------------
 -- EXPORT FUNCTIONS
 ---------------------------------------------------------------------------
 -- Normalize anchor point from user-friendly text to API format
@@ -225,6 +236,7 @@ ns.Constants = {
     TEXTURE_PATHS = TEXTURE_PATHS,
     OUTLINE_TYPES = OUTLINE_TYPES,
     TEXT_JUSTIFICATION = TEXT_JUSTIFICATION,
+    WIDTH_MODE = WIDTH_MODE,
     
     -- Functions
     NormalizeAnchorPoint = NormalizeAnchorPoint,

@@ -123,17 +123,27 @@ local NINE_POINT_ANCHOR_OPTIONS = (ns.Constants and ns.Constants.ANCHOR_POINT_OP
 ---------------------------------------------------------------------------
 -- WIDTH MODE OPTIONS
 ---------------------------------------------------------------------------
+-- Use centralized WIDTH_MODE constants
+local Constants = ns.Constants or {}
+local WIDTH_MODE = Constants.WIDTH_MODE or {
+    MANUAL = "Manual",
+    SYNC_UNIT_FRAME = "Sync With Unit Frame",
+    SYNC_ESSENTIAL = "Sync With Essential Cooldowns",
+    SYNC_UTILITY = "Sync With Utility Cooldowns",
+    SYNC_TRACKED_BUFFS = "Sync With Tracked Buffs",
+}
+
 local WIDTH_MODE_OPTIONS = {
-    {value = "Manual", text = "Manual"},
-    {value = "Sync With Unit Frame", text = "Sync With Unit Frame"},
+    {value = WIDTH_MODE.MANUAL, text = WIDTH_MODE.MANUAL},
+    {value = WIDTH_MODE.SYNC_UNIT_FRAME, text = WIDTH_MODE.SYNC_UNIT_FRAME},
 }
 
 local PLAYER_WIDTH_MODE_OPTIONS = {
-    {value = "Manual", text = "Manual"},
-    {value = "Sync With Unit Frame", text = "Sync With Unit Frame"},
-    {value = "Sync With Essential Cooldowns", text = "Sync With Essential Cooldowns"},
-    {value = "Sync With Utility Cooldowns", text = "Sync With Utility Cooldowns"},
-    {value = "Sync With Tracked Buffs", text = "Sync With Tracked Buffs"},
+    {value = WIDTH_MODE.MANUAL, text = WIDTH_MODE.MANUAL},
+    {value = WIDTH_MODE.SYNC_UNIT_FRAME, text = WIDTH_MODE.SYNC_UNIT_FRAME},
+    {value = WIDTH_MODE.SYNC_ESSENTIAL, text = WIDTH_MODE.SYNC_ESSENTIAL},
+    {value = WIDTH_MODE.SYNC_UTILITY, text = WIDTH_MODE.SYNC_UTILITY},
+    {value = WIDTH_MODE.SYNC_TRACKED_BUFFS, text = WIDTH_MODE.SYNC_TRACKED_BUFFS},
 }
 
 ---------------------------------------------------------------------------
@@ -463,10 +473,10 @@ local function BuildCastbarSettings(unitKey)
         name = "Width Mode",
         kind = LEM.SettingType.Dropdown,
         values = isPlayer and PLAYER_WIDTH_MODE_OPTIONS or WIDTH_MODE_OPTIONS,
-        default = "Manual",
+        default = WIDTH_MODE.MANUAL,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
-            return s and s.widthMode or "Manual"
+            return s and s.widthMode or WIDTH_MODE.MANUAL
         end,
         set = function(layoutName, value)
             local s = GetCastSettings(unitKey)
@@ -491,7 +501,7 @@ local function BuildCastbarSettings(unitKey)
         formatter = function(value) return string.format("%d", value) end,
         isEnabled = function(layoutName)
             local s = GetCastSettings(unitKey)
-            return s and s.widthMode == "Manual" or (not s)
+            return s and s.widthMode == WIDTH_MODE.MANUAL or (not s)
         end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
@@ -521,7 +531,7 @@ local function BuildCastbarSettings(unitKey)
         formatter = function(value) return string.format("%d", value) end,
         isEnabled = function(layoutName)
             local s = GetCastSettings(unitKey)
-            return s and s.widthMode ~= "Manual" or (not s)
+            return s and s.widthMode ~= WIDTH_MODE.MANUAL or (not s)
         end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)

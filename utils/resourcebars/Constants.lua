@@ -209,11 +209,22 @@ RB.availableRelativePoints = {
     { text = "BOTTOMRIGHT" },
 }
 
+------------------------------------------------------------
+-- WIDTH MODE CONSTANTS (Single source of truth)
+------------------------------------------------------------
+RB.WIDTH_MODE = {
+    MANUAL = "Manual",
+    SYNC_UNIT_FRAME = "Sync With Unit Frame",
+    SYNC_ESSENTIAL = "Sync With Essential Cooldowns",
+    SYNC_UTILITY = "Sync With Utility Cooldowns",
+    SYNC_TRACKED_BUFFS = "Sync With Tracked Buffs",
+}
+
 RB.availableWidthModes = {
-    { text = "Manual" },
-    { text = "Sync With Essential Cooldowns" },
-    { text = "Sync With Utility Cooldowns" },
-    { text = "Sync With Tracked Buffs" },
+    { text = RB.WIDTH_MODE.MANUAL },
+    { text = RB.WIDTH_MODE.SYNC_ESSENTIAL },
+    { text = RB.WIDTH_MODE.SYNC_UTILITY },
+    { text = RB.WIDTH_MODE.SYNC_TRACKED_BUFFS },
 }
 
 RB.availableFillDirections = {

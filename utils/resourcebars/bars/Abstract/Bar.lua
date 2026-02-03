@@ -99,7 +99,7 @@ function BarMixin:InitCooldownManagerWidthHook(layoutName)
     local v = _G["EssentialCooldownViewer"]
     if v and not (self._SUI_Essential_hooked or false) then
         local hookEssentialCooldowns = function(_, width)
-            if self._SUI_Essential_Utility_hook_widthMode ~= "Sync With Essential Cooldowns" then
+            if self._SUI_Essential_Utility_hook_widthMode ~= RB.WIDTH_MODE.SYNC_ESSENTIAL then
                 return
             end
 
@@ -118,7 +118,7 @@ function BarMixin:InitCooldownManagerWidthHook(layoutName)
     v = _G["UtilityCooldownViewer"]
     if v and not (self._SUI_Utility_hooked or false) then
         local hookUtilityCooldowns = function(width)
-            if self._SUI_Essential_Utility_hook_widthMode ~= "Sync With Utility Cooldowns" then
+            if self._SUI_Essential_Utility_hook_widthMode ~= RB.WIDTH_MODE.SYNC_UTILITY then
                 return
             end
 
@@ -137,7 +137,7 @@ function BarMixin:InitCooldownManagerWidthHook(layoutName)
     v = _G["BuffIconCooldownViewer"]
     if v and not (self._SUI_tBuffs_hooked or false) then
         local hookTrackedBuffs = function(width)
-            if self._SUI_Tracked_Buff_hook_widthMode ~= "Sync With Tracked Buffs" then
+            if self._SUI_Tracked_Buff_hook_widthMode ~= RB.WIDTH_MODE.SYNC_TRACKED_BUFFS then
                 return
             end
 
@@ -535,7 +535,7 @@ function BarMixin:GetSize(layoutName, data)
     if not data then return defaults.width or 200, defaults.height or 15 end
 
     local width = nil
-    if data.widthMode ~= nil and data.widthMode ~= "Manual" then
+    if data.widthMode ~= nil and data.widthMode ~= RB.WIDTH_MODE.MANUAL then
         width = self:GetCooldownManagerWidth(layoutName) or ((data.width ~= nil) and data.width or defaults.width)
         if data.minWidth and data.minWidth > 0 then
             width = max(width, data.minWidth)
@@ -782,17 +782,17 @@ function BarMixin:GetCooldownManagerWidth(layoutName)
     local data = self:GetData(layoutName)
     if not data then return nil end
 
-    if data.widthMode == "Sync With Essential Cooldowns" then
+    if data.widthMode == RB.WIDTH_MODE.SYNC_ESSENTIAL then
         local v = _G["EssentialCooldownViewer"]
         if v then
             return v:IsShown() and v:GetWidth() or nil
         end
-    elseif data.widthMode == "Sync With Utility Cooldowns" then
+    elseif data.widthMode == RB.WIDTH_MODE.SYNC_UTILITY then
         local v = _G["UtilityCooldownViewer"]
         if v then
             return v:IsShown() and v:GetWidth() or nil
         end
-    elseif data.widthMode == "Sync With Tracked Buffs" then
+    elseif data.widthMode == RB.WIDTH_MODE.SYNC_TRACKED_BUFFS then
         local v = _G["BuffIconCooldownViewer"]
         if v then
             return v:IsShown() and v:GetWidth() or nil

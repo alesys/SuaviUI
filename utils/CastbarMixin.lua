@@ -53,6 +53,16 @@ end
 
 -- Use constants from the constants module
 local Constants = ns.Constants or {}
+
+-- Width Mode constants (single source of truth)
+local WIDTH_MODE = Constants.WIDTH_MODE or {
+    MANUAL = "Manual",
+    SYNC_UNIT_FRAME = "Sync With Unit Frame",
+    SYNC_ESSENTIAL = "Sync With Essential Cooldowns",
+    SYNC_UTILITY = "Sync With Utility Cooldowns",
+    SYNC_TRACKED_BUFFS = "Sync With Tracked Buffs",
+}
+
 local ANCHOR_POINT_MAP = Constants.ANCHOR_POINT_MAP or {
     ["Top Left"] = "TOPLEFT",
     ["Top"] = "TOP",
@@ -241,37 +251,37 @@ end
 
 function CastbarMixin:ApplySize(settings, unitFrame, barHeight)
     local anchor = settings.anchor or "none"
-    local widthMode = settings.widthMode or "Manual"
+    local widthMode = settings.widthMode or WIDTH_MODE.MANUAL
     local frame = self.Frame
     
     -- Determine width based on Width Mode (mirror resource bar implementation)
     local castWidth = nil
     
-    if widthMode == "Sync With Unit Frame" then
+    if widthMode == WIDTH_MODE.SYNC_UNIT_FRAME then
         if unitFrame and unitFrame.GetWidth then
             local ufWidth = unitFrame:GetWidth()
             if ufWidth and ufWidth > 0 then
                 castWidth = ufWidth
             end
         end
-    elseif widthMode == "Sync With Essential Cooldowns" then
+    elseif widthMode == WIDTH_MODE.SYNC_ESSENTIAL then
         local bar = _G["EssentialCooldownViewer"]
         if bar and bar.IsShown and bar:IsShown() and bar.GetWidth then
             castWidth = bar:GetWidth()
         end
-    elseif widthMode == "Sync With Utility Cooldowns" then
+    elseif widthMode == WIDTH_MODE.SYNC_UTILITY then
         local bar = _G["UtilityCooldownViewer"]
         if bar and bar.IsShown and bar:IsShown() and bar.GetWidth then
             castWidth = bar:GetWidth()
         end
-    elseif widthMode == "Sync With Tracked Buffs" then
+    elseif widthMode == WIDTH_MODE.SYNC_TRACKED_BUFFS then
         local bar = _G["BuffIconCooldownViewer"]
         if bar and bar.IsShown and bar:IsShown() and bar.GetWidth then
             castWidth = bar:GetWidth()
         end
     end
     
-    if widthMode ~= "Manual" then
+    if widthMode ~= WIDTH_MODE.MANUAL then
         castWidth = (castWidth and castWidth > 0) and castWidth
             or ((settings.width and settings.width > 0) and settings.width or 250)
     else
@@ -279,7 +289,7 @@ function CastbarMixin:ApplySize(settings, unitFrame, barHeight)
     end
     
     -- Apply width adjustment if in synced mode
-    if widthMode ~= "Manual" and settings.widthAdjustment then
+    if widthMode ~= WIDTH_MODE.MANUAL and settings.widthAdjustment then
         castWidth = castWidth + (settings.widthAdjustment or 0)
     end
     
@@ -662,7 +672,7 @@ function CastbarMixin:InitCooldownManagerWidthHook(layoutName)
     local v = _G["EssentialCooldownViewer"]
     if v and not (self._SUI_Essential_hooked or false) then
         local hookEssentialCooldowns = function(_, width)
-            if self._SUI_Essential_Utility_hook_widthMode ~= "Sync With Essential Cooldowns" then
+            if self._SUI_Essential_Utility_hook_widthMode ~= WIDTH_MODE.SYNC_ESSENTIAL then
                 return
             end
             if (width == nil) or (type(width) == "number" and math.floor(width) > 1) then
@@ -680,7 +690,7 @@ function CastbarMixin:InitCooldownManagerWidthHook(layoutName)
     v = _G["UtilityCooldownViewer"]
     if v and not (self._SUI_Utility_hooked or false) then
         local hookUtilityCooldowns = function(width)
-            if self._SUI_Essential_Utility_hook_widthMode ~= "Sync With Utility Cooldowns" then
+            if self._SUI_Essential_Utility_hook_widthMode ~= WIDTH_MODE.SYNC_UTILITY then
                 return
             end
             if (width == nil) or (type(width) == "number" and math.floor(width) > 1) then
@@ -698,7 +708,7 @@ function CastbarMixin:InitCooldownManagerWidthHook(layoutName)
     v = _G["BuffIconCooldownViewer"]
     if v and not (self._SUI_tBuffs_hooked or false) then
         local hookTrackedBuffs = function(width)
-            if self._SUI_Tracked_Buff_hook_widthMode ~= "Sync With Tracked Buffs" then
+            if self._SUI_Tracked_Buff_hook_widthMode ~= WIDTH_MODE.SYNC_TRACKED_BUFFS then
                 return
             end
             if (width == nil) or (type(width) == "number" and math.floor(width) > 1) then
