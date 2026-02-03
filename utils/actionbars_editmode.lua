@@ -66,10 +66,22 @@ local FRAME_LABELS = {
 ---------------------------------------------------------------------------
 -- POSITION CHANGE CALLBACK
 ---------------------------------------------------------------------------
-local function OnPositionChanged(frame, point, x, y)
-    local buttonType = frame._suiButtonType
-    if not buttonType then return end
+local function OnPositionChanged(frame, layoutName, point, x, y)
+    -- Handle both callback signatures that LibEQOL might use
+    if type(layoutName) == "number" then
+        -- Arguments came in as (frame, point, x, y) - shift them
+        local origX = layoutName
+        local origY = point
+        local origPoint = x
+        x = origX
+        y = origY
+        point = origPoint
+        layoutName = nil
+    end
     
+    if not frame or not frame._suiButtonType then return end
+    
+    local buttonType = frame._suiButtonType
     local settings = GetButtonSettings(buttonType)
     if not settings then return end
     
@@ -77,10 +89,15 @@ local function OnPositionChanged(frame, point, x, y)
     if not settings.position then settings.position = {} end
     settings.position.point = point
     settings.position.relPoint = point
-    settings.position.x = x
-    settings.position.y = y
+    settings.position.x = tonumber(x) or 0
+    settings.position.y = tonumber(y) or 0
     
-    -- No refresh needed - LEM handles positioning
+    -- Refresh the settings panel to show updated values
+    if LEM and LEM.RefreshFrameSettings then
+        pcall(function()
+            LEM:RefreshFrameSettings(frame)
+        end)
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -328,12 +345,18 @@ function AB_EditMode:RegisterFrame(buttonType, holderFrame)
         -- Enable dragging only when customization is enabled
         LEM:SetFrameDragEnabled(holderFrame, function(layoutName)
             local st = GetButtonSettings(buttonType)
+            if LEM and LEM.IsInEditMode and LEM:IsInEditMode() then
+                return true
+            end
             return st and st.enabled or false
         end)
         
         -- Show reset button only when customization is enabled
         LEM:SetFrameResetVisible(holderFrame, function(layoutName)
             local st = GetButtonSettings(buttonType)
+            if LEM and LEM.IsInEditMode and LEM:IsInEditMode() then
+                return true
+            end
             return st and st.enabled or false
         end)
     end)
@@ -380,17 +403,11 @@ function AB_EditMode:RegisterAllFrames()
         local zoneHolder = _G.SUI_zoneAbilityHolder
         
         if extraHolder and not self.registeredFrames.extraActionButton then
-            local settings = GetButtonSettings("extraActionButton")
-            if settings and settings.enabled then
-                self:RegisterFrame("extraActionButton", extraHolder)
-            end
+            self:RegisterFrame("extraActionButton", extraHolder)
         end
         
         if zoneHolder and not self.registeredFrames.zoneAbility then
-            local settings = GetButtonSettings("zoneAbility")
-            if settings and settings.enabled then
-                self:RegisterFrame("zoneAbility", zoneHolder)
-            end
+            self:RegisterFrame("zoneAbility", zoneHolder)
         end
     end)
 end
@@ -415,7 +432,7 @@ function AB_EditMode:Initialize()
         local abdb = GetActionBarsDB()
         if abdb and abdb.bars then
             for buttonType, settings in pairs(abdb.bars) do
-                if settings.enabled and (buttonType == "extraActionButton" or buttonType == "zoneAbility") then
+                if buttonType == "extraActionButton" or buttonType == "zoneAbility" then
                     settings._editModeActive = true
                     RefreshButton(buttonType)
                 end

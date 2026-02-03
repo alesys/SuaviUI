@@ -1265,6 +1265,36 @@ local function CreateGeneralQoLPage(parent)
         panelAlphaSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
+        y = y - 10
+
+        -- Debug Section
+        local debugHeader = GUI:CreateSectionHeader(tabContent, "Debug")
+        debugHeader:SetPoint("TOPLEFT", PADDING, y)
+        y = y - debugHeader.gap
+
+        local debugDesc = GUI:CreateLabel(tabContent,
+            "Enable debug mode to auto-open the castbar debug window when errors are reported.",
+            11, C.textMuted)
+        debugDesc:SetPoint("TOPLEFT", PADDING, y)
+        debugDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        debugDesc:SetJustifyH("LEFT")
+        debugDesc:SetWordWrap(true)
+        debugDesc:SetHeight(18)
+        y = y - 24
+
+        if db.general.debugMode == nil then db.general.debugMode = false end
+        local debugCheck = GUI:CreateFormCheckbox(tabContent, "Enable Debug Mode", "debugMode", db.general, function(val)
+            if not val then
+                local debugWindow = _G.SUI_CastbarDebugWindow
+                if debugWindow and debugWindow.Hide then
+                    debugWindow:Hide()
+                end
+            end
+        end)
+        debugCheck:SetPoint("TOPLEFT", PADDING, y)
+        debugCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
         tabContent:SetHeight(math.abs(y) + 50)
     end
 

@@ -414,6 +414,7 @@ local defaults = {
             skinRollSpacing = 6,  -- Spacing between roll frames
             skinUseClassColor = true,  -- Use class color for skin accents
             skinCustomColor = { 0.2, 1, 0.6, 1 },  -- Custom skin accent color
+            debugMode = false,  -- Enable debug window auto-open
             -- QoL Automation
             sellJunk = true,
             autoRepair = "personal",      -- "off", "personal", "guild"

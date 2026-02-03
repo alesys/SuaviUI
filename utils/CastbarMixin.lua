@@ -198,7 +198,11 @@ end
 function CastbarMixin:GetUnitFrame()
     local SUI_UF = ns.SUI_UnitFrames
     if SUI_UF and SUI_UF.frames then
-        return SUI_UF.frames[self.unitKey]
+        local key = self.unitKey
+        if key == "boss" and self.bossIndex then
+            key = "boss" .. self.bossIndex
+        end
+        return SUI_UF.frames[key]
     end
     return nil
 end
@@ -413,14 +417,15 @@ end
 function CastbarMixin:ApplyColors(settings)
     -- Bar color
     if self.statusBar then
-        local barColor = settings.barColor or {1, 0.7, 0, 1}
+        local barColor = settings.color or settings.barColor or {1, 0.7, 0, 1}
         self.statusBar:SetStatusBarColor(GetSafeColor(barColor))
     end
     
     -- Background color
     if self.bgBar then
         local bgColor = settings.bgColor or {0.15, 0.15, 0.15, 1}
-        self.bgBar:SetColorTexture(GetSafeColor(bgColor))
+        local r, g, b, a = GetSafeColor(bgColor)
+        self.bgBar:SetVertexColor(r, g, b, a)
     end
     
     -- Border color
