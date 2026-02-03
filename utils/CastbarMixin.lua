@@ -346,7 +346,7 @@ function CastbarMixin:ApplyIconLayout(settings, iconSize, iconScale, borderSize)
     local iconFrame = self.icon
     if not iconFrame then return end
     
-    local showIcon = settings.showIcon == true
+    local showIcon = settings.showIcon ~= false
     if not showIcon then
         iconFrame:Hide()
         return
@@ -377,7 +377,7 @@ function CastbarMixin:ApplyStatusBarLayout(settings, barHeight, iconSize, iconSc
     statusBar:SetHeight(barHeight)
     statusBar:ClearAllPoints()
     
-    local showIcon = settings.showIcon == true
+    local showIcon = settings.showIcon ~= false
     
     if showIcon then
         local iconSizePx = iconSize * iconScale

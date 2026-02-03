@@ -273,21 +273,21 @@ local function BuildCastbarSettings(unitKey)
     })
     order = order + 1
     
-    -- Show Spell Icon
+    -- Preview Mode
     table.insert(settings, {
         parentId = "CATEGORY_GENERAL_" .. unitKey,
         order = order,
-        name = "Show Spell Icon",
+        name = "Preview Mode",
         kind = LEM.SettingType.Checkbox,
-        default = true,
+        default = false,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
-            return s and s.showIcon ~= false
+            return s and s.previewMode == true
         end,
         set = function(layoutName, value)
             local s = GetCastSettings(unitKey)
             if s then
-                s.showIcon = value
+                s.previewMode = value
                 RefreshCastbar(unitKey)
             end
         end,
@@ -371,8 +371,72 @@ local function BuildCastbarSettings(unitKey)
         order = order,
         name = "Bar Texture",
         kind = LEM.SettingType.Dropdown,
-        values = GetTextureList(),
         default = "Solid",
+        useOldStyle = true,
+        height = 200,
+        generator = function(dropdown, rootDescription, settingObject)
+            -- Initialize texture pool for previews
+            dropdown.texturePool = {}
+
+            -- Hook cleanup on menu close
+            if not dropdown._CB_Texture_Dropdown_OnMenuClosed_hooked then
+                hooksecurefunc(dropdown, "OnMenuClosed", function()
+                    for _, texture in pairs(dropdown.texturePool) do
+                        texture:Hide()
+                    end
+                end)
+                dropdown._CB_Texture_Dropdown_OnMenuClosed_hooked = true
+            end
+
+            local layoutName = LEM.GetActiveLayoutName() or "Default"
+
+            -- Set current texture as default text
+            dropdown:SetDefaultText(settingObject.get(layoutName))
+
+            if not LSM then
+                local fallback = "Solid"
+                rootDescription:CreateButton(fallback, function()
+                    dropdown:SetDefaultText(fallback)
+                    settingObject.set(layoutName, fallback)
+                end)
+                return
+            end
+
+            -- Get and sort available textures
+            local textures = LSM:HashTable("statusbar")
+            local sortedTextures = {}
+            for textureName in pairs(textures) do
+                table.insert(sortedTextures, textureName)
+            end
+            table.sort(sortedTextures)
+
+            -- Create button for each texture with preview
+            for index, textureName in ipairs(sortedTextures) do
+                local texturePath = textures[textureName]
+
+                local button = rootDescription:CreateButton(textureName, function()
+                    dropdown:SetDefaultText(textureName)
+                    settingObject.set(layoutName, textureName)
+                end)
+
+                -- Add texture preview to button
+                if texturePath then
+                    button:AddInitializer(function(self)
+                        local texturePreview = dropdown.texturePool[index]
+                        if not texturePreview then
+                            texturePreview = dropdown:CreateTexture(nil, "BACKGROUND")
+                            dropdown.texturePool[index] = texturePreview
+                        end
+
+                        texturePreview:SetParent(self)
+                        texturePreview:SetAllPoints(self)
+                        texturePreview:SetTexture(texturePath)
+
+                        texturePreview:Show()
+                    end)
+                end
+            end
+        end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.texture or "Solid"
@@ -433,6 +497,7 @@ local function BuildCastbarSettings(unitKey)
         kind = LEM.SettingType.Dropdown,
         values = isPlayer and PLAYER_ANCHOR_OPTIONS or ANCHOR_OPTIONS,
         default = "none",
+           useOldStyle = true,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.anchor or "none"
@@ -474,6 +539,7 @@ local function BuildCastbarSettings(unitKey)
         kind = LEM.SettingType.Dropdown,
         values = isPlayer and PLAYER_WIDTH_MODE_OPTIONS or WIDTH_MODE_OPTIONS,
         default = WIDTH_MODE.MANUAL,
+        useOldStyle = true,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.widthMode or WIDTH_MODE.MANUAL
@@ -657,6 +723,27 @@ local function BuildCastbarSettings(unitKey)
         defaultCollapsed = true,
     })
     order = order + 1
+
+    -- Show Spell Icon
+    table.insert(settings, {
+        parentId = "CATEGORY_ICON_" .. unitKey,
+        order = order,
+        name = "Show Spell Icon",
+        kind = LEM.SettingType.Checkbox,
+        default = true,
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.showIcon ~= false
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.showIcon = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
     
     -- Icon Size
     table.insert(settings, {
@@ -718,6 +805,7 @@ local function BuildCastbarSettings(unitKey)
         kind = LEM.SettingType.Dropdown,
         values = NINE_POINT_ANCHOR_OPTIONS,
         default = "LEFT",
+        useOldStyle = true,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.iconAnchor or "LEFT"
@@ -877,6 +965,7 @@ local function BuildCastbarSettings(unitKey)
         kind = LEM.SettingType.Dropdown,
         values = NINE_POINT_ANCHOR_OPTIONS,
         default = "LEFT",
+        useOldStyle = true,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.spellTextAnchor or "LEFT"
@@ -970,6 +1059,7 @@ local function BuildCastbarSettings(unitKey)
         kind = LEM.SettingType.Dropdown,
         values = NINE_POINT_ANCHOR_OPTIONS,
         default = "RIGHT",
+        useOldStyle = true,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.timeTextAnchor or "RIGHT"
@@ -1099,6 +1189,7 @@ local function BuildCastbarSettings(unitKey)
             kind = LEM.SettingType.Dropdown,
             values = NINE_POINT_ANCHOR_OPTIONS,
             default = "CENTER",
+            useOldStyle = true,
             get = function(layoutName)
                 local s = GetCastSettings(unitKey)
                 return s and s.empoweredLevelTextAnchor or "CENTER"

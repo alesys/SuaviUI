@@ -446,7 +446,68 @@ local function BuildUnitFrameSettings(unitKey)
         default = "Blizzard",
         useOldStyle = true,
         height = 200,
-        values = GetTextureList(),
+        generator = function(dropdown, rootDescription, settingObject)
+            -- Initialize texture pool for previews
+            dropdown.texturePool = {}
+            -- Hook cleanup on menu close
+            if not dropdown._UF_Texture_Dropdown_OnMenuClosed_hooked then
+                hooksecurefunc(dropdown, "OnMenuClosed", function()
+                    for _, texture in pairs(dropdown.texturePool) do
+                        texture:Hide()
+                    end
+                end)
+                dropdown._UF_Texture_Dropdown_OnMenuClosed_hooked = true
+            end
+
+            local layoutName = LEM.GetActiveLayoutName() or "Default"
+
+            -- Set current texture as default text
+            dropdown:SetDefaultText(settingObject.get(layoutName))
+
+            if not LSM then
+                local fallback = "Blizzard"
+                rootDescription:CreateButton(fallback, function()
+                    dropdown:SetDefaultText(fallback)
+                    settingObject.set(layoutName, fallback)
+                end)
+                return
+            end
+
+            -- Get and sort available textures
+            local lsmTextures = LSM:HashTable(LSM.MediaType.STATUSBAR)
+            local sortedTextures = {}
+            for textureName in pairs(lsmTextures) do
+                table.insert(sortedTextures, textureName)
+            end
+            table.sort(sortedTextures)
+
+            -- Create button for each texture with preview
+            for index, textureName in ipairs(sortedTextures) do
+                local texturePath = lsmTextures[textureName]
+
+                local button = rootDescription:CreateButton(textureName, function()
+                    dropdown:SetDefaultText(textureName)
+                    settingObject.set(layoutName, textureName)
+                end)
+
+                -- Add texture preview to button
+                if texturePath then
+                    button:AddInitializer(function(self)
+                        local texturePreview = dropdown.texturePool[index]
+                        if not texturePreview then
+                            texturePreview = dropdown:CreateTexture(nil, "BACKGROUND")
+                            dropdown.texturePool[index] = texturePreview
+                        end
+
+                        texturePreview:SetParent(self)
+                        texturePreview:SetAllPoints(self)
+                        texturePreview:SetTexture(texturePath)
+
+                        texturePreview:Show()
+                    end)
+                end
+            end
+        end,
         get = function(layoutName, layoutIndex)
             local s = GetUnitSettings(unitKey)
             return s and s.texture or "Blizzard"

@@ -445,7 +445,7 @@ end
 -- ELEMENT POSITIONING HELPERS
 ---------------------------------------------------------------------------
 local function ShouldShowIcon(anchorFrame, castSettings)
-    return castSettings.showIcon == true
+    return castSettings.showIcon ~= false
 end
 
 local function UpdateIconPosition(anchorFrame, castSettings, iconSize, iconScale, iconBorderSize)
