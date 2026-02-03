@@ -935,12 +935,15 @@ local function LayoutViewer(viewerName, trackerKey)
     -- Update locked power bars, castbars, and unit frames after layout completes
     -- Debounced to prevent spam during rapid layout changes
     -- Skipped entirely during EditMode to avoid triggering Blizzard's nil rect bug
-    if not viewer.__cdmUpdatePending and not viewer.isEditing then
+    -- Also skipped if RefreshAll is running (it will handle the updates in batch)
+    if not viewer.__cdmUpdatePending and not viewer.isEditing and not NCDM.refreshingAll then
         viewer.__cdmUpdatePending = true
         C_Timer.After(0.05, function()
             viewer.__cdmUpdatePending = nil
             -- Re-check isEditing at callback time - user may have entered EditMode after timer started
             if viewer.isEditing then return end
+            -- Also skip if RefreshAll started during the timer
+            if NCDM.refreshingAll then return end
             if trackerKey == "essential" then
                 if _G.SuaviUI_UpdateLockedPowerBar then
                     _G.SuaviUI_UpdateLockedPowerBar()
@@ -1250,6 +1253,9 @@ local function RefreshAll()
     NCDM.applying["essential"] = false
     NCDM.applying["utility"] = false
 
+    -- Set flag to suppress individual viewer update callbacks during batch refresh
+    NCDM.refreshingAll = true
+
     -- Increment settings versions to trigger re-layout
     IncrementSettingsVersion()
 
@@ -1273,7 +1279,10 @@ local function RefreshAll()
     end)
 
     -- Update locked power bars and castbars after all layouts complete
-    C_Timer.After(0.10, function()
+    -- CRITICAL: Delay must be > 0.05s to avoid conflicting with the individual
+    -- viewer's LayoutViewer callback which also calls these update functions
+    -- at the 0.05s mark. This prevents double-cascading updates.
+    C_Timer.After(0.15, function()
         -- Essential locked items
         if _G.SuaviUI_UpdateLockedPowerBar then
             _G.SuaviUI_UpdateLockedPowerBar()
@@ -1298,6 +1307,9 @@ local function RefreshAll()
         if _G.SuaviUI_UpdateCDMAnchoredUnitFrames then
             _G.SuaviUI_UpdateCDMAnchoredUnitFrames()
         end
+        
+        -- Clear the refreshing flag now that all updates are complete
+        NCDM.refreshingAll = false
     end)
 end
 

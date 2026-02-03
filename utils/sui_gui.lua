@@ -2086,6 +2086,7 @@ function GUI:CreateFormToggle(parent, label, dbKey, dbTable, onChange, registryI
     SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Option")
     text:SetPoint("LEFT", 0, 0); text:SetPoint("RIGHT", container, "LEFT", 210, 0)  -- Constrain label width to avoid overlap
+    text:SetJustifyH("RIGHT")
 
     -- Toggle track (the pill-shaped background)
     local track = CreateFrame("Button", nil, container, "BackdropTemplate")
@@ -2216,6 +2217,7 @@ function GUI:CreateFormToggleInverted(parent, label, dbKey, dbTable, onChange)
     SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Option")
     text:SetPoint("LEFT", 0, 0); text:SetPoint("RIGHT", container, "LEFT", 210, 0)  -- Constrain label width to avoid overlap
+    text:SetJustifyH("RIGHT")
 
     -- Toggle track
     local track = CreateFrame("Button", nil, container, "BackdropTemplate")
@@ -2425,6 +2427,7 @@ function GUI:CreateFormSlider(parent, label, min, max, step, dbKey, dbTable, onC
     SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Setting")
     text:SetPoint("LEFT", 0, 0); text:SetPoint("RIGHT", container, "LEFT", 210, 0)  -- Constrain label width to avoid overlap
+    text:SetJustifyH("RIGHT")
     container.label = text
 
     -- Track container (for the filled + unfilled portions)
@@ -2691,6 +2694,7 @@ function GUI:CreateFormDropdown(parent, label, options, dbKey, dbTable, onChange
     SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Setting")
     text:SetPoint("LEFT", 0, 0); text:SetPoint("RIGHT", container, "LEFT", 210, 0)  -- Constrain label width to avoid overlap
+    text:SetJustifyH("RIGHT")
 
     -- Dropdown button (right side)
     local dropdown = CreateFrame("Button", nil, container, "BackdropTemplate")
@@ -2954,6 +2958,7 @@ function GUI:CreateFormColorPicker(parent, label, dbKey, dbTable, onChange, opti
     SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Color")
     text:SetPoint("LEFT", 0, 0); text:SetPoint("RIGHT", container, "LEFT", 210, 0)  -- Constrain label width to avoid overlap
+    text:SetJustifyH("RIGHT")
 
     -- Color swatch aligned with other widgets (starts at 180px from left)
     local swatch = CreateFrame("Button", nil, container, "BackdropTemplate")
