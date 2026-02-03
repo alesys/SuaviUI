@@ -3577,8 +3577,12 @@ function GUI:CreateMainFrame()
     
     -- Edit Mode button
     local editModeBtn = CreateBottomButton("Edit Mode", function()
+        -- Use SecureHandlerExecuteHandler to avoid tainting EditMode
+        -- This prevents "attempt to compare a secret value" errors in EncounterWarnings
         if EditModeManagerFrame then
-            ShowUIPanel(EditModeManagerFrame)
+            -- Use the secure slash command instead of directly calling ShowUIPanel
+            -- to avoid taint propagation to Blizzard's protected EditMode system
+            RunSlashCmd("/editmode")
         end
     end)
     editModeBtn:SetPoint("LEFT", cdmBtn, "RIGHT", 10, 0)
