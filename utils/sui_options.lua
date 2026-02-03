@@ -11849,6 +11849,43 @@ local function CreateCreditsPage(parent)
     footer:SetText("Thank you for using SuaviUI!")
     footer:SetTextColor(C.accent[1], C.accent[2], C.accent[3], 1)
     footer:SetFont(footer:GetFont(), 12)
+    y = y - 40
+
+    -- Show Welcome Screen button
+    local welcomeBtn = CreateFrame("Button", nil, content, "BackdropTemplate")
+    welcomeBtn:SetSize(180, 32)
+    welcomeBtn:SetPoint("TOP", content, "TOP", 0, y)
+    welcomeBtn:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    welcomeBtn:SetBackdropColor(C.bgLight[1], C.bgLight[2], C.bgLight[3], 1)
+    welcomeBtn:SetBackdropBorderColor(C.accent[1], C.accent[2], C.accent[3], 1)
+
+    local welcomeBtnText = welcomeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    welcomeBtnText:SetPoint("CENTER", welcomeBtn, "CENTER", 0, 0)
+    welcomeBtnText:SetText("Show Welcome Screen")
+    welcomeBtnText:SetTextColor(C.accent[1], C.accent[2], C.accent[3], 1)
+    welcomeBtnText:SetFont(welcomeBtnText:GetFont(), 12)
+
+    welcomeBtn:SetScript("OnEnter", function(self)
+        self:SetBackdropColor(C.accent[1], C.accent[2], C.accent[3], 0.3)
+        welcomeBtnText:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
+    end)
+
+    welcomeBtn:SetScript("OnLeave", function(self)
+        self:SetBackdropColor(C.bgLight[1], C.bgLight[2], C.bgLight[3], 1)
+        welcomeBtnText:SetTextColor(C.accent[1], C.accent[2], C.accent[3], 1)
+    end)
+
+    welcomeBtn:SetScript("OnClick", function()
+        if SuaviUI.Welcome then
+            SuaviUI.Welcome:Show(true)  -- force=true to bypass "don't show again"
+        end
+    end)
+
+    y = y - 50
 
     content:SetHeight(math.abs(y) + 50)
 end

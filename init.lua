@@ -17,7 +17,10 @@ SuaviUI.versionString = C_AddOns.GetAddOnMetadata("SuaviUI", "Version") or "1.42
 
 ---@type table
 SuaviUI.defaults = {
-    global = {},
+    global = {
+        welcomeScreenShown = false,  -- Has the welcome screen been shown?
+        hideWelcomeScreen = false,   -- User preference to hide welcome screen
+    },
     char = {
         ---@type table
         debug = {

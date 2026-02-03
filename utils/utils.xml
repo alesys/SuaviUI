@@ -35,6 +35,7 @@
     <Script file="sui_character.lua"/>
     <Script file="sui_inspect.lua"/>
     <Script file="sui_gui.lua"/>
+    <Script file="sui_welcome.lua"/>
     <Script file="sui_castbar_options.lua"/>
     <Script file="sui_options.lua"/>
     <Script file="sui_blizzard_options.lua"/>
