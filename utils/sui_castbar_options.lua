@@ -8,6 +8,21 @@ local ADDON_NAME, ns = ...
 local SUI = SuaviUI
 local GUI = SUI.GUI
 local C = GUI.Colors
+local Constants = ns.Constants or {}
+
+local CASTBAR_ANCHOR = Constants.CASTBAR_ANCHOR or {
+    NONE = "none",
+    UNIT_FRAME = "unitframe",
+    ESSENTIAL = "essential",
+    UTILITY = "utility",
+}
+
+local CASTBAR_ANCHOR_TEXT = Constants.CASTBAR_ANCHOR_TEXT or {
+    NONE = "None (Free Position)",
+    UNIT_FRAME = "Unit Frame",
+    ESSENTIAL = "Essential Cooldowns",
+    UTILITY = "Utility Cooldowns",
+}
 
 -- Reference to main options file for helper functions
 local mainOptions = ns.SUI_Options or {}
@@ -70,13 +85,13 @@ local function BuildCastbarOptions(tabContent, unitKey, y, PAD, FORM_ROW, Refres
         -- Migrate from old lock flags to anchor field
         if not castDB.anchor then
             if castDB.lockedToEssential then
-                castDB.anchor = "essential"
+                castDB.anchor = CASTBAR_ANCHOR.ESSENTIAL
             elseif castDB.lockedToUtility then
-                castDB.anchor = "utility"
+                castDB.anchor = CASTBAR_ANCHOR.UTILITY
             elseif castDB.lockedToFrame then
-                castDB.anchor = "unitframe"
+                castDB.anchor = CASTBAR_ANCHOR.UNIT_FRAME
             else
-                castDB.anchor = "none"
+                castDB.anchor = CASTBAR_ANCHOR.NONE
             end
             -- Clear old lock flags
             castDB.lockedToEssential = nil
@@ -173,17 +188,17 @@ local function BuildCastbarOptions(tabContent, unitKey, y, PAD, FORM_ROW, Refres
 
         -- Anchor selection dropdown
         local anchorOptions = {
-            {value = "none", text = "None"}
+            {value = CASTBAR_ANCHOR.NONE, text = CASTBAR_ANCHOR_TEXT.NONE}
         }
-        table.insert(anchorOptions, {value = "unitframe", text = "Unit Frame"})
+        table.insert(anchorOptions, {value = CASTBAR_ANCHOR.UNIT_FRAME, text = CASTBAR_ANCHOR_TEXT.UNIT_FRAME})
         if unitKey == "player" then
-            table.insert(anchorOptions, {value = "essential", text = "Essential Cooldowns"})
-            table.insert(anchorOptions, {value = "utility", text = "Utility Cooldowns"})
+            table.insert(anchorOptions, {value = CASTBAR_ANCHOR.ESSENTIAL, text = CASTBAR_ANCHOR_TEXT.ESSENTIAL})
+            table.insert(anchorOptions, {value = CASTBAR_ANCHOR.UTILITY, text = CASTBAR_ANCHOR_TEXT.UTILITY})
         end
         
         -- Initialize anchor if not set
         if not castDB.anchor then
-            castDB.anchor = "none"
+            castDB.anchor = CASTBAR_ANCHOR.NONE
         end
         
         -- Create slider references first (needed for UpdateCastbarSliders)
@@ -206,13 +221,13 @@ local function BuildCastbarOptions(tabContent, unitKey, y, PAD, FORM_ROW, Refres
 
             -- Update dropdown selection
             if anchorDropdown and anchorDropdown.SetValue then
-                anchorDropdown.SetValue(castDB.anchor or "none", true)
+                anchorDropdown.SetValue(castDB.anchor or CASTBAR_ANCHOR.NONE, true)
             end
             
             -- Disable width slider when auto-resize anchor is set (width controlled by anchors)
             -- Only enable width slider when anchor is "none" (manual positioning)
             if castWidthSlider then
-                if castDB.anchor == "none" then
+                if castDB.anchor == CASTBAR_ANCHOR.NONE then
                     castWidthSlider:SetEnabled(true)
                 else
                     castWidthSlider:SetEnabled(false)
@@ -221,7 +236,7 @@ local function BuildCastbarOptions(tabContent, unitKey, y, PAD, FORM_ROW, Refres
 
             -- Width Adjustment slider is the opposite: enabled when locked to a frame
             if castWidthAdjSlider then
-                local isLocked = (castDB.anchor == "essential" or castDB.anchor == "utility" or castDB.anchor == "unitframe")
+                local isLocked = (castDB.anchor == CASTBAR_ANCHOR.ESSENTIAL or castDB.anchor == CASTBAR_ANCHOR.UTILITY or castDB.anchor == CASTBAR_ANCHOR.UNIT_FRAME)
                 castWidthAdjSlider:SetEnabled(isLocked)
             end
             
@@ -235,7 +250,7 @@ local function BuildCastbarOptions(tabContent, unitKey, y, PAD, FORM_ROW, Refres
         end
         
         -- Track previous anchor to swap offsets when mode changes
-        local prevAnchor = castDB.anchor or "none"
+        local prevAnchor = castDB.anchor or CASTBAR_ANCHOR.NONE
 
         anchorDropdown = GUI:CreateFormDropdown(tabContent, "Autoresize + Lock To", anchorOptions, "anchor", castDB, function()
             -- Clear all lock flags when anchor changes
@@ -243,13 +258,13 @@ local function BuildCastbarOptions(tabContent, unitKey, y, PAD, FORM_ROW, Refres
             castDB.lockedToEssential = false
             castDB.lockedToUtility = false
             -- Clear width to allow anchors to control sizing (only for essential/utility)
-            if castDB.anchor == "essential" or castDB.anchor == "utility" then
+            if castDB.anchor == CASTBAR_ANCHOR.ESSENTIAL or castDB.anchor == CASTBAR_ANCHOR.UTILITY then
                 castDB.width = 0
             end
 
             -- Swap offsets between free (none) and locked modes
-            local wasNone = (prevAnchor == "none")
-            local isNone = (castDB.anchor == "none")
+            local wasNone = (prevAnchor == CASTBAR_ANCHOR.NONE)
+            local isNone = (castDB.anchor == CASTBAR_ANCHOR.NONE)
 
             if wasNone and not isNone then
                 -- Switching FROM none TO locked: save free offsets, load locked offsets
@@ -468,7 +483,7 @@ local function BuildCastbarOptions(tabContent, unitKey, y, PAD, FORM_ROW, Refres
 
         -- Quick Snap button click handlers (one-time snap, no lock)
         snapFrameBtn:SetScript("OnClick", function()
-            castDB.anchor = "unitframe"
+            castDB.anchor = CASTBAR_ANCHOR.UNIT_FRAME
             castDB.offsetX = 0
             castDB.offsetY = 0
             castDB.width = unitDB.width or 250
@@ -481,7 +496,7 @@ local function BuildCastbarOptions(tabContent, unitKey, y, PAD, FORM_ROW, Refres
             snapEssentialBtn:SetScript("OnClick", function()
                 local viewer = _G["EssentialCooldownViewer"]
                 if viewer and viewer:IsShown() then
-                    castDB.anchor = "essential"
+                    castDB.anchor = CASTBAR_ANCHOR.ESSENTIAL
                     castDB.offsetX = 0
                     castDB.offsetY = 0
                     castDB.width = 0  -- Clear width to allow dual anchors to control sizing
@@ -498,7 +513,7 @@ local function BuildCastbarOptions(tabContent, unitKey, y, PAD, FORM_ROW, Refres
             snapUtilityBtn:SetScript("OnClick", function()
                 local viewer = _G["UtilityCooldownViewer"]
                 if viewer and viewer:IsShown() then
-                    castDB.anchor = "utility"
+                    castDB.anchor = CASTBAR_ANCHOR.UTILITY
                     castDB.offsetX = 0
                     castDB.offsetY = 0
                     castDB.width = 0  -- Clear width to allow dual anchors to control sizing
@@ -522,7 +537,7 @@ local function BuildCastbarOptions(tabContent, unitKey, y, PAD, FORM_ROW, Refres
         castWidthAdjSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
         -- Set initial enabled state (will be updated by UpdateCastbarSliders)
-        local isLocked = (castDB.anchor == "essential" or castDB.anchor == "utility" or castDB.anchor == "unitframe")
+        local isLocked = (castDB.anchor == CASTBAR_ANCHOR.ESSENTIAL or castDB.anchor == CASTBAR_ANCHOR.UTILITY or castDB.anchor == CASTBAR_ANCHOR.UNIT_FRAME)
         castWidthAdjSlider:SetEnabled(isLocked)
 
         castHeightSlider = GUI:CreateFormSlider(tabContent, "Bar Height", 4, 40, 1, "height", castDB, RefreshUnit)

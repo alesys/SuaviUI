@@ -250,7 +250,7 @@ function CastbarMixin:ApplyLayout(layoutName, force)
 end
 
 function CastbarMixin:ApplySize(settings, unitFrame, barHeight)
-    local anchor = settings.anchor or "none"
+    local anchor = settings.anchor or (Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.NONE) or "none"
     local widthMode = settings.widthMode or WIDTH_MODE.MANUAL
     local frame = self.Frame
     
@@ -301,12 +301,12 @@ function CastbarMixin:ApplySize(settings, unitFrame, barHeight)
 end
 
 function CastbarMixin:ApplyPosition(settings, unitFrame, barHeight)
-    local anchor = settings.anchor or "none"
+    local anchor = settings.anchor or (Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.NONE) or "none"
     local frame = self.Frame
     
     frame:ClearAllPoints()
     
-    if anchor == "essential" then
+    if anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.ESSENTIAL) or "essential") then
         local bar = _G["EssentialCooldownViewer"]
         if bar then
             local offsetY = Scale(settings.offsetY or -25)
@@ -317,7 +317,7 @@ function CastbarMixin:ApplyPosition(settings, unitFrame, barHeight)
         else
             frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
         end
-    elseif anchor == "utility" then
+    elseif anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.UTILITY) or "utility") then
         local bar = _G["UtilityCooldownViewer"]
         if bar then
             local offsetY = Scale(settings.offsetY or -25)
@@ -328,7 +328,7 @@ function CastbarMixin:ApplyPosition(settings, unitFrame, barHeight)
         else
             frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
         end
-    elseif anchor == "unitframe" and unitFrame then
+    elseif anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.UNIT_FRAME) or "unitframe") and unitFrame then
         local offsetX = Scale(settings.offsetX or 0)
         local offsetY = Scale(settings.offsetY or -25)
         local widthAdj = Scale(settings.widthAdjustment or 0)
@@ -346,7 +346,7 @@ function CastbarMixin:ApplyIconLayout(settings, iconSize, iconScale, borderSize)
     local iconFrame = self.icon
     if not iconFrame then return end
     
-    local showIcon = settings.showIcon ~= false
+    local showIcon = settings.showIcon == true
     if not showIcon then
         iconFrame:Hide()
         return
@@ -377,7 +377,7 @@ function CastbarMixin:ApplyStatusBarLayout(settings, barHeight, iconSize, iconSc
     statusBar:SetHeight(barHeight)
     statusBar:ClearAllPoints()
     
-    local showIcon = settings.showIcon ~= false
+    local showIcon = settings.showIcon == true
     
     if showIcon then
         local iconSizePx = iconSize * iconScale

@@ -1,4 +1,4 @@
-﻿--[[
+--[[
     SuaviUI Options Pages
     Top-down flow layout for the /sui GUI
     Single scrollable content area per tab
@@ -410,7 +410,7 @@ local function CreateGeneralQoLPage(parent)
     -- =====================================================
     local function BuildGeneralTab(tabContent)
         local y = -10
-        local FORM_ROW = 32
+        local FORM_ROW = 30
 
         -- Set search context for auto-registration
         GUI:SetSearchContext({tabIndex = 1, tabName = "General & QoL", subTabIndex = 1, subTabName = "General"})
@@ -490,11 +490,11 @@ local function CreateGeneralQoLPage(parent)
 
             -- Tooltip data for preset buttons
             local tooltipData = {
-                { title = "1080p", desc = "Scale: 0.7111111\nPixel-perfect for 1920Ã—1080" },
-                { title = "1440p", desc = "Scale: 0.5333333\nPixel-perfect for 2560Ã—1440" },
-                { title = "1440p+", desc = "Scale: 0.64\nSuavi's personal setting â€” larger and more readable.\nRequires manual adjustment for pixel perfection." },
-                { title = "4K", desc = "Scale: 0.3555556\nPixel-perfect for 3840Ã—2160" },
-                { title = "Auto", desc = "Computes pixel-perfect scale based on your resolution.\nFormula: 768 Ã· screen height" },
+                { title = "1080p", desc = "Scale: 0.7111111\nPixel-perfect for 1920×1080" },
+                { title = "1440p", desc = "Scale: 0.5333333\nPixel-perfect for 2560×1440" },
+                { title = "1440p+", desc = "Scale: 0.64\nSuavi's personal setting — larger and more readable.\nRequires manual adjustment for pixel perfection." },
+                { title = "4K", desc = "Scale: 0.3555556\nPixel-perfect for 3840×2160" },
+                { title = "Auto", desc = "Computes pixel-perfect scale based on your resolution.\nFormula: 768 ÷ screen height" },
             }
 
             -- Add tooltips to buttons
@@ -522,7 +522,7 @@ local function CreateGeneralQoLPage(parent)
 
             -- Big picture advice
             local bigPicture = GUI:CreateLabel(tabContent,
-                "UI scale is highly personalâ€”it depends on your monitor size, resolution, and preference. If you already have a scale you like from years of playing WoW, stick with it. These presets are just common values people tend to use.",
+                "UI scale is highly personal—it depends on your monitor size, resolution, and preference. If you already have a scale you like from years of playing WoW, stick with it. These presets are just common values people tend to use.",
                 11, C.textMuted)
             bigPicture:SetPoint("TOPLEFT", PADDING, y)
             bigPicture:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
@@ -1303,7 +1303,7 @@ local function CreateGeneralQoLPage(parent)
     -- =====================================================
     local function BuildHUDVisibilityTab(tabContent)
         local y = -10
-        local FORM_ROW = 32
+        local FORM_ROW = 30
 
         -- Set search context for auto-registration
         GUI:SetSearchContext({tabIndex = 1, tabName = "General & QoL", subTabIndex = 2, subTabName = "HUD Visibility"})
@@ -1670,7 +1670,7 @@ local function CreateGeneralQoLPage(parent)
     -- =====================================================
     local function BuildCrosshairTab(tabContent)
         local y = -10
-        local FORM_ROW = 32
+        local FORM_ROW = 30
 
         -- Set search context for auto-registration
         GUI:SetSearchContext({tabIndex = 1, tabName = "General & QoL", subTabIndex = 3, subTabName = "Cursor & Crosshair"})
@@ -1923,7 +1923,7 @@ local function CreateGeneralQoLPage(parent)
     -- =====================================================
     local function BuildBuffDebuffTab(tabContent)
         local y = -10
-        local FORM_ROW = 32
+        local FORM_ROW = 30
 
         -- Set search context for auto-registration
         GUI:SetSearchContext({tabIndex = 1, tabName = "General & QoL", subTabIndex = 4, subTabName = "Buff & Debuff"})
@@ -2002,7 +2002,7 @@ local function CreateGeneralQoLPage(parent)
     -- =====================================================
     local function BuildChatTab(tabContent)
         local y = -10
-        local FORM_ROW = 32
+        local FORM_ROW = 30
 
         -- Set search context for auto-registration
         GUI:SetSearchContext({tabIndex = 1, tabName = "General & QoL", subTabIndex = 5, subTabName = "Chat"})
@@ -2219,7 +2219,7 @@ local function CreateGeneralQoLPage(parent)
     -- =====================================================
     local function BuildTooltipTab(tabContent)
         local y = -10
-        local FORM_ROW = 32
+        local FORM_ROW = 30
 
         -- Set search context for auto-registration
         GUI:SetSearchContext({tabIndex = 1, tabName = "General & QoL", subTabIndex = 6, subTabName = "Tooltip"})
@@ -2389,7 +2389,7 @@ local function CreateGeneralQoLPage(parent)
         local char = db and db.character
         if not char then return end
 
-        local FORM_ROW = 32
+        local FORM_ROW = 30
 
         -- SECTION: Enable/Disable
         local enableHeader = GUI:CreateSectionHeader(tabContent, "Enable/Disable SUI Character Module")
@@ -2433,9 +2433,9 @@ local function CreateGeneralQoLPage(parent)
         desc:SetHeight(50)
         y = y - 60
 
-        -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        -- ───────────────────────────────────────────────────────────────
         -- INSPECT FRAME Section
-        -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        -- ───────────────────────────────────────────────────────────────
         local inspectHeader = GUI:CreateSectionHeader(tabContent, "Inspect Frame")
         inspectHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - inspectHeader.gap
@@ -2483,7 +2483,7 @@ local function CreateGeneralQoLPage(parent)
     -- =====================================================
     local function BuildDragonridingTab(tabContent)
         local y = -10
-        local FORM_ROW = 32
+        local FORM_ROW = 30
 
         -- Set search context for auto-registration
         GUI:SetSearchContext({tabIndex = 1, tabName = "General & QoL", subTabIndex = 8, subTabName = "Dragonriding"})
@@ -2519,9 +2519,9 @@ local function CreateGeneralQoLPage(parent)
         if sr.useClassColorVigor == nil then sr.useClassColorVigor = false end
         if sr.useClassColorSecondWind == nil then sr.useClassColorSecondWind = false end
 
-        -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        -- ═══════════════════════════════════════════════════════════════
         -- SECTION: Enable
-        -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        -- ═══════════════════════════════════════════════════════════════
         GUI:SetSearchSection("Enable")
         local header = GUI:CreateSectionHeader(tabContent, "Skyriding Vigor Bar")
         header:SetPoint("TOPLEFT", PADDING, y)
@@ -2538,9 +2538,9 @@ local function CreateGeneralQoLPage(parent)
         desc:SetJustifyH("LEFT")
         y = y - 24
 
-        -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        -- ═══════════════════════════════════════════════════════════════
         -- SECTION: Visibility
-        -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        -- ═══════════════════════════════════════════════════════════════
         GUI:SetSearchSection("Visibility")
         local visHeader = GUI:CreateSectionHeader(tabContent, "Visibility")
         visHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -2573,9 +2573,9 @@ local function CreateGeneralQoLPage(parent)
         visInfo:SetWordWrap(true)
         y = y - 30
 
-        -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        -- ═══════════════════════════════════════════════════════════════
         -- SECTION: Bar Size
-        -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        -- ═══════════════════════════════════════════════════════════════
         GUI:SetSearchSection("Bar Size")
         local sizeHeader = GUI:CreateSectionHeader(tabContent, "Bar Size")
         sizeHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -2601,9 +2601,9 @@ local function CreateGeneralQoLPage(parent)
         textureDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        -- ═══════════════════════════════════════════════════════════════
         -- SECTION: Position
-        -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        -- ═══════════════════════════════════════════════════════════════
         GUI:SetSearchSection("Position")
         local posHeader = GUI:CreateSectionHeader(tabContent, "Position")
         posHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -2630,9 +2630,9 @@ local function CreateGeneralQoLPage(parent)
         ySlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        -- ═══════════════════════════════════════════════════════════════
         -- SECTION: Fill Colors
-        -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        -- ═══════════════════════════════════════════════════════════════
         GUI:SetSearchSection("Fill Colors")
         local fillHeader = GUI:CreateSectionHeader(tabContent, "Fill Colors")
         fillHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -2676,9 +2676,9 @@ local function CreateGeneralQoLPage(parent)
         swColorPicker:SetAlpha(sr.useClassColorSecondWind and 0.4 or 1)
         y = y - FORM_ROW
 
-        -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        -- ═══════════════════════════════════════════════════════════════
         -- SECTION: Background & Effects
-        -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        -- ═══════════════════════════════════════════════════════════════
         GUI:SetSearchSection("Background & Effects")
         local bgHeader = GUI:CreateSectionHeader(tabContent, "Background & Effects")
         bgHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -2704,9 +2704,9 @@ local function CreateGeneralQoLPage(parent)
         rechargeColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        -- ═══════════════════════════════════════════════════════════════
         -- SECTION: Text Display
-        -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        -- ═══════════════════════════════════════════════════════════════
         GUI:SetSearchSection("Text Display")
         local textHeader = GUI:CreateSectionHeader(tabContent, "Text Display")
         textHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -2787,7 +2787,7 @@ local function CreateAutohidesPage(parent)
     local function BuildAutohideTab(tabContent)
         local y = -10
         local PAD = 10
-        local FORM_ROW = 32
+        local FORM_ROW = 30
 
         GUI:SetSearchContext({tabIndex = 5, tabName = "Autohide & Skinning", subTabIndex = 1, subTabName = "Autohide"})
         GUI:SetSearchSection("Autohide Settings")
@@ -2795,9 +2795,9 @@ local function CreateAutohidesPage(parent)
         if db then
             if not db.uiHider then db.uiHider = {} end
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- SECTION: Objective Tracker
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             local objHeader = GUI:CreateSectionHeader(tabContent, "Objective Tracker")
             objHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - objHeader.gap
@@ -2839,9 +2839,9 @@ local function CreateAutohidesPage(parent)
                 y = y - FORM_ROW
             end
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- SECTION: Frames & Buttons
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             local framesHeader = GUI:CreateSectionHeader(tabContent, "Frames & Buttons")
             framesHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - framesHeader.gap
@@ -2861,9 +2861,9 @@ local function CreateAutohidesPage(parent)
                 y = y - FORM_ROW
             end
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- SECTION: Nameplates
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             local nameplatesHeader = GUI:CreateSectionHeader(tabContent, "Nameplates")
             nameplatesHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - nameplatesHeader.gap
@@ -2880,9 +2880,9 @@ local function CreateAutohidesPage(parent)
                 y = y - FORM_ROW
             end
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- SECTION: Status Bars
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             local barsHeader = GUI:CreateSectionHeader(tabContent, "Status Bars")
             barsHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - barsHeader.gap
@@ -2899,9 +2899,9 @@ local function CreateAutohidesPage(parent)
                 y = y - FORM_ROW
             end
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- SECTION: Combat & Messages
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             local combatHeader = GUI:CreateSectionHeader(tabContent, "Combat & Messages")
             combatHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - combatHeader.gap
@@ -2925,7 +2925,7 @@ local function CreateAutohidesPage(parent)
     local function BuildSkinningTab(tabContent)
         local y = -10
         local PAD = 10
-        local FORM_ROW = 32
+        local FORM_ROW = 30
 
         GUI:SetSearchContext({tabIndex = 5, tabName = "Autohide & Skinning", subTabIndex = 2, subTabName = "Skinning"})
 
@@ -2937,9 +2937,9 @@ local function CreateAutohidesPage(parent)
             if general.skinCustomColor == nil then general.skinCustomColor = {0.2, 1.0, 0.6, 1} end
             if general.skinKeystoneFrame == nil then general.skinKeystoneFrame = true end
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- CHOOSE DEFAULT COLOR SECTION
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             GUI:SetSearchSection("Choose Default Color")
 
             local colorHeader = GUI:CreateSectionHeader(tabContent, "Choose Default Color")
@@ -3016,9 +3016,9 @@ local function CreateAutohidesPage(parent)
 
             y = y - 10  -- Extra padding before next section
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- GAME MENU SECTION
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             GUI:SetSearchSection("Game Menu")
 
             if general.skinGameMenu == nil then general.skinGameMenu = false end
@@ -3074,9 +3074,9 @@ local function CreateAutohidesPage(parent)
 
             y = y - 10  -- Extra padding before next section
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- READY CHECK FRAME SECTION
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             GUI:SetSearchSection("Ready Check Frame")
 
             if general.skinReadyCheck == nil then general.skinReadyCheck = true end
@@ -3125,9 +3125,9 @@ local function CreateAutohidesPage(parent)
 
             y = y - 10  -- Extra padding before next section
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- KEYSTONE FRAME SECTION
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             GUI:SetSearchSection("Keystone Frame")
 
             local header = GUI:CreateSectionHeader(tabContent, "Keystone Frame")
@@ -3157,9 +3157,9 @@ local function CreateAutohidesPage(parent)
 
             y = y - 10  -- Extra padding before next section
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- ENCOUNTER POWER BAR SECTION
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             GUI:SetSearchSection("Encounter Power Bar")
 
             if general.skinPowerBarAlt == nil then general.skinPowerBarAlt = true end
@@ -3199,9 +3199,9 @@ local function CreateAutohidesPage(parent)
 
             y = y - 10  -- Extra padding before next section
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- ALERT FRAMES SECTION
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             GUI:SetSearchSection("Alert Frames")
 
             if general.skinAlerts == nil then general.skinAlerts = true end
@@ -3249,9 +3249,9 @@ local function CreateAutohidesPage(parent)
 
             y = y - 10  -- Extra padding before next section
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- LOOT WINDOW SECTION
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             GUI:SetSearchSection("Loot Window")
 
             -- Get loot settings from profile root (not general)
@@ -3311,9 +3311,9 @@ local function CreateAutohidesPage(parent)
 
             y = y - 10  -- Extra padding before next section
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- ROLL FRAMES SECTION
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             GUI:SetSearchSection("Roll Frames")
 
             local rollHeader = GUI:CreateSectionHeader(tabContent, "Roll Frames")
@@ -3387,9 +3387,9 @@ local function CreateAutohidesPage(parent)
 
             y = y - 10  -- Extra padding before next section
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- LOOT HISTORY SECTION
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             GUI:SetSearchSection("Loot History")
 
             local historyHeader = GUI:CreateSectionHeader(tabContent, "Loot History")
@@ -3419,9 +3419,9 @@ local function CreateAutohidesPage(parent)
 
             y = y - 10  -- Extra padding before next section
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- SUI M+ TIMER SECTION
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             GUI:SetSearchSection("SUI M+ Timer")
 
             local mplusTimer = db.mplusTimer
@@ -3456,7 +3456,7 @@ local function CreateAutohidesPage(parent)
             quiMplusDesc:SetHeight(20)
             y = y - 24
 
-            local quiMplusNote = GUI:CreateLabel(tabContent, "Disabled by default â€” most M+ players prefer dedicated timer addons. Enable for an all-in-one solution.", 10, {1.0, 0.75, 0.2, 1})
+            local quiMplusNote = GUI:CreateLabel(tabContent, "Disabled by default — most M+ players prefer dedicated timer addons. Enable for an all-in-one solution.", 10, {1.0, 0.75, 0.2, 1})
             quiMplusNote:SetPoint("TOPLEFT", PAD, y)
             quiMplusNote:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             quiMplusNote:SetJustifyH("LEFT")
@@ -3574,9 +3574,9 @@ local function CreateAutohidesPage(parent)
             quiMplusDemoInfo:SetJustifyH("LEFT")
             y = y - 25
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- REPUTATION/CURRENCY SECTION
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             GUI:SetSearchSection("Reputation/Currency")
 
             if general.skinCharacterFrame == nil then general.skinCharacterFrame = true end
@@ -3608,9 +3608,9 @@ local function CreateAutohidesPage(parent)
 
             y = y - 10  -- Extra padding before next section
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- INSPECT FRAME SECTION
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             GUI:SetSearchSection("Inspect Frame")
 
             if general.skinInspectFrame == nil then general.skinInspectFrame = true end
@@ -3642,9 +3642,9 @@ local function CreateAutohidesPage(parent)
 
             y = y - 10  -- Extra padding before next section
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- OVERRIDE ACTION BAR SECTION
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             GUI:SetSearchSection("Override Action Bar")
 
             if general.skinOverrideActionBar == nil then general.skinOverrideActionBar = false end
@@ -3676,9 +3676,9 @@ local function CreateAutohidesPage(parent)
 
             y = y - 10  -- Extra padding before next section
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- OBJECTIVE TRACKER SECTION
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             GUI:SetSearchSection("Objective Tracker")
 
             if general.skinObjectiveTracker == nil then general.skinObjectiveTracker = false end
@@ -3795,9 +3795,9 @@ local function CreateAutohidesPage(parent)
 
             y = y - 10  -- Extra padding before next section
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- INSTANCE FRAMES SECTION
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             GUI:SetSearchSection("Instance Frames")
 
             if general.skinInstanceFrames == nil then general.skinInstanceFrames = false end
@@ -3862,7 +3862,7 @@ local function CreateMinimapPage(parent)
     local function BuildMinimapTab(tabContent)
         local y = -10
         local PAD = 10
-        local FORM_ROW = 32
+        local FORM_ROW = 30
 
         -- Set search context for auto-registration
         GUI:SetSearchContext({tabIndex = 3, tabName = "Minimap & Datatext", subTabIndex = 1, subTabName = "Minimap"})
@@ -4101,7 +4101,7 @@ local function CreateMinimapPage(parent)
     local function BuildDatatextTab(tabContent)
         local y = -10
         local PAD = 10
-        local FORM_ROW = 32
+        local FORM_ROW = 30
 
         -- Set search context for auto-registration
         GUI:SetSearchContext({tabIndex = 3, tabName = "Minimap & Datatext", subTabIndex = 2, subTabName = "Datatext"})
@@ -4888,7 +4888,7 @@ local function CreateCDEffectsPage(parent)
     local scroll, content = CreateScrollableContent(parent)
     local db = GetDB()
     local y = -15
-    local FORM_ROW = 32
+    local FORM_ROW = 30
 
     -- Set search context for auto-registration
     GUI:SetSearchContext({tabIndex = 7, tabName = "CDM GCD & Effects"})
@@ -5232,7 +5232,7 @@ local function CreateCooldownViewersPage(parent)
     local scroll, content = CreateScrollableContent(parent)
     local db = GetDB()
     local y = -15
-    local FORM_ROW = 32
+    local FORM_ROW = 30
 
     -- Set search context for auto-registration
     GUI:SetSearchContext({tabIndex = 8, tabName = "CDM Styles"})
@@ -5988,7 +5988,7 @@ local function CreateCDKeybindsPage(parent)
     local scroll, content = CreateScrollableContent(parent)
     local db = GetDB()
     local y = -15
-    local FORM_ROW = 32
+    local FORM_ROW = 30
 
     -- Set search context for auto-registration
     GUI:SetSearchContext({tabIndex = 9, tabName = "CDM Keybind & Rotation"})
@@ -6226,7 +6226,7 @@ local function CreateCDKeybindsPage(parent)
 
         if raiDB then
             -- Form layout constants
-            local FORM_ROW = 32  -- Height per form row
+            local FORM_ROW = 30  -- Height per form row
 
             -- Info text
             local raiInfo = GUI:CreateLabel(content, "Displays a standalone movable icon showing Blizzard's next recommended ability.", 11, C.textMuted)
@@ -6375,7 +6375,7 @@ local function CreateCustomTrackersPage(parent)
 
     local bars = db.customTrackers.bars
     local PAD = 10
-    local FORM_ROW = 32
+    local FORM_ROW = 30
 
     ---------------------------------------------------------------------------
     -- Helper: Calculate offset relative to sui_Player frame's top-left corner
@@ -8200,7 +8200,7 @@ local function CreateUnitFramesPage(parent)
     local function BuildGeneralTab(tabContent)
         local y = -10
         local PAD = 10
-        local FORM_ROW = 32
+        local FORM_ROW = 30
         local ufdb = GetUFDB()
 
         -- Set search context for auto-registration
@@ -8496,7 +8496,7 @@ local function CreateUnitFramesPage(parent)
     local function BuildUnitTab(tabContent, unitKey)
         local y = -10
         local PAD = 10
-        local FORM_ROW = 32
+        local FORM_ROW = 30
         local ufdb = GetUFDB()
 
         -- Set search context for widget auto-registration (dynamic based on unitKey)
@@ -8689,7 +8689,7 @@ local function CreateUnitFramesPage(parent)
                 {value = " - ", text = "-"},
                 {value = " | ", text = "|"},
                 {value = " -> ", text = "->"},
-                {value = " â€”> ", text = "â€”>"},
+                {value = " —> ", text = "—>"},
                 {value = " >>> ", text = ">>>"},
             }
             local totSepDropdown = GUI:CreateFormDropdown(tabContent, "ToT Separator", totSepOptions, "totSeparator", unitDB, RefreshUnit)
@@ -9253,9 +9253,9 @@ local function CreateUnitFramesPage(parent)
             combatYSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             -- STANCE/FORM TEXT SECTION (player only)
-            -- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            -- ═══════════════════════════════════════════════════════════════
             local stanceHeader = GUI:CreateSectionHeader(tabContent, "Stance / Form Text")
             stanceHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - stanceHeader.gap
@@ -9585,7 +9585,7 @@ local function CreateActionBarsPage(parent)
     local function BuildMouseoverHideTab(tabContent)
         local y = -15
         local PAD = PADDING
-        local FORM_ROW = 32
+        local FORM_ROW = 30
 
         -- Set search context for widget auto-registration
         GUI:SetSearchContext({tabIndex = 4, tabName = "Action Bars", subTabIndex = 2, subTabName = "Mouseover Hide"})
@@ -9723,7 +9723,7 @@ local function CreateActionBarsPage(parent)
     local function BuildMasterSettingsTab(tabContent)
         local y = -15
         local PAD = PADDING
-        local FORM_ROW = 32
+        local FORM_ROW = 30
 
         -- Set search context for auto-registration
         GUI:SetSearchContext({tabIndex = 4, tabName = "Action Bars", subTabIndex = 1, subTabName = "Master Settings"})
@@ -10110,7 +10110,7 @@ local function CreateActionBarsPage(parent)
         -- Use tabContent directly - parent Action Bars page already has scroll
         local content = tabContent
         local PAD = PADDING
-        local FORM_ROW = 32
+        local FORM_ROW = 30
         local SECTION_GAP = 4
 
         -- 9-point anchor options for text positioning
@@ -10524,7 +10524,7 @@ local function CreateActionBarsPage(parent)
     local function BuildExtraButtonsTab(tabContent)
         local y = -15
         local PAD = PADDING
-        local FORM_ROW = 32
+        local FORM_ROW = 30
 
         -- Set search context
         GUI:SetSearchContext({tabIndex = 4, tabName = "Action Bars", subTabIndex = 4, subTabName = "Extra Buttons"})
@@ -11080,7 +11080,7 @@ local function CreateSpecProfilesPage(parent)
     local scroll, content = CreateScrollableContent(parent)
     local y = -15
     local PAD = PADDING
-    local FORM_ROW = 32
+    local FORM_ROW = 30
 
     local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
     local db = SUICore and SUICore.db
@@ -11785,7 +11785,7 @@ local function CreateCreditsPage(parent)
     AddCreditsSection("SuaviTesters", {
         { name = "Vela", desc = "Testing and feedback" },
         { name = "Pataz", desc = "Testing and feedback" },
-        { name = "Ñora", desc = "The one who paid for Quazii's addon. Look what that got us into." },
+        { name = "�ora", desc = "The one who paid for Quazii's addon. Look what that got us into." },
     })
 
     AddCreditsSection("Special Thanks", {
@@ -11897,7 +11897,7 @@ local function CreateHUDLayeringPage(parent)
     local scroll, content = CreateScrollableContent(parent)
     local y = -15
     local PAD = PADDING
-    local FORM_ROW = 32
+    local FORM_ROW = 30
 
     local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
     local db = SUICore and SUICore.db and SUICore.db.profile

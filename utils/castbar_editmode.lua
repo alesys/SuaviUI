@@ -96,17 +96,72 @@ end
 ---------------------------------------------------------------------------
 -- ANCHOR OPTIONS
 ---------------------------------------------------------------------------
-local ANCHOR_OPTIONS = {
-    {value = "none", text = "None (Free Position)"},
-    {value = "unitframe", text = "Unit Frame"},
+local Constants = ns.Constants or {}
+local ANCHOR_OPTIONS = (Constants.CASTBAR_ANCHOR_OPTIONS) or {
+    {text = (Constants.CASTBAR_ANCHOR_TEXT and Constants.CASTBAR_ANCHOR_TEXT.NONE) or "None (Free Position)", value = (Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.NONE) or "none"},
+    {text = (Constants.CASTBAR_ANCHOR_TEXT and Constants.CASTBAR_ANCHOR_TEXT.UNIT_FRAME) or "Unit Frame", value = (Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.UNIT_FRAME) or "unitframe"},
 }
 
-local PLAYER_ANCHOR_OPTIONS = {
-    {value = "none", text = "None (Free Position)"},
-    {value = "unitframe", text = "Unit Frame"},
-    {value = "essential", text = "Essential Cooldowns"},
-    {value = "utility", text = "Utility Cooldowns"},
+local PLAYER_ANCHOR_OPTIONS = (Constants.CASTBAR_PLAYER_ANCHOR_OPTIONS) or {
+    {text = (Constants.CASTBAR_ANCHOR_TEXT and Constants.CASTBAR_ANCHOR_TEXT.NONE) or "None (Free Position)", value = (Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.NONE) or "none"},
+    {text = (Constants.CASTBAR_ANCHOR_TEXT and Constants.CASTBAR_ANCHOR_TEXT.UNIT_FRAME) or "Unit Frame", value = (Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.UNIT_FRAME) or "unitframe"},
+    {text = (Constants.CASTBAR_ANCHOR_TEXT and Constants.CASTBAR_ANCHOR_TEXT.ESSENTIAL) or "Essential Cooldowns", value = (Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.ESSENTIAL) or "essential"},
+    {text = (Constants.CASTBAR_ANCHOR_TEXT and Constants.CASTBAR_ANCHOR_TEXT.UTILITY) or "Utility Cooldowns", value = (Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.UTILITY) or "utility"},
 }
+
+local CASTBAR_ANCHOR = (Constants and Constants.CASTBAR_ANCHOR) or {
+    NONE = "none",
+    UNIT_FRAME = "unitframe",
+    ESSENTIAL = "essential",
+    UTILITY = "utility",
+}
+
+local CASTBAR_ANCHOR_TEXT = (Constants and Constants.CASTBAR_ANCHOR_TEXT) or {
+    NONE = "None (Free Position)",
+    UNIT_FRAME = "Unit Frame",
+    ESSENTIAL = "Essential Cooldowns",
+    UTILITY = "Utility Cooldowns",
+}
+
+local ANCHOR_TEXT_TO_VALUE = {
+    [CASTBAR_ANCHOR_TEXT.NONE] = CASTBAR_ANCHOR.NONE,
+    [CASTBAR_ANCHOR_TEXT.UNIT_FRAME] = CASTBAR_ANCHOR.UNIT_FRAME,
+}
+
+local PLAYER_ANCHOR_TEXT_TO_VALUE = {
+    [CASTBAR_ANCHOR_TEXT.NONE] = CASTBAR_ANCHOR.NONE,
+    [CASTBAR_ANCHOR_TEXT.UNIT_FRAME] = CASTBAR_ANCHOR.UNIT_FRAME,
+    [CASTBAR_ANCHOR_TEXT.ESSENTIAL] = CASTBAR_ANCHOR.ESSENTIAL,
+    [CASTBAR_ANCHOR_TEXT.UTILITY] = CASTBAR_ANCHOR.UTILITY,
+}
+
+local ANCHOR_VALUE_TO_TEXT = {
+    [CASTBAR_ANCHOR.NONE] = CASTBAR_ANCHOR_TEXT.NONE,
+    [CASTBAR_ANCHOR.UNIT_FRAME] = CASTBAR_ANCHOR_TEXT.UNIT_FRAME,
+}
+
+local PLAYER_ANCHOR_VALUE_TO_TEXT = {
+    [CASTBAR_ANCHOR.NONE] = CASTBAR_ANCHOR_TEXT.NONE,
+    [CASTBAR_ANCHOR.UNIT_FRAME] = CASTBAR_ANCHOR_TEXT.UNIT_FRAME,
+    [CASTBAR_ANCHOR.ESSENTIAL] = CASTBAR_ANCHOR_TEXT.ESSENTIAL,
+    [CASTBAR_ANCHOR.UTILITY] = CASTBAR_ANCHOR_TEXT.UTILITY,
+}
+
+local function AnchorValueToText(value, isPlayer)
+    local v = value or CASTBAR_ANCHOR.NONE
+    if isPlayer then
+        return PLAYER_ANCHOR_VALUE_TO_TEXT[v] or CASTBAR_ANCHOR_TEXT.NONE
+    end
+    return ANCHOR_VALUE_TO_TEXT[v] or CASTBAR_ANCHOR_TEXT.NONE
+end
+
+local function AnchorTextToValue(text, isPlayer)
+    local t = text or CASTBAR_ANCHOR_TEXT.NONE
+    if isPlayer then
+        return PLAYER_ANCHOR_TEXT_TO_VALUE[t] or CASTBAR_ANCHOR.NONE
+    end
+    return ANCHOR_TEXT_TO_VALUE[t] or CASTBAR_ANCHOR.NONE
+end
 
 local NINE_POINT_ANCHOR_OPTIONS = (ns.Constants and ns.Constants.ANCHOR_POINT_OPTIONS) or {
     {value = "TOPLEFT", text = "Top Left"},
@@ -124,7 +179,6 @@ local NINE_POINT_ANCHOR_OPTIONS = (ns.Constants and ns.Constants.ANCHOR_POINT_OP
 -- WIDTH MODE OPTIONS
 ---------------------------------------------------------------------------
 -- Use centralized WIDTH_MODE constants
-local Constants = ns.Constants or {}
 local WIDTH_MODE = Constants.WIDTH_MODE or {
     MANUAL = "Manual",
     SYNC_UNIT_FRAME = "Sync With Unit Frame",
@@ -190,28 +244,43 @@ local function OnPositionChanged(frame, layoutName, point, x, y)
         CB_EditMode:LogDebug("OnPositionChanged: Normalized arguments")
     end
     
-    local nx = tonumber(x)
-    local ny = tonumber(y)
-    if not nx or not ny then
-        CB_EditMode:ReportDebug("OnPositionChanged: non-numeric offsets x=" .. tostring(x) .. " y=" .. tostring(y))
-        return
+    -- Prefer actual frame center to avoid coordinate mismatches
+    local cx, cy = frame:GetCenter()
+    local ux, uy = UIParent:GetCenter()
+    if not cx or not cy or not ux or not uy then
+        local nx = tonumber(x)
+        local ny = tonumber(y)
+        if not nx or not ny then
+            CB_EditMode:ReportDebug("OnPositionChanged: non-numeric offsets x=" .. tostring(x) .. " y=" .. tostring(y))
+            return
+        end
+        cx, cy = nx + ux, ny + uy
     end
+
+    local nx = cx - ux
+    local ny = cy - uy
     
     -- Check if castbar is anchored to something
-    local anchor = castSettings.anchor or "none"
-    local isAnchored = (anchor ~= "none") and (anchor ~= "disabled")
+    local anchor = castSettings.anchor or CASTBAR_ANCHOR.NONE
+    local isAnchored = (anchor ~= CASTBAR_ANCHOR.NONE) and (anchor ~= "disabled")
     
     if isAnchored then
-        -- Don't save position when anchored - the anchor controls positioning
-        CB_EditMode:LogDebug("OnPositionChanged: Ignoring drag - castbar is anchored to " .. tostring(anchor))
-        -- Refresh the castbar to restore anchor position
-        RefreshCastbar(unitKey)
-        return
+        -- Switch to free positioning when the user drags an anchored castbar
+        CB_EditMode:LogDebug("OnPositionChanged: switching to free position from anchor " .. tostring(anchor))
+        -- Preserve locked offsets for later re-anchoring
+        if castSettings.lockedOffsetX == nil then castSettings.lockedOffsetX = castSettings.offsetX or 0 end
+        if castSettings.lockedOffsetY == nil then castSettings.lockedOffsetY = castSettings.offsetY or 0 end
+        -- Save free offsets
+        castSettings.freeOffsetX = math.floor(nx + 0.5)
+        castSettings.freeOffsetY = math.floor(ny + 0.5)
+        castSettings.offsetX = castSettings.freeOffsetX
+        castSettings.offsetY = castSettings.freeOffsetY
+        castSettings.anchor = CASTBAR_ANCHOR.NONE
+    else
+        -- Save position for free-positioned castbars
+        castSettings.offsetX = math.floor(nx + 0.5)
+        castSettings.offsetY = math.floor(ny + 0.5)
     end
-    
-    -- Save position for free-positioned castbars
-    castSettings.offsetX = math.floor(nx + 0.5)
-    castSettings.offsetY = math.floor(ny + 0.5)
     
     CB_EditMode:LogDebug("OnPositionChanged: " .. unitKey .. " position saved to (" .. castSettings.offsetX .. ", " .. castSettings.offsetY .. ")")
     
@@ -223,7 +292,7 @@ local function OnPositionChanged(frame, layoutName, point, x, y)
     -- Update sidebar values using LEM's internal API
     if LEM and LEM.internal and LEM.internal.RefreshSettingValues then
         CB_EditMode:LogDebug("OnPositionChanged: Calling RefreshSettingValues")
-        LEM.internal:RefreshSettingValues({"X Offset", "Y Offset"})
+        LEM.internal:RefreshSettingValues({"Anchor To", "X Offset", "Y Offset"})
     else
         CB_EditMode:ReportDebug("OnPositionChanged: LEM.internal.RefreshSettingValues not available")
     end
@@ -496,18 +565,19 @@ local function BuildCastbarSettings(unitKey)
         name = "Anchor To",
         kind = LEM.SettingType.Dropdown,
         values = isPlayer and PLAYER_ANCHOR_OPTIONS or ANCHOR_OPTIONS,
-        default = "none",
+        default = CASTBAR_ANCHOR_TEXT.NONE,
            useOldStyle = true,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
-            return s and s.anchor or "none"
+            return AnchorValueToText(s and s.anchor, isPlayer)
         end,
         set = function(layoutName, value)
             local s = GetCastSettings(unitKey)
             if s then
+                value = AnchorTextToValue(value, isPlayer)
                 -- Treat nil as "none" for comparison purposes
-                local wasNone = (s.anchor == nil or s.anchor == "none")
-                local isNone = (value == "none")
+                local wasNone = (s.anchor == nil or s.anchor == CASTBAR_ANCHOR.NONE)
+                local isNone = (value == CASTBAR_ANCHOR.NONE)
                 
                 -- Swap offsets between free and locked modes
                 if wasNone and not isNone then
@@ -1399,7 +1469,7 @@ function CB_EditMode:RegisterFrame(unitKey, frame)
             local st = GetCastSettings(unitKey)
             -- If settings not found or anchor is nil/"none", allow reset (free positioning mode)
             if not st then return true end
-            return st.anchor == nil or st.anchor == "none"
+            return st.anchor == nil or st.anchor == CASTBAR_ANCHOR.NONE
         end)
         
         -- Disable dragging when locked to anchor (but always allow in Edit Mode)
@@ -1410,7 +1480,7 @@ function CB_EditMode:RegisterFrame(unitKey, frame)
             local st = GetCastSettings(unitKey)
             -- If settings not found or anchor is nil/"none", allow dragging (free positioning mode)
             if not st then return true end
-            return st.anchor == nil or st.anchor == "none"
+            return st.anchor == nil or st.anchor == CASTBAR_ANCHOR.NONE
         end)
     end)
     

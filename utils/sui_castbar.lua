@@ -9,6 +9,7 @@ local SUICore = ns.Addon
 local LSM = LibStub("LibSharedMedia-3.0")
 local LEM = LibStub("LibEQOLEditMode-1.0", true)
 local IsSecretValue = function(v) return ns.Utils and ns.Utils.IsSecretValue and ns.Utils.IsSecretValue(v) or false end
+local Constants = ns.Constants or {}
 
 ---------------------------------------------------------------------------
 -- MODULE TABLE
@@ -385,11 +386,11 @@ end
 -- POSITIONING HELPERS
 ---------------------------------------------------------------------------
 local function PositionCastbarByAnchor(anchorFrame, castSettings, unitFrame, barHeight)
-    local anchor = castSettings.anchor or "none"
+    local anchor = castSettings.anchor or (Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.NONE) or "none"
     
     anchorFrame:ClearAllPoints()
     
-    if anchor == "essential" then
+    if anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.ESSENTIAL) or "essential") then
         local offsetX = Scale(castSettings.offsetX or 0)
         local offsetY = math.floor(Scale(castSettings.offsetY or -25) + 0.5)
         local widthAdj = Scale(castSettings.widthAdjustment or 0)
@@ -400,7 +401,7 @@ local function PositionCastbarByAnchor(anchorFrame, castSettings, unitFrame, bar
         else
             anchorFrame:SetPoint("TOPLEFT", unitFrame, "BOTTOMLEFT", offsetX, offsetY)
         end
-    elseif anchor == "utility" then
+    elseif anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.UTILITY) or "utility") then
         local offsetX = Scale(castSettings.offsetX or 0)
         local offsetY = math.floor(Scale(castSettings.offsetY or -25) + 0.5)
         local widthAdj = Scale(castSettings.widthAdjustment or 0)
@@ -411,7 +412,7 @@ local function PositionCastbarByAnchor(anchorFrame, castSettings, unitFrame, bar
         else
             anchorFrame:SetPoint("TOPLEFT", unitFrame, "BOTTOMLEFT", offsetX, offsetY)
         end
-    elseif anchor == "unitframe" then
+    elseif anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.UNIT_FRAME) or "unitframe") then
         local offsetX = Scale(castSettings.offsetX or 0)
         local offsetY = math.floor(Scale(castSettings.offsetY or -25) + 0.5)
         local widthAdj = Scale(castSettings.widthAdjustment or 0)
@@ -426,11 +427,12 @@ local function PositionCastbarByAnchor(anchorFrame, castSettings, unitFrame, bar
 end
 
 local function SetCastbarSize(anchorFrame, castSettings, unitFrame, barHeight)
-    local anchor = castSettings.anchor or "none"
+    local anchor = castSettings.anchor or (Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.NONE) or "none"
     
-    if anchor == "essential" or anchor == "utility" then
+    if anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.ESSENTIAL) or "essential")
+        or anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.UTILITY) or "utility") then
         anchorFrame:SetSize(1, barHeight)
-    elseif anchor == "none" then
+    elseif anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.NONE) or "none") then
         local frameWidth = unitFrame:GetWidth() or 250
         local castWidth = Scale((castSettings.width and castSettings.width > 0) and castSettings.width or frameWidth)
         anchorFrame:SetSize(castWidth, barHeight)
@@ -727,7 +729,7 @@ local function SimulateCast(castbar, castSettings, unitKey, bossIndex)
         isEditModeActive = LEM:IsInEditMode()
     end
     
-    if castSettings.anchor == "none" and not isEditModeActive then
+    if castSettings.anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.NONE) or "none") and not isEditModeActive then
         -- Old-style manual dragging (only when NOT in Edit Mode)
         castbar:SetMovable(true)
         castbar:EnableMouse(true)
