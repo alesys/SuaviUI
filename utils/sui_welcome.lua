@@ -35,38 +35,38 @@ local LOGO_SIZE = 100
 local PADDING = 25
 
 ---------------------------------------------------------------------------
--- FEATURES LIST
+-- FEATURES LIST (The Dark Arts)
 ---------------------------------------------------------------------------
 local FEATURES = {
     {
         icon = "Interface\\Icons\\INV_Misc_Gear_01",
-        title = "Customizable Unit Frames",
-        desc = "Player, target, focus, boss frames with full Edit Mode integration."
+        title = "Bound Unit Frames",
+        desc = "Your enemies and allies, crystallized into perfect clarity. No soul escapes your gaze."
     },
     {
         icon = "Interface\\Icons\\Spell_Holy_BorrowedTime",
         title = "Cooldown Manager (CDM)",
-        desc = "Track essential and utility cooldowns with beautiful styled bars."
+        desc = "Channel the forbidden knowledge of when to strike. Every ability, tracked. Every moment, calculated."
     },
     {
         icon = "Interface\\Icons\\Ability_Warrior_BattleShout",
         title = "Resource Bars",
-        desc = "Class-specific power bars (combo points, runes, holy power, etc.)."
+        desc = "Your power made manifest. Combo points, runes, holy power—all dancing at your command."
     },
     {
         icon = "Interface\\Icons\\Spell_Nature_Lightning",
         title = "Cast Bars",
-        desc = "Stylized cast bars for player and target with empowered cast support."
+        desc = "See the future before it arrives. Know when spells complete—yours and theirs."
     },
     {
         icon = "Interface\\Icons\\INV_Misc_Map_01",
-        title = "Edit Mode Integration",
-        desc = "Position and customize frames using WoW's native Edit Mode."
+        title = "Edit Mode Mastery",
+        desc = "Reshape reality itself. Every frame bends to your will through Blizzard's own arcane interface."
     },
     {
         icon = "Interface\\Icons\\Achievement_BG_winAV",
-        title = "Profile System",
-        desc = "Save and load UI layouts per spec, share with friends via import/export."
+        title = "Profile Grimoire",
+        desc = "Store your configurations like spells in a tome. Switch specs, switch layouts. Share the knowledge."
     },
 }
 
@@ -130,7 +130,7 @@ function Welcome:CreateFrame()
     -- Title
     local title = content:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", content, "TOP", 0, y)
-    title:SetText("Welcome to SuaviUI!")
+    title:SetText("The Ritual is Complete.")
     title:SetTextColor(C.accent[1], C.accent[2], C.accent[3], 1)
     title:SetFont(title:GetFont(), 26, "OUTLINE")
     y = y - 35
@@ -139,7 +139,7 @@ function Welcome:CreateFrame()
     local version = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     version:SetPoint("TOP", content, "TOP", 0, y)
     local ADDON_VERSION = C_AddOns.GetAddOnMetadata("SuaviUI", "Version") or "2.0.0"
-    version:SetText("Version " .. ADDON_VERSION)
+    version:SetText("Grimoire Edition " .. ADDON_VERSION)
     version:SetTextColor(C.textMuted[1], C.textMuted[2], C.textMuted[3], 1)
     y = y - 30
     
@@ -147,7 +147,7 @@ function Welcome:CreateFrame()
     local thankYou = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     thankYou:SetPoint("TOP", content, "TOP", 0, y)
     thankYou:SetWidth(WELCOME_WIDTH - 60)
-    thankYou:SetText("Thank you for installing SuaviUI! This addon is a |cffA855F7work in progress|r, and your feedback helps shape its future.")
+    thankYou:SetText("You have summoned SuaviUI into your realm. This |cffA855F7dark work|r is still being perfected in the fires of the Twisting Nether. Your whispers shape its destiny.")
     thankYou:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
     thankYou:SetJustifyH("CENTER")
     thankYou:SetWordWrap(true)
@@ -164,7 +164,7 @@ function Welcome:CreateFrame()
     -- Features header
     local featuresHeader = content:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     featuresHeader:SetPoint("TOP", content, "TOP", 0, y)
-    featuresHeader:SetText("Key Features")
+    featuresHeader:SetText("The Dark Arts")
     featuresHeader:SetTextColor(C.accentLight[1], C.accentLight[2], C.accentLight[3], 1)
     featuresHeader:SetFont(featuresHeader:GetFont(), 16, "OUTLINE")
     y = y - 30
@@ -210,17 +210,17 @@ function Welcome:CreateFrame()
     -- Getting Started header
     local gettingStarted = content:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     gettingStarted:SetPoint("TOP", content, "TOP", 0, y)
-    gettingStarted:SetText("Getting Started")
+    gettingStarted:SetText("Begin the Incantation")
     gettingStarted:SetTextColor(C.accentLight[1], C.accentLight[2], C.accentLight[3], 1)
     gettingStarted:SetFont(gettingStarted:GetFont(), 16, "OUTLINE")
     y = y - 30
     
     -- Steps
     local steps = {
-        { num = "1", text = "Type |cffA855F7/sui|r to open the options panel and explore settings." },
-        { num = "2", text = "Use |cffA855F7/em|r or |cffA855F7/ed|r to enter Edit Mode and position frames." },
-        { num = "3", text = "Type |cffA855F7/cdm|r to configure the Cooldown Manager (CDM) appearance." },
-        { num = "4", text = "Check the |cffA855F7Profiles|r tab to save/load layouts per specialization." },
+        { num = "1", text = "Whisper |cffA855F7/sui|r to commune with the configuration realm." },
+        { num = "2", text = "Invoke |cffA855F7/em|r or |cffA855F7/ed|r to bend reality and position your frames." },
+        { num = "3", text = "Chant |cffA855F7/cdm|r to shape the appearance of your cooldown trackers." },
+        { num = "4", text = "Consult the |cffA855F7Profiles|r grimoire to store and recall your configurations." },
     }
     
     for _, step in ipairs(steps) do
@@ -262,7 +262,7 @@ function Welcome:CreateFrame()
     -- Feedback section
     local feedbackHeader = content:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     feedbackHeader:SetPoint("TOP", content, "TOP", 0, y)
-    feedbackHeader:SetText("Feedback & Support")
+    feedbackHeader:SetText("Send Word to the Nether")
     feedbackHeader:SetTextColor(C.accentLight[1], C.accentLight[2], C.accentLight[3], 1)
     feedbackHeader:SetFont(feedbackHeader:GetFont(), 16, "OUTLINE")
     y = y - 30
@@ -270,7 +270,7 @@ function Welcome:CreateFrame()
     local feedbackText = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     feedbackText:SetPoint("TOP", content, "TOP", 0, y)
     feedbackText:SetWidth(WELCOME_WIDTH - 60)
-    feedbackText:SetText("This addon is actively developed and your feedback is invaluable!\n\nFound a bug? Have a suggestion? Please report it on |cffA855F7CurseForge|r or |cffA855F7GitHub|r. Every report helps make SuaviUI better for everyone.")
+    feedbackText:SetText("The dark work continues, and your counsel strengthens the spell.\n\nDiscovered an anomaly? Have forbidden knowledge to share? Send your whispers through |cffA855F7CurseForge|r or |cffA855F7GitHub|r. Every report makes the magic more... |cffA855F7smooth|r.")
     feedbackText:SetTextColor(C.textMuted[1], C.textMuted[2], C.textMuted[3], 1)
     feedbackText:SetJustifyH("CENTER")
     feedbackText:SetWordWrap(true)
@@ -281,7 +281,7 @@ function Welcome:CreateFrame()
     local wipNotice = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     wipNotice:SetPoint("TOP", content, "TOP", 0, y)
     wipNotice:SetWidth(WELCOME_WIDTH - 60)
-    wipNotice:SetText("|cffF59E0B⚠ Work In Progress|r\nSome features may be incomplete or change in future updates.")
+    wipNotice:SetText("|cffF59E0B⚠ Ritual in Progress|r\nThe spell is still being woven. Some incantations may shift in future summonings.")
     wipNotice:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
     wipNotice:SetJustifyH("CENTER")
     wipNotice:SetWordWrap(true)
@@ -330,7 +330,7 @@ function Welcome:CreateFrame()
     local btnText = getStartedBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     btnText:SetPoint("CENTER", getStartedBtn, "CENTER", 0, 0)
     btnText:SetText("Let's Go!")
-    btnText:SetTextColor(0.05, 0.05, 0.1, 1)
+    btnText:SetTextColor(1, 1, 1, 1)
     btnText:SetFont(btnText:GetFont(), 14, "OUTLINE")
     
     getStartedBtn:SetScript("OnEnter", function(self)

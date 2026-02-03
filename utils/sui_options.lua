@@ -11785,12 +11785,12 @@ local function CreateCreditsPage(parent)
     AddCreditsSection("SuaviTesters", {
         { name = "Vela", desc = "Testing and feedback" },
         { name = "Pataz", desc = "Testing and feedback" },
-        { name = "Ñora", desc = "Testing and feedback" },
+        { name = "Ñora", desc = "The one who paid for Quazii's addon. Look what that got us into." },
     })
 
     AddCreditsSection("Special Thanks", {
         { name = "ElvUI", desc = "UI framework inspiration" },
-        { name = "Claudia", desc = "AI-powered development assistant" },
+        { name = "Claudia", desc = "My tireless companion from beyond the Nether. She doesn't understand what a Soul Shard is, but after countless hours of my patient teachings, she now fears the Burning Legion as she should." },
         { name = "The WoW Community", desc = "Inspiration and feedback" },
     })
 
