@@ -350,12 +350,13 @@ local function CreateExtraButtonHolder(buttonType, displayName)
     local settings = GetExtraButtonDB(buttonType)
     if not settings then return nil, nil end
 
-    -- Create holder frame
+    -- Create holder frame (MUST be movable for LEM dragging)
     local holder = CreateFrame("Frame", "SUI_" .. buttonType .. "Holder", UIParent)
     holder:SetSize(64, 64)
     holder:SetMovable(true)
     holder:SetClampedToScreen(true)
     holder:EnableMouse(true)
+    holder:RegisterForDrag("LeftButton")
 
     -- Load saved position or default to center-bottom
     local pos = settings.position
@@ -540,6 +541,8 @@ HookExtraButtonPositioning = function()
         ExtraActionBarFrame._quiHooked = true
         hooksecurefunc(ExtraActionBarFrame, "SetPoint", function(self)
             if hookingSetPoint or InCombatLockdown() then return end
+            -- Don't interfere during Edit Mode - let LEM handle positioning
+            if EditModeManagerFrame and EditModeManagerFrame:IsShown() then return end
             if extraActionHolder and GetExtraButtonDB("extraActionButton") then
                 local settings = GetExtraButtonDB("extraActionButton")
                 if settings and settings.enabled then
@@ -558,6 +561,8 @@ HookExtraButtonPositioning = function()
         ZoneAbilityFrame._quiHooked = true
         hooksecurefunc(ZoneAbilityFrame, "SetPoint", function(self)
             if hookingSetPoint or InCombatLockdown() then return end
+            -- Don't interfere during Edit Mode - let LEM handle positioning
+            if EditModeManagerFrame and EditModeManagerFrame:IsShown() then return end
             if zoneAbilityHolder and GetExtraButtonDB("zoneAbility") then
                 local settings = GetExtraButtonDB("zoneAbility")
                 if settings and settings.enabled then

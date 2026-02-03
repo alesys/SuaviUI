@@ -283,63 +283,63 @@ Internal.managerHiddenFrames = Internal.managerHiddenFrames or {}
 Internal.managerEyeLocales = Internal.managerEyeLocales
 	or {
 		enUS = {
-			show = "Show all windows",
-			hide = "Hide all windows",
+			show = "Show All Overlays",
+			hide = "Hide All Overlays",
 			body = "Toggles every edit mode window, including Blizzard frames.",
 		},
 		enGB = {
-			show = "Show all windows",
-			hide = "Hide all windows",
+			show = "Show All Overlays",
+			hide = "Hide All Overlays",
 			body = "Toggles every edit mode window, including Blizzard frames.",
 		},
 		deDE = {
-			show = "Alle Fenster einblenden",
-			hide = "Alle Fenster ausblenden",
+			show = "Alle Overlays anzeigen",
+			hide = "Alle Overlays ausblenden",
 			body = "Schaltet alle Edit-Mode-Fenster inklusive Blizzard-Frames um.",
 		},
 		frFR = {
-			show = "Afficher toutes les fenêtres",
-			hide = "Masquer toutes les fenêtres",
+			show = "Afficher tous les overlays",
+			hide = "Masquer tous les overlays",
 			body = "Bascule toutes les fenêtres du mode édition, y compris celles de Blizzard.",
 		},
 		esES = {
-			show = "Mostrar todas las ventanas",
-			hide = "Ocultar todas las ventanas",
+			show = "Mostrar todos los overlays",
+			hide = "Ocultar todos los overlays",
 			body = "Alterna todas las ventanas del modo de edición, incluidas las de Blizzard.",
 		},
 		esMX = {
-			show = "Mostrar todas las ventanas",
-			hide = "Ocultar todas las ventanas",
+			show = "Mostrar todos los overlays",
+			hide = "Ocultar todos los overlays",
 			body = "Alterna todas las ventanas del modo de edición, incluidas las de Blizzard.",
 		},
 		itIT = {
-			show = "Mostra tutte le finestre",
-			hide = "Nascondi tutte le finestre",
+			show = "Mostra tutti gli overlay",
+			hide = "Nascondi tutti gli overlay",
 			body = "Attiva o disattiva tutte le finestre della modalità di modifica, incluse quelle Blizzard.",
 		},
 		ptBR = {
-			show = "Mostrar todas as janelas",
-			hide = "Ocultar todas as janelas",
+			show = "Mostrar todos os overlays",
+			hide = "Ocultar todos os overlays",
 			body = "Alterna todas as janelas do modo de edição, incluindo as da Blizzard.",
 		},
 		ruRU = {
-			show = "Показать все окна",
-			hide = "Скрыть все окна",
+			show = "Показать все оверлеи",
+			hide = "Скрыть все оверлеи",
 			body = "Переключает все окна режима редактирования, включая окна Blizzard.",
 		},
 		koKR = {
-			show = "모든 창 보이기",
-			hide = "모든 창 숨기기",
+			show = "모든 오버레이 표시",
+			hide = "모든 오버레이 숨기기",
 			body = "블리자드 창을 포함한 모든 편집 모드 창을 전환합니다.",
 		},
 		zhCN = {
-			show = "显示所有窗口",
-			hide = "隐藏所有窗口",
+			show = "显示所有叠加层",
+			hide = "隐藏所有叠加层",
 			body = "切换所有编辑模式窗口（含暴雪框体）。",
 		},
 		zhTW = {
-			show = "顯示所有視窗",
-			hide = "隱藏所有視窗",
+			show = "顯示所有疊加層",
+			hide = "隱藏所有疊加層",
 			body = "切換所有編輯模式視窗（包含暴雪框體）。",
 		},
 	}
@@ -3233,8 +3233,9 @@ local function resetSelectionIndicators()
 		end
 		updateSelectionKeyboard(selection)
 	end
-	if Internal.dialog and Internal.dialog.HideLabelButton then
-		updateEyeButton(Internal.dialog.HideLabelButton, false)
+	if Internal.dialog and Internal.dialog.HideLabelButton and Internal.dialog.selection then
+		-- Update eye button to match current selection's actual state
+		updateEyeButton(Internal.dialog.HideLabelButton, Internal.dialog.selection.overlayHidden)
 	end
 	updateManagerEyeButton()
 end
@@ -3371,7 +3372,9 @@ local function selectSelection(selection)
 	end
 	if not selection.isSelected then
 		selection.parent:SetMovable(true)
-		selection:ShowSelected(true)
+		-- Check if overlays are supposed to be hidden before showing
+		local shouldShowOverlay = not selection.overlayHidden
+		selection:ShowSelected(shouldShowOverlay)
 		selection.isSelected = true
 		if Internal.dialog then
 			Internal.dialog:Update(selection)
@@ -3539,7 +3542,17 @@ function lib:AddFrame(frame, callback, default)
 	ensureMagnetismAPI(frame, selection)
 
 	selection.labelHidden = false
-	selection.overlayHidden = false
+	-- Check if Hide All Overlays is active and respect that state
+	if lib.isEditing then
+		local allHidden, hasToggleable = areAllOverlayTogglesHidden()
+		if hasToggleable and allHidden then
+			selection.overlayHidden = true
+		else
+			selection.overlayHidden = false
+		end
+	else
+		selection.overlayHidden = false
+	end
 	if default then
 		local toggle = default.enableOverlayToggle
 			or default.overlayToggleEnabled
@@ -3746,8 +3759,9 @@ function lib:SetFrameOverlayToggleEnabled(frame, enabled)
 	State.overlayToggleFlags[frame] = not not enabled
 	if enabled == false and State.selectionRegistry[frame] then
 		local selection = State.selectionRegistry[frame]
-		selection.overlayHidden = false
-		updateSelectionVisuals(selection, false)
+		-- Don't force show - preserve user's Hide All state
+		-- selection.overlayHidden = false
+		-- updateSelectionVisuals(selection, false)
 	end
 	updateManagerEyeButton()
 end

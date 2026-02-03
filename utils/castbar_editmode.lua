@@ -20,6 +20,7 @@ local CB_EditMode = {}
 ns.CB_EditMode = CB_EditMode
 
 CB_EditMode.registeredFrames = {}
+CB_EditMode.allOverlaysHidden = false  -- Track global "hide all overlays" state
 
 ---------------------------------------------------------------------------
 -- DATABASE HELPERS
@@ -120,6 +121,22 @@ local NINE_POINT_ANCHOR_OPTIONS = (ns.Constants and ns.Constants.ANCHOR_POINT_OP
 }
 
 ---------------------------------------------------------------------------
+-- WIDTH MODE OPTIONS
+---------------------------------------------------------------------------
+local WIDTH_MODE_OPTIONS = {
+    {value = "Manual", text = "Manual"},
+    {value = "Sync With Unit Frame", text = "Sync With Unit Frame"},
+}
+
+local PLAYER_WIDTH_MODE_OPTIONS = {
+    {value = "Manual", text = "Manual"},
+    {value = "Sync With Unit Frame", text = "Sync With Unit Frame"},
+    {value = "Sync With Essential Cooldowns", text = "Sync With Essential Cooldowns"},
+    {value = "Sync With Utility Cooldowns", text = "Sync With Utility Cooldowns"},
+    {value = "Sync With Tracked Buffs", text = "Sync With Tracked Buffs"},
+}
+
+---------------------------------------------------------------------------
 -- FRAME LABEL MAPPINGS
 ---------------------------------------------------------------------------
 local FRAME_LABELS = {
@@ -133,11 +150,24 @@ local FRAME_LABELS = {
 
 ---------------------------------------------------------------------------
 local function OnPositionChanged(frame, layoutName, point, x, y)
-    if not frame or not frame._suiCastbarUnit then return end
+    -- DEBUG: Log all parameters
+    CB_EditMode:LogDebug("OnPositionChanged called: frame=" .. tostring(frame and frame:GetName()) .. 
+                         " layoutName=" .. tostring(layoutName) .. 
+                         " point=" .. tostring(point) .. 
+                         " x=" .. tostring(x) .. 
+                         " y=" .. tostring(y))
+    
+    if not frame or not frame._suiCastbarUnit then 
+        CB_EditMode:ReportDebug("OnPositionChanged: Early return - no frame or unitKey")
+        return 
+    end
     
     local unitKey = frame._suiCastbarUnit
     local castSettings = GetCastSettings(unitKey)
-    if not castSettings then return end
+    if not castSettings then 
+        CB_EditMode:ReportDebug("OnPositionChanged: Early return - no castSettings for " .. unitKey)
+        return 
+    end
 
     -- Normalize argument order in case the callback supplies swapped values
     -- Expected: layoutName (string), point (string), x (number), y (number)
@@ -147,33 +177,45 @@ local function OnPositionChanged(frame, layoutName, point, x, y)
         local actualX = layoutName
         local actualY = y
         layoutName, point, x, y = actualLayout, actualPoint, actualX, actualY
+        CB_EditMode:LogDebug("OnPositionChanged: Normalized arguments")
     end
     
-    -- Only update position if anchor is nil or "none" (free positioning mode)
-    if castSettings.anchor == nil or castSettings.anchor == "none" then
-        local nx = tonumber(x)
-        local ny = tonumber(y)
-        if not nx or not ny then
-            CB_EditMode:ReportDebug("OnPositionChanged: non-numeric offsets x=" .. tostring(x) .. " y=" .. tostring(y))
-            return
-        end
-        castSettings.offsetX = math.floor(nx + 0.5)
-        castSettings.offsetY = math.floor(ny + 0.5)
-        
-        -- Do NOT reposition the frame - LibEQOL has already done so
-        -- Just update the database and refresh the UI
-        
-        CB_EditMode:LogDebug("OnPositionChanged: " .. unitKey .. " moved to (" .. castSettings.offsetX .. ", " .. castSettings.offsetY .. ")")
-        
-        -- Trigger a settings refresh to update the sidebar values
-        -- Schedule it for the next frame to ensure database is updated first
-        C_Timer.After(0, function()
-            if LEM and LEM.RefreshFrameSettings and frame then
-                pcall(function()
-                    LEM:RefreshFrameSettings(frame)
-                end)
-            end
-        end)
+    local nx = tonumber(x)
+    local ny = tonumber(y)
+    if not nx or not ny then
+        CB_EditMode:ReportDebug("OnPositionChanged: non-numeric offsets x=" .. tostring(x) .. " y=" .. tostring(y))
+        return
+    end
+    
+    -- Check if castbar is anchored to something
+    local anchor = castSettings.anchor or "none"
+    local isAnchored = (anchor ~= "none") and (anchor ~= "disabled")
+    
+    if isAnchored then
+        -- Don't save position when anchored - the anchor controls positioning
+        CB_EditMode:LogDebug("OnPositionChanged: Ignoring drag - castbar is anchored to " .. tostring(anchor))
+        -- Refresh the castbar to restore anchor position
+        RefreshCastbar(unitKey)
+        return
+    end
+    
+    -- Save position for free-positioned castbars
+    castSettings.offsetX = math.floor(nx + 0.5)
+    castSettings.offsetY = math.floor(ny + 0.5)
+    
+    CB_EditMode:LogDebug("OnPositionChanged: " .. unitKey .. " position saved to (" .. castSettings.offsetX .. ", " .. castSettings.offsetY .. ")")
+    
+    -- Apply the new position immediately
+    frame:ClearAllPoints()
+    frame:SetPoint("CENTER", UIParent, "CENTER", castSettings.offsetX, castSettings.offsetY)
+    CB_EditMode:LogDebug("OnPositionChanged: SetPoint called")
+    
+    -- Update sidebar values using LEM's internal API
+    if LEM and LEM.internal and LEM.internal.RefreshSettingValues then
+        CB_EditMode:LogDebug("OnPositionChanged: Calling RefreshSettingValues")
+        LEM.internal:RefreshSettingValues({"X Offset", "Y Offset"})
+    else
+        CB_EditMode:ReportDebug("OnPositionChanged: LEM.internal.RefreshSettingValues not available")
     end
 end
 
@@ -377,7 +419,7 @@ local function BuildCastbarSettings(unitKey)
     table.insert(settings, {
         parentId = "CATEGORY_POSITION_" .. unitKey,
         order = order,
-        name = "Lock To",
+        name = "Anchor To",
         kind = LEM.SettingType.Dropdown,
         values = isPlayer and PLAYER_ANCHOR_OPTIONS or ANCHOR_OPTIONS,
         default = "none",
@@ -407,18 +449,36 @@ local function BuildCastbarSettings(unitKey)
                 
                 s.anchor = value
                 
-                -- Clear width for auto-resize anchors
-                if value == "essential" or value == "utility" then
-                    s.width = 0
-                end
-                
+                -- Keep manual width intact for Width Mode fallback
                 RefreshCastbar(unitKey)
             end
         end,
     })
     order = order + 1
     
-    -- Width
+    -- Width Mode
+    table.insert(settings, {
+        parentId = "CATEGORY_POSITION_" .. unitKey,
+        order = order,
+        name = "Width Mode",
+        kind = LEM.SettingType.Dropdown,
+        values = isPlayer and PLAYER_WIDTH_MODE_OPTIONS or WIDTH_MODE_OPTIONS,
+        default = "Manual",
+        get = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.widthMode or "Manual"
+        end,
+        set = function(layoutName, value)
+            local s = GetCastSettings(unitKey)
+            if s then
+                s.widthMode = value
+                RefreshCastbar(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+    
+    -- Width (only visible in Manual mode)
     table.insert(settings, {
         parentId = "CATEGORY_POSITION_" .. unitKey,
         order = order,
@@ -429,6 +489,10 @@ local function BuildCastbarSettings(unitKey)
         maxValue = 2000,
         valueStep = 1,
         formatter = function(value) return string.format("%d", value) end,
+        isEnabled = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.widthMode == "Manual" or (not s)
+        end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.width or 250
@@ -443,7 +507,7 @@ local function BuildCastbarSettings(unitKey)
     })
     order = order + 1
     
-    -- Width Adjustment (for locked modes)
+    -- Width Adjustment (for synced modes)
     table.insert(settings, {
         parentId = "CATEGORY_POSITION_" .. unitKey,
         order = order,
@@ -455,6 +519,10 @@ local function BuildCastbarSettings(unitKey)
         valueStep = 1,
         allowInput = true,
         formatter = function(value) return string.format("%d", value) end,
+        isEnabled = function(layoutName)
+            local s = GetCastSettings(unitKey)
+            return s and s.widthMode ~= "Manual" or (not s)
+        end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.widthAdjustment or 0
@@ -502,11 +570,11 @@ local function BuildCastbarSettings(unitKey)
         name = "X Offset",
         kind = LEM.SettingType.Slider,
         default = 0,
-        minValue = -3000,
-        maxValue = 3000,
+        minValue = -2000,
+        maxValue = 2000,
         valueStep = 1,
         allowInput = true,
-        formatter = function(value) return string.format("%d", value) end,
+        formatter = function(value) return string.format("%5d", value) end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.offsetX or 0
@@ -528,11 +596,11 @@ local function BuildCastbarSettings(unitKey)
         name = "Y Offset",
         kind = LEM.SettingType.Slider,
         default = 0,
-        minValue = -3000,
-        maxValue = 3000,
+        minValue = -2000,
+        maxValue = 2000,
         valueStep = 1,
         allowInput = true,
-        formatter = function(value) return string.format("%d", value) end,
+        formatter = function(value) return string.format("%5d", value) end,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
             return s and s.offsetY or 0
@@ -1192,6 +1260,39 @@ function CB_EditMode:RegisterFrame(unitKey, frame)
         local settings = BuildCastbarSettings(unitKey)
         LEM:AddFrameSettings(frame, settings)
         
+        -- Override magnetism to add distance threshold and prevent wild snapping
+        -- Only snap to frames within 500 pixels (reasonable screen distance)
+        if frame.GetFrameMagneticEligibility then
+            local SNAP_DISTANCE_THRESHOLD = 500
+            local originalGetFrameMagneticEligibility = frame.GetFrameMagneticEligibility
+            
+            frame.GetFrameMagneticEligibility = function(self, systemFrame)
+                -- First check the original eligibility (alignment check)
+                local horizontalEligible, verticalEligible = originalGetFrameMagneticEligibility(self, systemFrame)
+                if not horizontalEligible and not verticalEligible then
+                    return nil, nil
+                end
+                
+                -- Add distance check to prevent snapping to faraway frames
+                local myLeft, myRight, myBottom, myTop = self:GetScaledSelectionSides()
+                local otherLeft, otherRight, otherBottom, otherTop = systemFrame:GetScaledSelectionSides()
+                
+                local myCenterX = (myLeft + myRight) / 2
+                local myCenterY = (myBottom + myTop) / 2
+                local otherCenterX = (otherLeft + otherRight) / 2
+                local otherCenterY = (otherBottom + otherTop) / 2
+                
+                local distance = math.sqrt((myCenterX - otherCenterX)^2 + (myCenterY - otherCenterY)^2)
+                
+                -- If too far away, don't snap
+                if distance > SNAP_DISTANCE_THRESHOLD then
+                    return nil, nil
+                end
+                
+                return horizontalEligible, verticalEligible
+            end
+        end
+        
         -- Disable position reset when locked to anchor
         LEM:SetFrameResetVisible(frame, function(layoutName)
             local st = GetCastSettings(unitKey)
@@ -1466,23 +1567,12 @@ function CB_EditMode:Initialize()
     
     LEM:RegisterCallback("exit", function()
         -- AceDB auto-saves, no manual save needed
-        -- Re-apply positions and clear preview state
+        -- LEM handles position restoration automatically - just clear preview state
         C_Timer.After(0.05, function()
             local SUI_UF = ns.SUI_UnitFrames
             if SUI_UF and SUI_UF.castbars then
                 for unitKey, castbar in pairs(SUI_UF.castbars) do
                     if castbar then
-                        -- Re-apply the new positions from Edit Mode
-                        local castSettings = GetCastSettings(unitKey)
-                        if castSettings then
-                            -- Apply the new offsets that were changed in Edit Mode
-                            if castSettings.anchor == nil or castSettings.anchor == "none" then
-                                castbar:ClearAllPoints()
-                                castbar:SetPoint("CENTER", UIParent, "CENTER", castSettings.offsetX or 0, castSettings.offsetY or 0)
-                                CB_EditMode:LogDebug("EditMode exit: Applied new position for " .. unitKey .. " (" .. (castSettings.offsetX or 0) .. ", " .. (castSettings.offsetY or 0) .. ")")
-                            end
-                        end
-                        
                         -- Use mixin methods if available (new architecture)
                         if castbar._castbarMixin then
                             castbar._castbarMixin:StopPreviewMode()
@@ -1500,6 +1590,37 @@ function CB_EditMode:Initialize()
             end
         end)
     end)
+    
+    -- Hook to track and enforce "hide all overlays" state when selecting frames
+    -- This ensures that when "Hide All Overlays" is active, new selections don't show their overlay
+    if LEM and LEM.internal and LEM.internal.State then
+        local originalState = LEM.internal.State
+        
+        -- Periodically check if all overlays are hidden and maintain this state
+        local checkHideAllTimer
+        checkHideAllTimer = C_Timer.NewLoopTimer(0.2, function()
+            if not EditModeManagerFrame or not EditModeManagerFrame:IsShown() then
+                if checkHideAllTimer then
+                    checkHideAllTimer:Cancel()
+                    checkHideAllTimer = nil
+                end
+                return
+            end
+            
+            -- Check if all overlays should be hidden
+            local areAllHidden = true
+            if originalState.selectionRegistry then
+                for _, selection in pairs(originalState.selectionRegistry) do
+                    if selection and not selection.overlayHidden then
+                        areAllHidden = false
+                        break
+                    end
+                end
+            end
+            
+            CB_EditMode.allOverlaysHidden = areAllHidden
+        end, 0)
+    end
 end
 
 ---------------------------------------------------------------------------
