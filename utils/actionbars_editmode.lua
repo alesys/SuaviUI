@@ -435,6 +435,16 @@ function AB_EditMode:Initialize()
                 if buttonType == "extraActionButton" or buttonType == "zoneAbility" then
                     settings._editModeActive = true
                     RefreshButton(buttonType)
+                    
+                    -- Show overlay and ensure frame is visible and interactable
+                    local frame = self.registeredFrames[buttonType]
+                    if frame then
+                        frame:Show()
+                        frame:SetFrameStrata("DIALOG")  -- Match Edit Mode panel strata
+                        if frame._editModeOverlay then
+                            frame._editModeOverlay:Show()
+                        end
+                    end
                 end
             end
         end
@@ -453,6 +463,15 @@ function AB_EditMode:Initialize()
                 if buttonType == "extraActionButton" or buttonType == "zoneAbility" then
                     settings._editModeActive = nil
                     RefreshButton(buttonType)
+                    
+                    -- Hide overlay and restore normal frame strata
+                    local frame = self.registeredFrames[buttonType]
+                    if frame then
+                        frame:SetFrameStrata("MEDIUM")  -- Normal strata when not in Edit Mode
+                        if frame._editModeOverlay then
+                            frame._editModeOverlay:Hide()
+                        end
+                    end
                 end
             end
         end

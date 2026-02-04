@@ -384,7 +384,7 @@ local function CreateExtraButtonHolder(buttonType, displayName)
     mover:EnableMouse(true)
     mover:SetMovable(true)
     mover:RegisterForDrag("LeftButton")
-    mover:SetFrameStrata("FULLSCREEN_DIALOG")
+    mover:SetFrameStrata("DIALOG")  -- Match Edit Mode panel strata
     mover:Hide()
 
     -- Label text
@@ -491,7 +491,7 @@ local function ApplyExtraButtonSettings(buttonType)
     end
     
     -- Handle "Always Show" for positioning purposes
-    -- Show holder when: Edit Mode active OR Always Show enabled OR Blizzard frame is shown
+    -- Show holder when: Edit Mode active OR Always Show enabled OR button has content
     if holder then
         if settings._editModeActive or settings.alwaysShow then
             holder:Show()
@@ -500,8 +500,18 @@ local function ApplyExtraButtonSettings(buttonType)
                 blizzFrame:Show()
             end
         else
-            -- Mirror Blizzard frame visibility (hide holder when button is empty)
-            if blizzFrame:IsShown() then
+            -- Check if button actually has content (not just frame visibility)
+            local hasContent = false
+            if buttonType == "extraActionButton" then
+                -- Use HasExtraActionBar() API to check if there's actually an extra action
+                hasContent = HasExtraActionBar and HasExtraActionBar()
+            elseif buttonType == "zoneAbility" then
+                -- Zone ability uses ZoneAbilityFrame visibility and spell check
+                hasContent = blizzFrame:IsShown() and ZoneAbilityFrame.SpellButton 
+                    and ZoneAbilityFrame.SpellButton.spellID
+            end
+            
+            if hasContent then
                 holder:Show()
             else
                 holder:Hide()
@@ -514,14 +524,27 @@ local function ApplyExtraButtonSettings(buttonType)
         blizzFrame._suiVisibilityHooked = true
         
         -- Mirror Blizzard frame visibility changes to our holder
+        -- But only show if button actually has content
         blizzFrame:HookScript("OnShow", function()
-            if holder and not (settings._editModeActive or settings.alwaysShow) then
-                holder:Show()
+            local s = GetExtraButtonDB(buttonType)
+            if holder and not (s and (s._editModeActive or s.alwaysShow)) then
+                -- Verify there's actually content before showing
+                local hasContent = false
+                if buttonType == "extraActionButton" then
+                    hasContent = HasExtraActionBar and HasExtraActionBar()
+                elseif buttonType == "zoneAbility" then
+                    hasContent = ZoneAbilityFrame and ZoneAbilityFrame.SpellButton 
+                        and ZoneAbilityFrame.SpellButton.spellID
+                end
+                if hasContent then
+                    holder:Show()
+                end
             end
         end)
         
         blizzFrame:HookScript("OnHide", function()
-            if holder and not (settings._editModeActive or settings.alwaysShow) then
+            local s = GetExtraButtonDB(buttonType)
+            if holder and not (s and (s._editModeActive or s.alwaysShow)) then
                 holder:Hide()
             end
         end)
