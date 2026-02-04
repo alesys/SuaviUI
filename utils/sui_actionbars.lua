@@ -493,12 +493,27 @@ local function ApplyExtraButtonSettings(buttonType)
     -- Handle "Always Show" for positioning purposes
     -- Show holder when: Edit Mode active OR Always Show enabled OR button has content
     if holder then
-        if settings._editModeActive or settings.alwaysShow then
-            holder:Show()
-            -- Also make the Blizzard frame visible if in Edit Mode
-            if settings._editModeActive then
-                blizzFrame:Show()
+        local function SetHolderVisible(isVisible)
+            if isVisible then
+                holder:Show()
+                holder:EnableMouse(true)
+                if blizzFrame then
+                    blizzFrame:Show()
+                    blizzFrame:EnableMouse(true)
+                end
+            else
+                holder:Hide()
+                holder:EnableMouse(false)
+                -- Completely disable the Blizzard frame to prevent any mouse interaction
+                if blizzFrame then
+                    blizzFrame:Hide()
+                    blizzFrame:EnableMouse(false)
+                end
             end
+        end
+
+        if settings._editModeActive or settings.alwaysShow then
+            SetHolderVisible(true)
         else
             -- Check if button actually has content (not just frame visibility)
             local hasContent = false
@@ -506,16 +521,16 @@ local function ApplyExtraButtonSettings(buttonType)
                 -- Use HasExtraActionBar() API to check if there's actually an extra action
                 hasContent = HasExtraActionBar and HasExtraActionBar()
             elseif buttonType == "zoneAbility" then
-                -- Zone ability uses ZoneAbilityFrame visibility and spell check
-                hasContent = blizzFrame:IsShown() and ZoneAbilityFrame.SpellButton 
-                    and ZoneAbilityFrame.SpellButton.spellID
+                -- Zone ability: check if there are any active buttons in the container
+                if ZoneAbilityFrame and ZoneAbilityFrame.SpellButtonContainer then
+                    for button in ZoneAbilityFrame.SpellButtonContainer:EnumerateActive() do
+                        hasContent = true
+                        break  -- Just need one active button to know there's content
+                    end
+                end
             end
             
-            if hasContent then
-                holder:Show()
-            else
-                holder:Hide()
-            end
+            SetHolderVisible(hasContent)
         end
     end
     
@@ -533,11 +548,25 @@ local function ApplyExtraButtonSettings(buttonType)
                 if buttonType == "extraActionButton" then
                     hasContent = HasExtraActionBar and HasExtraActionBar()
                 elseif buttonType == "zoneAbility" then
-                    hasContent = ZoneAbilityFrame and ZoneAbilityFrame.SpellButton 
-                        and ZoneAbilityFrame.SpellButton.spellID
+                    -- Check if there are any active buttons in the container
+                    if ZoneAbilityFrame and ZoneAbilityFrame.SpellButtonContainer then
+                        for button in ZoneAbilityFrame.SpellButtonContainer:EnumerateActive() do
+                            hasContent = true
+                            break
+                        end
+                    end
                 end
                 if hasContent then
                     holder:Show()
+                    holder:EnableMouse(true)
+                    blizzFrame:Show()
+                    blizzFrame:EnableMouse(true)
+                else
+                    -- No content - hide both holder and Blizzard frame to prevent mouse blocking
+                    holder:Hide()
+                    holder:EnableMouse(false)
+                    blizzFrame:Hide()
+                    blizzFrame:EnableMouse(false)
                 end
             end
         end)
@@ -546,6 +575,7 @@ local function ApplyExtraButtonSettings(buttonType)
             local s = GetExtraButtonDB(buttonType)
             if holder and not (s and (s._editModeActive or s.alwaysShow)) then
                 holder:Hide()
+                holder:EnableMouse(false)
             end
         end)
     end

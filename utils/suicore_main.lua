@@ -992,7 +992,7 @@ local defaults = {
             autoAttach        = false,
             standaloneMode    = false,
             attachTo          = "EssentialCooldownViewer",
-            height            = 8,
+            height            = 32,
             borderSize        = 1,
             offsetY           = -204,      -- Snapped to top of Essential CDM (default position)
             offsetX           = 0,
@@ -1480,7 +1480,7 @@ local defaults = {
                     enabled = true,
                     fadeEnabled = nil,
                     fadeOutAlpha = nil,
-                    alwaysShow = true,
+                    alwaysShow = false,
                     scale = 1.0,
                     offsetX = 0,
                     offsetY = 0,
@@ -1492,7 +1492,7 @@ local defaults = {
                     enabled = true,
                     fadeEnabled = nil,
                     fadeOutAlpha = nil,
-                    alwaysShow = true,
+                    alwaysShow = false,
                     scale = 1.0,
                     offsetX = 0,
                     offsetY = 0,
@@ -3567,14 +3567,13 @@ function SUICore:OnProfileChanged(event, db, profileKey)
         _G.SuaviUI_RefreshSpecProfilesTab()
     end
 
-    -- Show popup notification about profile change
-    -- Delay slightly to ensure UI is ready
-    C_Timer.After(0.5, function()
-        self:ShowProfileChangeNotification()
-    end)
+    -- Profile change notification removed (no forced Edit Mode prompt)
 end
 
 function SUICore:ShowProfileChangeNotification()
+    -- Deprecated: Do nothing (no forced Edit Mode prompt)
+    return
+    --[[ DISABLED: Profile change popup (forced Edit Mode)
     -- Create a simple popup frame if it doesn't exist
     if not self.profileChangePopup then
         local popup = CreateFrame("Frame", "SUICore_ProfileChangePopup", UIParent, "BackdropTemplate")
@@ -3633,6 +3632,7 @@ function SUICore:ShowProfileChangeNotification()
             end
         end)
     end
+    ]]--
 end
 
 -- ============================================================================
