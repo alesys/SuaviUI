@@ -180,6 +180,56 @@ function SUICore:ImportProfileFromString(str)
     return true
 end
 
+-- Default profile string to be applied on first install
+local DEFAULT_PROFILE_STRING = [[SUI1:S3v6Ynoos6NL9bOCqDl9NncFwLNXxDj5UNE(HktlbBXXuKQjPST6yd)SVzM4GjibLO8z194zIOllEacKirE8HmtmUX4rJhgTC6TIDNhVmkB8zngpCsCC404hIo8MBetYsXhzwWuXLzbHbzRgFT8NhMMkIYc8dHlKL)sN6h5FRi5hP)Xs)eXXtIJs)3XXZ)XElV5g6xJpZBNMLF(jltZINV7KSG7f7hhgN8JRXNStp4r9tZ2Zpb7hIi)RdfthVh2aWdbxd6XWZ1OF)XN1K(rl83dWF3g)n03sNf)WOG5IrIhZWxDzQy)q)0u67GJNhcMMndETXd9ZY8NmBu84HMX3(kYXVgiEqKmEy8n3KkY(x0JJTmoQWw96BLTNUl51t2L82H(lQB51Th1T82PFhSNnteC7mGQ3STUD)9XN9LgE93PZ4Hzq3DyWFkGrrx5VwMigp8xw6)Nbb4BhghNvGQGx6YOPIKtJHrjo2ObFIFu684Bp1p5oyiaD2fXPbzbqhhiQRgF0x60Vz)(9B2Or3UT961T)4B(sBOl844J641Vh0TB0RB7wD61OjEhO3Uioayxgo68lgpmreEr(pZCYoa9IVbJ1qC8(doVJHDtZ5efNm3peg3kgoIeadenBPdoS9ItGH8p0COit8IyyYsX1iN)NCxk2miDeiYTSyM0Zd9jMJV7)WfbpkctrkvAMF0u)W4iXPXtPosg0uwt1YPz5uCoxxT4hqodnB610OqnJl7OxwKtfhkxisMal9WoNKxe5zA6btkYfr2SHqxJyc7s9py9H(Zvb71WL(3ha37PRUhOr4dTFPwfAfZAnwlYxzGViSgbMjqY1OzW)jsKcR(P1(W6eIAkNMumPQvNQfJTAcm91y5O)YS4DPvTe3EK)IV6Vy8zaZlmtEb28s6bsTsca6MpX3p8BN)9J)3NF2ODprT(F4QOjGWqyIg(UaFAekfq(ZIcmCjVd6b3TB0KzXjk2WFOfwbDRBfrIRequjSABkSgeh7Ft4hMnRg8rP3feDI9YAyS4Vyr4QVggFTF4rXrzJI3dwY8N(jKSr8v(UWF6Q9NjMChEL7eRaHatGv)4tl5XgmE4Cq0QIaj7pKisOdFdCJDbkl(HX3x3RjASQd9TaGBlzfrzV()aQkar3QpcmaxgkY)uGyJH3aFyqS6Jlsa(Gh8xbJb4dCGiuKbs8JUjizo)lD(c)jO6MJ62YRJxRbT71VvJ(Dh0bea1b4mXEX53lssaDrOAJ4iC1o0xMfNk1ur02ZelZKuEK3NZ4IQHYvraT2x9NloveTehJ3Q(B7HarxJddpkbUTu6aCL9N5dKwGosxgVkJSEgCjnrfvBEEbkLu0LwWetapS(d4HPrzHxbF4Ie8rbzw0Bq3KEkBpUEPJ60QvRU964Hc072PjkOhOMWQYQUtRkVJwqsX(Y3uk166HAircuLIL0QRbHtgL1WlSBOibm8azZNoLeiD5X7Tmldw3IwFynb)n6xcJAxTsxyYLu5YMKDs04RaRqU2YaWge4tG2JaKp4)5ycafuAP)x3r06(zs6NkUXFzybP74Ofwqmewqmj7RXPPbliJvcb(xqMiP6HXyTpSc9A)eZcwy115lZcdq5vfLYSP1sQ(Jdrsi5JuF4GCMZGTP23T4HYuEWSi13jNFWE2(iue(0WvMPBD)ttLxZ09VjTYRzxCXH46L3QvOJ8O2RsA3PzJMDB41DqVUn7aVaSkzaTkPI7aRsQ4oA(AfnwtQqnJQlT3ToVynunG8lFxSWpauHUqKKghbs6OLCKIpqG4UHK4B8s22sO422DYeXISJJqv(POEp17FCeA3ZeHsshW6zXJW7WKcyQz(LLIu6ZXytPoIMjf7gqlVayWnYk1At(TGiWPdAnp0G7hp)A)StIV1Oode7oevjeD74ZaldeRe3eeP8hHOdXHGEaSByRV7WCxgyDRrXJmDkry4)yzePMSKecyvntfaW48h4y8BGdsGtq3qFk0K7lSnNgeW2VvRgnh0cyHabTkBMZTtEVZhn68tp5WJadcYTKw(BWM7UdA1UzNwn60QdO6Rf9(Tipzac4)uSc07gjNA00lGQcImHBHx4pwcwBbZL3dEIX9pafGepn4Ma0KRDpze2IiPB0YeyAjF2Br4Y0rGyOfXjz5Kp4HHg(aFWakGQqUfUWpcTsgBi4UzGJszGqRc(Pz80cvfknKhNBX(6WHF7yCidCAGDtJI3FjWdlvIdc8KIJuA1Vpin4APdOWlaCRZb2vWiUFdEB66bi)R8crlMy(BPjXkZsmx9gPcC1Zpz6C1FIUKbF5JJK8FqpXHPEGTuxdmRiFbnKgccL(ZNUc8lBAcqDE6QrqpCjWBQw8ytpwe6VcO)WfzCM7EnmUVUWfllaW4DRuFjkvMO8J8VLMpKuScndJ)fCr4CT3RFbuIjTxfTZ97h)1VbnqnugkBaWLdyXG89pkjgOFQw4GGuCeM7Jc09iQK9aUIoLvFsUC4f0LynWERgc8TlrpaHoejuI3JaUsBl9YjtanlNmjx3(miwMwrsS4Tdndkxmdd39(kBad2(2PVxZwEGqG2DbzkOEOoKEOkUdOhQI7O1dLpy2)WZgD43HVT1NSxR298A3VVxR(Gx)Dr)97aSBWNSI7aFYkUJ9NuoY1FuTYyelbgymWsFT5JTbFgaNyit7ni1GcTlGcIwvxromRrLu5Shsm7nO3aAu1JPqV0Dmk0lDhj8n4KMUNcDuQdU3QrRwqIKL)e8362K4Lrtv3a4YERNEjMPVM7TjYvBGmsYJpZh0ZsIlwVfgEytXxTBwtq35O4eHC0vyo5hOFlhO8YT0Im9lzBRCdIPgXXd(dYSD8p08pGLldJddmFiGaNtBlG2HUHAQBi8pune1RJYok0)wyKD5Oto(Sd5nLzGqFnG(K73crV0CJsJp148r25RS(ZMzb(SvWg1gOGWB9IBIw1OjaY566fT5UgFu)MD70U5GbETB1XRdSer6Ei0a9h41OzRMn9A3TpSycTjPdnm6iBGQOa00kzDEfpb0eDF5nrVxEt0)f3emvlggePpLA0bzt7QBSdJrfURNEgvTGqExeg7ZAOgJa9Sh5mcAaGewpVDgmaFe1qa(n5tp6WQ2Xn6(n0pG(J3vzsbDtdpD5VTAgchhYjuzZs9lntOf4kudMZEclfYPcK0t5)F4nXGfAffDRvgARy4Tw2zU8CW3Spa1K2k7aHCCZRkO3Srt00pPHmkuUzMtARr)NcDFOm73ytBwRHWRXcVFwmegmJGPI1bh4lWuyn7JYoLFQnggDL0p5wbT3wF6KeTbGCp3(0jP3AjjFes)xJW(MBJtsGG2pDsA9(adcy2DzIVcYe5oWdwgnuHYFtCZ3hol(HdexV8MBO9Hy3WfZ8PTZu54QhOpdUPX)O24fS3ax5RZfPlFGAaS73JF4KG5bK9Gd5TZVtBGk25WVo11Y7gumjqwvDDCALgv9MV453nOHMJredJP3C4g(x5FFWjgBZOKqcPbFa3GkBBmLRcVWpb3G9H)YLhVp4M7pgjvhzmqSv3Iqt4EvNgxU1dagmHMBTzTb9YwtEbRfLTIH1ZO9qcBN6vPrUeqSnbCi30KVyHi2ZalmNahQChqQ43P6)3piYymWFPHP3ISWVBqMX4HB0V1oghsCcIg6mWZIpUj0UL86WH2J6XhZTrXjv7TX(1Y8U226)Xa6njgErjByF)yI)aCG95zctzMqy(BnmHBA(2sw1N(29Z1gDiX8zrkIF7sARcFq4NntKCGikf3CVHWm2((Zfj(FxmD5eXLrIhX9lwm9047fZj1YGWLBt8xmlys6fjXyKhj0ydNoEiitlmEQmOzoYFQqAv3WgOY(thU7U)YsFABeXhCKijXhdVQPheC)4HDW4uAXSvPqlFI4Er44HWfWWCnBLe3Cwd2eSsmjyXIqXbIm)a4zHgu3Voj4pwgmvFdOr03q2mM(agitleHH)Aqk0TueHJccZejdb9G4UDJDbZBJpRHubFVeXny4IeehjJNoym(DrQ)COxTB4d(RsHVxYcre15Gg1mAtb6yhKK8v)5Z9HxCN(E0)RrJbn9ga9R5(pE0fd37oykbEStals9Zertwj)qyy8rttheiJuGt9Fed03J8NKfNa3FhWgjZ8W(lddPGoBiANT8fpkgO4dyZLFL2nH9dxMbD0XdH3FAC8u)PWSdFoutlur7IP7iNMOPsCWHkUV5Mh)Ay8d0GhmRl4pJJqOfW7oah7paJiGZto7bJi1ZSFyWIXd7bedKYJDkzOqlB4M4LxMkKgfcKiQ51uDIEtr64Wg70ya9)633R3a2ZWN9)6J7UiaSXV1biVNHTg6Kbtqol1QcqjgXNyOoCMIH7EoTUr)2hiwKnth924n2lbDYr2R6oaJUVKjSXOCMg6WnHr2c6tVmeinPAWxiMN8HlrbUpoC5CXrX3MVqz)4OmWTkGg1h(itcxIbxOykYYtmYqRaZi7cZt7gg4NcxZW0UW56y9acd9AnFgXyOVX(XZxSmtWhR6BziYShxPvbMRGoVmmqb6OHl90GijtkJP8WO7dsIJqbpAgfObVpLcwu45uCHhgDBGkcHXMufS2YfYMXjfY3yGbid)aynplKgWi793MjIKSvh(iWRrXRmfI5yuZqRY0xrU4Mcog6(Q4vqfB(y7Ckgp)IP5nbU8Ab(tFLGH4huXqg9DUbevEa4vmrwKXOp20NJnuQaK9sbPi(uWqw5omTrGfJl7YrY)T0guaIll9OQqRxV37fJCwy4TMO(MLtbiDAzWLBoMlWqAbKbMj9e3D4vZJyj5GPuGXDuVMED611ZRDFVw963N2Nm5gZ3PTx7wng0RBVodAoqg6yYDqRI3rVlN6U2qmw)gk9GZxdtXu1mtnmHgN1mtKyGBPEvvGLJZRySkxJwcHVaw3p5oupn2Si)gggVQMcy)nH89xGf3YW4Xo6gYdrDkZsYtqc3XAjIDb8v19F(2pJDazVb6fMUM0MZcFt6UCYG6n4yXGraO7pKMGX)42pDoPmycOsrhwAaPL3M1GclBwAuvJNUChwMfk8RN31OwM11Shc18ZbA1vzTdObYMWOYaM84EVWKaXLLhhnu8oI9jqoeOrwHBGIauQBQNwhD(fYvcYh0Q7yiDMjk4BWPfvW2ctt8mvqZ1Q9T3KtfaLTwmSiJPbno2mQJXUnFD(ShNvtZ8A41LnjN31mYZxismIuy9JGbuG0aFiC952WRXgh5FeSbmZmXlE6Qte3aRyT5SmuDuDHBHfaL9ft1X(cYAMpOzD53vbw6LfAkJMrI1FCkLQeRYVtamZwJqqtxG8wXxPG0oopJe0pA5y(ujPLqHVnmrXx2u9xWWsYwBtDAeRdLMvk7Bq7iv)w(jr4X1PKLkLhazY2AJnz(KD62GremjKNA52G5SrG1tMLdOzZGbSieRNiIUvLhFSefu)zDa7Uk2lyPWe9WOzI5lEbtzNzYnMQTya3fEL5AkekObOC)5HxZovKqYV8XyzZfoUyHHiyNPnbQgBCGSNQNbvczX2fht1qMVor4W5R8KlRb(ZCIqnAhDhNl1kFmJH7kyaUm6LnXG60Guz2DomuaMzMqjwjl4zbQ7JY2deNbUrMAYnsTWeJ2Iv6NJItpPRlQKFSIgexHifFYeorz3ODBjPcheCpyLgy2Xtx9)90vAAdxkU85SNn1VlfHSdZwHWsCDmWXo0NI)xAlByznwSkfOOW5Pg6IYZrukNzsZscwisL7huEQfI(5sDoM(j4AsA4VRjCDbcSzXWrykzs4zkZ8qYyWlulWrU(8vKsHnMKv9G)bRzkT4H9bmgvIiWOxewdgnm5GVwMCWKdYiFUM9xA5Gyo1EIPG3yHulI0zwa8HXqLmfjPa2d9vjpFKyrPh4cV85APdzl45vwVBcckYrh5J1t)yqBQFmD025TtB9JPt5fQz1pNkO6uTc1C6oxFRaA0m6i3WZLCjNhm25GlxG5Sd10cPt7Wmxy8K7ethfBLsUzQKL2kkONmZpkseIurGF4bmvdnVVHZ)liQyY2KV03YmzeyMeHscUmFNHlHpsT3FuDhSGGoU0R8pby9dm81duwASdQnyQmmSp8TnJC6qZxHIROrImBWaD1fEhjrNsGvjYgyoL(0v)wq2SNUYqHF6kDkLNY4olm)jTnCrI4(aXd6evka8Opjz5ISaqozHaFvhyELt7TIjICJ26OhK(lz42I)LRerwbdGoj3ZNLu2DPOigL8mfVeDy3P)hWfAc3wlbdKekenbTrKAz4YmUfZcdDk7FEKHTvM(i8SSh82UqI)NVOKMSSfgWmifHuRqHbyMod1pMtOzviGwnGjDZsoqXYTYPHcsumHZClDAP1jp7)ysuKqgWZUoNsuWxwkcWeD0SMlxKstkI2XG(uZeKBzJomDvTI1x1sGctRpUSuVSrUXvu2VlnMWYLL6gxdGDJzltX8sZLB7LQldLfUvW2uYUtLfBLSXQGTCWItQUfiTiZKLbMQ)qt0iNGOPbt8ZKZOQmvQOwztg0y0As1bbLXwg6hUYrBHc0ptePiCCf0WxrBj1CvvtPGc0UPyC2i281nN9nvWcmPIzv2cBSC4RYXyrJv3bkMD8kzK5Qou5Oe(HO4GatZU8HDxL982ltTnFukwvBfB1wr4KPk3SvT)fWKblF8FwPlUnX2vQDwDw(tP2q1j7qv5gSjzrRHxavK)5vMcN21KahzJ6wMzWvwwb4LrGYPpmLtSkchVtmXKcH6C20zUTJYrxx6F4oFBRmxvrDdYmAKWzxw(ci1w1opSn5yYZpjMF2j7E68yW1cbiPnaSDhb13o)XZZawEu4)kHpUuLgRUJyLh(2iDRKBMd1DoMO2ip5cu4NhoW6wQishva9gcLSfYZUGX75dLBoKTVqiAXYeuCu4QtxXICXTa01C0vXwYj8Q5yDsPeUBCgDbTU0E26bj2gG6u2iLqi2bIw2keKkvzaLQGoNHIO6km3z09zZLuORwEReioKIqr7aS71Y8vyReQ7odu9Mz8S2qcDxSWMjubG(f2PLnIfigob5wa0gC2wbirruvQaEqgcjVuS9atzkb2OeBdvE1ac(TqBu(cYAoIUeZO3f2nHNhz9jF7hRHM8xl88YP5uXIcTH7fJNxzuxReUZpsa9WioHbqidqVUi0y5Oss1DagYysZoluvUCHHNbwmhW4Hw7UHkz0M3KPQb2ZLHYUXzTAW8Q0W6IO8vcttGlYG0xkAz0tx9DX9IKuWd(Iqc6cRpdQY2anTri9SHaO6kCMdxvD5JJjKmk6DlUVzWyKHPXwcTfcfQQtubuviCZwqvHarRbCIJeLnYf1agQcyh9IqbcH6sxQdbf)frbsbFNcsivPlKstFvMuxgiMIqVyJfNlOJkbfhFJA5ZlKeoz9FZzzESrxkUvwZM6WXuWUj2gOPvfYo8ZLJsb3ocUlXL3CmCburVITXUaCDUgOFuFVIZd7EJoqTdxvehmVi78)mKw(qdPLcBi8pnr4ILjZVxH2sz3MuCNwBG5ZlIwic9AIaGnhulRXJhzGN8SCglpQsuw6WIhQ3PqNPIqBH7VnZFnUtP5qdSjFk3MOEH7yjVgD9rfAj2b5cAj7hsS2uJiCX58rrVHzUiRcjj7HJl8yQgRLYXNxLa1uVGMPaccVsb5I7ig4vmavAkn2(vnYr0LMo1ERuJnIV8UTGXbDCMYP(sO2VvbdbZlQxEWq4YNjOJouSWpb36hmQo(F)FXW6OqmrGMMBIBh0BXAgMdC78Sqt4ldkcjqjYel0NWmAWX2xvEdo2cikQ0J91yDmFx2D7R5lgAHxz8cCfJrWmoUDuyX7npvRl7(FfyqviGAkbIu1EBxa1eCsTOF2qxRuX6Sqi7amo1XbBW51k9U))2JCgxBKnhDa5uCnWOtdU0MGrWLpQBpEcBvCYyoFba3HFBqzOQ4pYz8R4YT(xnCjuB8mVimaAGyMpc0aoKbk3ZBINZbgb56QO(tx9D)GPpDfgvNdFEHDtTdHLkXVQmQjveGkQ0aIFgxucTiWtRDZys591kHXpK2qDIAROgq4TgNXaVd8SqQgvmsAV9QA3GV9SM)RwAyNhcgA(MvR)8O0p939f9dAN7XlAedcRjJo5IbKLxNm2oPpuTCegFl)JYYL)XL4ykkS37eSiuVf6wcNe3XAK6QggupCDtg7c2WZ7rPV0UhfmtY1QNHiph(NR2TgV2E)Fb1KPIVcHnAFs6JNKUUhN)W173s5D6Is2dIib2PVYTSIgHuoM1LsdwA0vBYHR5frCTk3YPcrqXf5J)RSz0Q2BBgEjRNoTAEmbsvWburJv6dq6TWh7ryzwUupjUCSghX)uctcDnAa50Oe4HI3z(e1BYWlebLMEPfvFbpWTu3KBPZfkR2cZyUGfbYn1KhBwTPJR2vwVFk(cRgE5lasHJ5sRHRDK73u1SOSD)0FTF64voRJG)8CkQfO6Tzl05K03mqEY2OsSrest)wRjmYxxh66nLVUL19l4TH(fwiJ)fRbdXPiGPrMODTvuMwbyoVGLIO9pkYjbSTpo2mrdLTLlLKYd4G(rhRyaZPsAkA2c5eRl)SshusOR0iQqYUd0SoV8LIT1Tp3c8jK5tmEDZekYvrlnAvZdVXCcYKz2UPsilaQhDoHmlR3PzWTcVKwbfAZQOa)ziPojzNHZ3DRmbeVo2iAYfF4vNS0uKe8Ry4lY)OMePqNYgWbEoYviT9ZeoHJMBgrw0b8H14m1NiPJ)m5looR0wTrmFjmR5ays9iALbhtGUwGvKSC6G7aTPeApmfdnELVdbj(hAP7SS8E9XBmcSlK(45eOBu4tqHGXxdpduxwqiKDa0C3aSvi4wi7e52e)1KfhjV3(GLWy7KjF8d]]
+
+function SUICore:ApplyDefaultProfileOnFirstInstall()
+    -- Check if this is a fresh install (no saved variables exist yet)
+    -- We detect this by checking if the DB has any custom changes beyond defaults
+    
+    if not self.db or not self.db.profile then
+        return  -- DB not initialized yet
+    end
+    
+    -- Check if we've already applied the default profile
+    if self.db.profile.defaultProfileApplied then
+        return  -- Already applied, don't re-apply
+    end
+    
+    -- Check if this is truly a fresh install by seeing if the profile matches defaults exactly
+    -- We check a few key settings that would be different in the custom profile
+    local profile = self.db.profile
+    
+    -- If user has customized anything, don't overwrite
+    local hasCustomizations = false
+    
+    -- Check some distinctive settings from the default profile
+    if profile.ncdm and profile.ncdm.essential and profile.ncdm.essential.row1 then
+        -- Check if row1 settings match the hard-coded defaults (which differ from our custom profile)
+        if profile.ncdm.essential.row1.iconSize ~= 39 or
+           profile.ncdm.essential.row1.iconCount ~= 8 then
+            hasCustomizations = true
+        end
+    end
+    
+    if hasCustomizations then
+        -- User has made changes, mark as applied but don't overwrite
+        profile.defaultProfileApplied = true
+        return
+    end
+    
+    -- This is a fresh install - apply the default profile
+    local success, errorMsg = self:ImportProfileFromString(DEFAULT_PROFILE_STRING)
+    
+    if success then
+        -- Mark that we've applied the default profile
+        self.db.profile.defaultProfileApplied = true
+        print("|cff34D399SuaviUI:|r Default profile loaded successfully!")
+    else
+        print("|cffFF5757SuaviUI:|r Failed to load default profile: " .. tostring(errorMsg))
+    end
+end
+
 ---=================================================================================
 --- HUD LAYERING UTILITY
 ---=================================================================================
@@ -3196,6 +3246,8 @@ function SUICore:OnInitialize()
         LibDualSpec:EnhanceDatabase(self.db, ADDON_NAME)
     end
 
+    -- Apply default profile on first install
+    self:ApplyDefaultProfileOnFirstInstall()
 
     -- Note: Main /sui command is handled by init.lua
     self:RegisterChatCommand("suicorerefresh", "ForceRefreshBuffIcons")

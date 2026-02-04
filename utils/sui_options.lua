@@ -10755,7 +10755,7 @@ local function BuildImportExportTab(tabContent)
     local y = -10
     local PAD = 10
 
-    GUI:SetSearchContext({tabIndex = 14, tabName = "SUI Import/Export", subTabIndex = 1, subTabName = "Import/Export"})
+    GUI:SetSearchContext({tabIndex = 11, tabName = "Profiles", subTabIndex = 2, subTabName = "Import/Export"})
 
     local info = GUI:CreateLabel(tabContent, "Import and export SuaviUI profiles", 11, C.textMuted)
     info:SetPoint("TOPLEFT", PAD, y)
@@ -11059,6 +11059,9 @@ end
 ---------------------------------------------------------------------------
 -- PAGE: SUI Import/Export (with sub-tabs)
 ---------------------------------------------------------------------------
+-- DEPRECATED: Import/Export is now a subtab within Profiles page
+-- This page wrapper is kept for reference but is no longer used
+--[[
 local function CreateImportExportPage(parent)
     local scroll, content = CreateScrollableContent(parent)
 
@@ -11073,12 +11076,12 @@ local function CreateImportExportPage(parent)
 
     content:SetHeight(600)
 end
+--]]
 
 ---------------------------------------------------------------------------
--- PAGE: Spec Profiles (Autoswap)
+-- SUB-TAB BUILDER: Profile Management (spec autoswap, create, delete, etc.)
 ---------------------------------------------------------------------------
-local function CreateSpecProfilesPage(parent)
-    local scroll, content = CreateScrollableContent(parent)
+local function BuildProfileManagementTab(tabContent)
     local y = -15
     local PAD = PADDING
     local FORM_ROW = 30
@@ -11086,16 +11089,18 @@ local function CreateSpecProfilesPage(parent)
     local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
     local db = SUICore and SUICore.db
 
-    local info = GUI:CreateLabel(content, "Manage profiles and auto-switch based on specialization", 11, C.textMuted)
+    GUI:SetSearchContext({tabIndex = 11, tabName = "Profiles", subTabIndex = 1, subTabName = "Profile Management"})
+
+    local info = GUI:CreateLabel(tabContent, "Manage profiles and auto-switch based on specialization", 11, C.textMuted)
     info:SetPoint("TOPLEFT", PAD, y)
-    info:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
+    info:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
     info:SetJustifyH("LEFT")
     y = y - 28
     
     -- =====================================================
     -- CURRENT PROFILE SECTION
     -- =====================================================
-    local currentHeader = GUI:CreateSectionHeader(content, "Current Profile")
+    local currentHeader = GUI:CreateSectionHeader(tabContent, "Current Profile")
     currentHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - currentHeader.gap
 
@@ -11103,10 +11108,10 @@ local function CreateSpecProfilesPage(parent)
     local profileDropdown
 
     -- Current profile display (form style row)
-    local activeContainer = CreateFrame("Frame", nil, content)
+    local activeContainer = CreateFrame("Frame", nil, tabContent)
     activeContainer:SetHeight(FORM_ROW)
     activeContainer:SetPoint("TOPLEFT", PAD, y)
-    activeContainer:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
+    activeContainer:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
 
     local currentProfileLabel = activeContainer:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     currentProfileLabel:SetPoint("LEFT", 0, 0)
@@ -11130,10 +11135,7 @@ local function CreateSpecProfilesPage(parent)
     end
     
     -- Update on show
-    content:SetScript("OnShow", RefreshProfileDisplay)
-    
-    -- Also update on scroll parent show (in case content is already visible)
-    scroll:SetScript("OnShow", RefreshProfileDisplay)
+    tabContent:SetScript("OnShow", RefreshProfileDisplay)
     
     -- Also use a short timer to catch any race conditions
     C_Timer.After(0.1, RefreshProfileDisplay)
@@ -11141,10 +11143,10 @@ local function CreateSpecProfilesPage(parent)
     y = y - FORM_ROW
 
     -- Reset Profile button (form style row)
-    local resetContainer = CreateFrame("Frame", nil, content)
+    local resetContainer = CreateFrame("Frame", nil, tabContent)
     resetContainer:SetHeight(FORM_ROW)
     resetContainer:SetPoint("TOPLEFT", PAD, y)
-    resetContainer:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
+    resetContainer:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
 
     local resetLabel = resetContainer:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     resetLabel:SetPoint("LEFT", 0, 0)
@@ -11189,7 +11191,7 @@ local function CreateSpecProfilesPage(parent)
     -- =====================================================
     -- PROFILE SELECTION SECTION
     -- =====================================================
-    local selectHeader = GUI:CreateSectionHeader(content, "Switch Profile")
+    local selectHeader = GUI:CreateSectionHeader(tabContent, "Switch Profile")
     selectHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - selectHeader.gap
     
@@ -11206,10 +11208,10 @@ local function CreateSpecProfilesPage(parent)
     end
     
     -- Profile dropdown - custom styled (matches our form dropdowns)
-    local profileDropdownContainer = CreateFrame("Frame", nil, content)
+    local profileDropdownContainer = CreateFrame("Frame", nil, tabContent)
     profileDropdownContainer:SetHeight(FORM_ROW)
     profileDropdownContainer:SetPoint("TOPLEFT", PAD, y)
-    profileDropdownContainer:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
+    profileDropdownContainer:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
 
     local profileDropdownLabel = profileDropdownContainer:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     profileDropdownLabel:SetPoint("LEFT", 0, 0)
@@ -11381,8 +11383,7 @@ local function CreateSpecProfilesPage(parent)
     end
 
     -- Re-register OnShow scripts with updated function (they were set before replacement)
-    content:SetScript("OnShow", RefreshProfileDisplay)
-    scroll:SetScript("OnShow", RefreshProfileDisplay)
+    tabContent:SetScript("OnShow", RefreshProfileDisplay)
 
     -- Refresh display after a short delay to ensure everything is loaded
     C_Timer.After(0.2, RefreshProfileDisplay)
@@ -11396,15 +11397,15 @@ local function CreateSpecProfilesPage(parent)
     -- =====================================================
     -- CREATE NEW PROFILE SECTION
     -- =====================================================
-    local newHeader = GUI:CreateSectionHeader(content, "Create New Profile")
+    local newHeader = GUI:CreateSectionHeader(tabContent, "Create New Profile")
     newHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - newHeader.gap
 
     -- New profile name input (form style row)
-    local newProfileContainer = CreateFrame("Frame", nil, content)
+    local newProfileContainer = CreateFrame("Frame", nil, tabContent)
     newProfileContainer:SetHeight(FORM_ROW)
     newProfileContainer:SetPoint("TOPLEFT", PAD, y)
-    newProfileContainer:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
+    newProfileContainer:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
 
     local newProfileLabel = newProfileContainer:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     newProfileLabel:SetPoint("LEFT", 0, 0)
@@ -11467,19 +11468,19 @@ local function CreateSpecProfilesPage(parent)
     -- =====================================================
     -- COPY FROM PROFILE SECTION
     -- =====================================================
-    local copyHeader = GUI:CreateSectionHeader(content, "Copy From Profile")
+    local copyHeader = GUI:CreateSectionHeader(tabContent, "Copy From Profile")
     copyHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - copyHeader.gap
 
-    local copyInfo = GUI:CreateLabel(content, "Copy settings from another profile into current", 11, C.textMuted)
+    local copyInfo = GUI:CreateLabel(tabContent, "Copy settings from another profile into current", 11, C.textMuted)
     copyInfo:SetPoint("TOPLEFT", PAD, y)
-    copyInfo:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
+    copyInfo:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
     copyInfo:SetJustifyH("LEFT")
     y = y - 24
 
     -- Copy from dropdown (form style)
     local copyWrapper = { selected = "" }
-    local copyDropdown = GUI:CreateFormDropdown(content, "Copy From", GetProfileList(), "selected", copyWrapper, function(value)
+    local copyDropdown = GUI:CreateFormDropdown(tabContent, "Copy From", GetProfileList(), "selected", copyWrapper, function(value)
         if db and value and value ~= "" then
             db:CopyProfile(value)
             print("|cff34D399SuaviUI:|r Copied settings from: " .. value)
@@ -11487,25 +11488,25 @@ local function CreateSpecProfilesPage(parent)
         end
     end)
     copyDropdown:SetPoint("TOPLEFT", PAD, y)
-    copyDropdown:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
+    copyDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
     y = y - FORM_ROW - 10
 
     -- =====================================================
     -- DELETE PROFILE SECTION
     -- =====================================================
-    local deleteHeader = GUI:CreateSectionHeader(content, "Delete Profile")
+    local deleteHeader = GUI:CreateSectionHeader(tabContent, "Delete Profile")
     deleteHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - deleteHeader.gap
 
-    local deleteInfo = GUI:CreateLabel(content, "Remove unused profiles to save space", 11, C.textMuted)
+    local deleteInfo = GUI:CreateLabel(tabContent, "Remove unused profiles to save space", 11, C.textMuted)
     deleteInfo:SetPoint("TOPLEFT", PAD, y)
-    deleteInfo:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
+    deleteInfo:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
     deleteInfo:SetJustifyH("LEFT")
     y = y - 24
 
     -- Delete dropdown (form style)
     local deleteWrapper = { selected = "" }
-    local deleteDropdown = GUI:CreateFormDropdown(content, "Delete Profile", GetProfileList(), "selected", deleteWrapper, function(value)
+    local deleteDropdown = GUI:CreateFormDropdown(tabContent, "Delete Profile", GetProfileList(), "selected", deleteWrapper, function(value)
         if db and value and value ~= "" then
             local current = db:GetCurrentProfile()
             if value == current then
@@ -11531,13 +11532,13 @@ local function CreateSpecProfilesPage(parent)
         end
     end)
     deleteDropdown:SetPoint("TOPLEFT", PAD, y)
-    deleteDropdown:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
+    deleteDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
     y = y - FORM_ROW - 10
 
     -- =====================================================
     -- SPEC AUTO-SWITCH SECTION
     -- =====================================================
-    local specHeader = GUI:CreateSectionHeader(content, "Spec Auto-Switch")
+    local specHeader = GUI:CreateSectionHeader(tabContent, "Spec Auto-Switch")
     specHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - specHeader.gap
 
@@ -11545,18 +11546,18 @@ local function CreateSpecProfilesPage(parent)
     if db and db.IsDualSpecEnabled and db.SetDualSpecEnabled and db.GetDualSpecProfile and db.SetDualSpecProfile then
         -- Enable checkbox (form style)
         local enableWrapper = { enabled = db:IsDualSpecEnabled() }
-        local enableCheckbox = GUI:CreateFormCheckbox(content, "Enable Spec Profiles", "enabled", enableWrapper,
+        local enableCheckbox = GUI:CreateFormCheckbox(tabContent, "Enable Spec Profiles", "enabled", enableWrapper,
             function()
                 db:SetDualSpecEnabled(enableWrapper.enabled)
                 print("|cff34D399SuaviUI:|r Spec auto-switch " .. (enableWrapper.enabled and "enabled" or "disabled"))
             end)
         enableCheckbox:SetPoint("TOPLEFT", PAD, y)
-        enableCheckbox:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
+        enableCheckbox:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        local specInfo = GUI:CreateLabel(content, "When enabled, your profile will switch when you change specialization", 11, C.textMuted)
+        local specInfo = GUI:CreateLabel(tabContent, "When enabled, your profile will switch when you change specialization", 11, C.textMuted)
         specInfo:SetPoint("TOPLEFT", PAD, y)
-        specInfo:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
+        specInfo:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         specInfo:SetJustifyH("LEFT")
         y = y - 28
 
@@ -11578,35 +11579,52 @@ local function CreateSpecProfilesPage(parent)
                 local specWrapper = { selected = currentSpecProfile }
 
                 -- Dropdown for this spec (form style)
-                local specDropdown = GUI:CreateFormDropdown(content, displayName, GetProfileList(), "selected", specWrapper, function(value)
+                local specDropdown = GUI:CreateFormDropdown(tabContent, displayName, GetProfileList(), "selected", specWrapper, function(value)
                     if value and value ~= "" then
                         db:SetDualSpecProfile(value, i)
                         print("|cff34D399SuaviUI:|r " .. specName .. " will use profile: " .. value)
                     end
                 end)
                 specDropdown:SetPoint("TOPLEFT", PAD, y)
-                specDropdown:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
+                specDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
                 
                 y = y - FORM_ROW
             end
         end
     else
-        local noSpec = GUI:CreateLabel(content, "LibDualSpec not available. Make sure another addon provides it.", 11, C.textMuted)
+        local noSpec = GUI:CreateLabel(tabContent, "LibDualSpec not available. Make sure another addon provides it.", 11, C.textMuted)
         noSpec:SetPoint("TOPLEFT", PAD, y)
-        noSpec:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
+        noSpec:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         noSpec:SetJustifyH("LEFT")
         y = y - 24
 
-        local noSpec2 = GUI:CreateLabel(content, "Common addons with LibDualSpec: Masque and other action bar addons", 11, C.textMuted)
+        local noSpec2 = GUI:CreateLabel(tabContent, "Common addons with LibDualSpec: Masque and other action bar addons", 11, C.textMuted)
         noSpec2:SetPoint("TOPLEFT", PAD, y)
-        noSpec2:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
+        noSpec2:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         noSpec2:SetJustifyH("LEFT")
         y = y - 24
     end
 
     y = y - 20
 
-    content:SetHeight(math.abs(y) + 20)
+    tabContent:SetHeight(math.abs(y) + 20)
+end
+
+---------------------------------------------------------------------------
+-- PAGE: Spec Profiles (with subtabs for Profile Management and Import/Export)
+---------------------------------------------------------------------------
+local function CreateSpecProfilesPage(parent)
+    local scroll, content = CreateScrollableContent(parent)
+
+    local subTabs = GUI:CreateSubTabs(content, {
+        {name = "Profile Management", builder = BuildProfileManagementTab},
+        {name = "Import/Export", builder = BuildImportExportTab},
+    })
+    subTabs:SetPoint("TOPLEFT", 5, -5)
+    subTabs:SetPoint("TOPRIGHT", -5, -5)
+    subTabs:SetHeight(550)
+
+    content:SetHeight(600)
 end
 
 ---------------------------------------------------------------------------
@@ -12143,7 +12161,6 @@ function GUI:InitializeOptions()
     -- Row 3: Utilities + Action Buttons
     GUI:AddTab(frame, "HUD Layers", CreateHUDLayeringPage)
     GUI:AddTab(frame, "Profiles", CreateSpecProfilesPage)
-    GUI:AddTab(frame, "Import/Export", CreateImportExportPage)
     GUI:AddTab(frame, "Search", CreateSearchPage)
     GUI._searchTabIndex = #frame.tabs  -- Store Search tab index for ForceLoadAllTabs trigger
     GUI:AddTab(frame, "Credits", CreateCreditsPage)
