@@ -43,6 +43,7 @@ git push origin vX.X.X
 - `SuaviUI.code-workspace` - VS Code workspace
 - `error.log` - Runtime error log
 - `.DS_Store` - macOS metadata
+- `DS_Store` - macOS metadata (without dot)
 - `.previews/` - Screenshot previews
 
 **Files INCLUDED in ZIP:**
@@ -143,7 +144,7 @@ if (Test-Path "SuaviUI-vX.X.X.zip") { Remove-Item "SuaviUI-vX.X.X.zip" }
 # Define exclusions
 $exclude = @('docs', '.git', '.github', '.gitignore', '.pkgmeta', '.wowup_ignore', 
              '.copilot-instructions.md', 'SuaviUI.code-workspace', 'error.log', 
-             '.DS_Store', '.previews')
+             '.DS_Store', 'DS_Store', '.previews')
 
 # Get files excluding specified paths
 $files = Get-ChildItem -Path "SuaviUI" -Recurse | Where-Object { 
