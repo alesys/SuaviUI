@@ -11064,7 +11064,8 @@ local function CreateImportExportPage(parent)
 
     local subTabs = GUI:CreateSubTabs(content, {
         {name = "Import/Export", builder = BuildImportExportTab},
-        {name = "Suavi's Strings", builder = BuildSuaviStringsTab},
+        -- HIDDEN: Suavi's Strings subtab - preset strings moved to documentation
+        -- {name = "Suavi's Strings", builder = BuildSuaviStringsTab},
     })
     subTabs:SetPoint("TOPLEFT", 5, -5)
     subTabs:SetPoint("TOPRIGHT", -5, -5)
@@ -11785,7 +11786,7 @@ local function CreateCreditsPage(parent)
     AddCreditsSection("SuaviTesters", {
         { name = "Vela", desc = "Testing and feedback" },
         { name = "Pataz", desc = "Testing and feedback" },
-        { name = "Ñora", desc = "The one who paid for Quazii's addon. Look what that got us into." },
+        { name = "ï¿½ora", desc = "The one who paid for Quazii's addon. Look what that got us into." },
     })
 
     AddCreditsSection("Special Thanks", {

@@ -888,13 +888,20 @@ local function LayoutViewer(viewerName, trackerKey)
 
     -- Resize viewer (suppress OnSizeChanged triggering another layout)
     if maxRowWidth > 0 and totalHeight > 0 then
-        viewer.__cdmLayoutSuppressed = (viewer.__cdmLayoutSuppressed or 0) + 1
-        pcall(function()
-            viewer:SetSize(maxRowWidth, totalHeight)
-        end)
-        viewer.__cdmLayoutSuppressed = viewer.__cdmLayoutSuppressed - 1
-        if viewer.__cdmLayoutSuppressed <= 0 then
-            viewer.__cdmLayoutSuppressed = nil
+        -- Only resize if the size actually changed (prevent oscillation)
+        local currentWidth = viewer:GetWidth()
+        local currentHeight = viewer:GetHeight()
+        local needsResize = math.abs(currentWidth - maxRowWidth) >= 1 or math.abs(currentHeight - totalHeight) >= 1
+        
+        if needsResize then
+            viewer.__cdmLayoutSuppressed = (viewer.__cdmLayoutSuppressed or 0) + 1
+            pcall(function()
+                viewer:SetSize(maxRowWidth, totalHeight)
+            end)
+            viewer.__cdmLayoutSuppressed = viewer.__cdmLayoutSuppressed - 1
+            if viewer.__cdmLayoutSuppressed <= 0 then
+                viewer.__cdmLayoutSuppressed = nil
+            end
         end
         
         if viewer.Selection then
@@ -935,15 +942,12 @@ local function LayoutViewer(viewerName, trackerKey)
     -- Update locked power bars, castbars, and unit frames after layout completes
     -- Debounced to prevent spam during rapid layout changes
     -- Skipped entirely during EditMode to avoid triggering Blizzard's nil rect bug
-    -- Also skipped if RefreshAll is running (it will handle the updates in batch)
-    if not viewer.__cdmUpdatePending and not viewer.isEditing and not NCDM.refreshingAll then
+    if not viewer.__cdmUpdatePending and not viewer.isEditing then
         viewer.__cdmUpdatePending = true
         C_Timer.After(0.05, function()
             viewer.__cdmUpdatePending = nil
             -- Re-check isEditing at callback time - user may have entered EditMode after timer started
             if viewer.isEditing then return end
-            -- Also skip if RefreshAll started during the timer
-            if NCDM.refreshingAll then return end
             if trackerKey == "essential" then
                 if _G.SuaviUI_UpdateLockedPowerBar then
                     _G.SuaviUI_UpdateLockedPowerBar()
@@ -1085,12 +1089,27 @@ local function HookViewer(viewerName, trackerKey)
     end)
 
     -- Step 5: OnSizeChanged hook - increment layout counter
-    viewer:HookScript("OnSizeChanged", function(self)
-        -- Increment layout counter so OnUpdate knows Blizzard changed something
-        self.__ncdmBlizzardLayoutCount = (self.__ncdmBlizzardLayoutCount or 0) + 1
+    viewer:HookScript("OnSizeChanged", function(self, width, height)
+        -- Ignore size changes during our own layout to prevent loops
         if self.__cdmLayoutSuppressed or self.__cdmLayoutRunning then
             return
         end
+        
+        -- Ignore size changes that match our target size (prevent oscillation)
+        if self.__cdmIconWidth and self.__cdmTotalHeight then
+            local currentWidth = self:GetWidth()
+            local currentHeight = self:GetHeight()
+            local targetWidth = self.__cdmIconWidth
+            local targetHeight = self.__cdmTotalHeight
+            
+            -- If size matches within 1 pixel, don't trigger a layout
+            if math.abs(currentWidth - targetWidth) < 1 and math.abs(currentHeight - targetHeight) < 1 then
+                return
+            end
+        end
+        
+        -- Increment layout counter so OnUpdate knows Blizzard changed something
+        self.__ncdmBlizzardLayoutCount = (self.__ncdmBlizzardLayoutCount or 0) + 1
         LayoutViewer(viewerName, trackerKey)
     end)
 
@@ -1249,12 +1268,11 @@ end
 -- PUBLIC: Force refresh all layouts
 ---------------------------------------------------------------------------
 local function RefreshAll()
-    UpdateCooldownViewerCVar()
+    -- REMOVED: UpdateCooldownViewerCVar() - This was automatically disabling CDM
+    -- Users should manually control the "Enable Cooldown Manager" checkbox
+    -- UpdateCooldownViewerCVar()
     NCDM.applying["essential"] = false
     NCDM.applying["utility"] = false
-
-    -- Set flag to suppress individual viewer update callbacks during batch refresh
-    NCDM.refreshingAll = true
 
     -- Increment settings versions to trigger re-layout
     IncrementSettingsVersion()
@@ -1279,10 +1297,7 @@ local function RefreshAll()
     end)
 
     -- Update locked power bars and castbars after all layouts complete
-    -- CRITICAL: Delay must be > 0.05s to avoid conflicting with the individual
-    -- viewer's LayoutViewer callback which also calls these update functions
-    -- at the 0.05s mark. This prevents double-cascading updates.
-    C_Timer.After(0.15, function()
+    C_Timer.After(0.10, function()
         -- Essential locked items
         if _G.SuaviUI_UpdateLockedPowerBar then
             _G.SuaviUI_UpdateLockedPowerBar()
@@ -1307,9 +1322,6 @@ local function RefreshAll()
         if _G.SuaviUI_UpdateCDMAnchoredUnitFrames then
             _G.SuaviUI_UpdateCDMAnchoredUnitFrames()
         end
-        
-        -- Clear the refreshing flag now that all updates are complete
-        NCDM.refreshingAll = false
     end)
 end
 
@@ -1400,8 +1412,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         ApplyGetScaledRectHook(VIEWER_ESSENTIAL)
         ApplyGetScaledRectHook(VIEWER_UTILITY)
         
-        -- Force load CDM first, then initialize our hooks
-        C_Timer.After(0.3, ForceLoadCDM)
+        -- REMOVED: ForceLoadCDM - This was opening the settings panel on every reload
+        -- The CDM viewers initialize on their own without needing to force-open the settings
+        -- C_Timer.After(0.3, ForceLoadCDM)
         C_Timer.After(0.5, Initialize)
     elseif event == "PLAYER_ENTERING_WORLD" then
         local isLogin, isReload = ...
