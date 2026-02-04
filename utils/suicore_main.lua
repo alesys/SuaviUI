@@ -231,6 +231,84 @@ function SUICore:ApplyDefaultProfileOnFirstInstall()
 end
 
 ---=================================================================================
+--- CHARACTER-SPECIFIC PROFILE MANAGEMENT
+---=================================================================================
+
+-- Create or switch to a character-specific profile for this character
+-- This prevents UI changes on one character from affecting other characters
+function SUICore:EnsureCharacterProfile()
+    if not self.db then return end
+    
+    -- Get character and realm name
+    local charName = UnitName("player")
+    local realmName = GetRealmName()
+    
+    if not charName or not realmName then
+        return  -- Can't determine character
+    end
+    
+    -- Create character profile name in format "CharName - RealmName"
+    local charProfileName = charName .. " - " .. realmName
+    
+    -- Check if this character already has a profile
+    local currentProfile = self.db:GetCurrentProfile()
+    
+    -- If already on a character-specific profile, we're good
+    if currentProfile == charProfileName then
+        return
+    end
+    
+    -- Check if this is the first time this character is logging in
+    -- (i.e., if the character profile already exists in the database)
+    local existingProfiles = self.db:GetProfiles()
+    local charProfileExists = false
+    
+    for _, profileName in ipairs(existingProfiles) do
+        if profileName == charProfileName then
+            charProfileExists = true
+            break
+        end
+    end
+    
+    if charProfileExists then
+        -- Character profile exists, switch to it
+        self.db:SetProfile(charProfileName)
+        print("|cff34D399SuaviUI:|r Switched to character profile: |cffFFD700" .. charProfileName .. "|r")
+    else
+        -- This is the first login for this character
+        -- Create the character profile by switching to it (AceDB auto-creates on first SetProfile)
+        self.db:SetProfile(charProfileName)
+        
+        -- Copy settings from the current profile to the new character profile
+        -- This gives the character a good starting point
+        local sourceProfile = currentProfile
+        local sourceProfileData = self.db.global.profiles and self.db.global.profiles[sourceProfile]
+        
+        if sourceProfileData then
+            -- Copy the profile data
+            local charProfileData = self.db.global.profiles[charProfileName]
+            if not charProfileData then
+                self.db.global.profiles[charProfileName] = {}
+            end
+            -- Do a deep copy of all settings
+            for key, value in pairs(sourceProfileData) do
+                if type(value) == "table" then
+                    charProfileData[key] = {}
+                    for k, v in pairs(value) do
+                        charProfileData[key][k] = v
+                    end
+                else
+                    charProfileData[key] = value
+                end
+            end
+            print("|cff34D399SuaviUI:|r Created character profile: |cffFFD700" .. charProfileName .. "|r (copied from " .. sourceProfile .. ")")
+        else
+            print("|cff34D399SuaviUI:|r Created character profile: |cffFFD700" .. charProfileName .. "|r (fresh start)")
+        end
+    end
+end
+
+---=================================================================================
 --- HUD LAYERING UTILITY
 ---=================================================================================
 
@@ -3245,6 +3323,9 @@ function SUICore:OnInitialize()
     if LibDualSpec then
         LibDualSpec:EnhanceDatabase(self.db, ADDON_NAME)
     end
+
+    -- Ensure character has their own profile (prevents UI changes from affecting other characters)
+    self:EnsureCharacterProfile()
 
     -- Apply default profile on first install
     self:ApplyDefaultProfileOnFirstInstall()
