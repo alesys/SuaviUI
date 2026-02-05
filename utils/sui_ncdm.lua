@@ -308,46 +308,8 @@ local function SkinIcon(icon, size, aspectRatioCrop, zoom, borderSize, borderCol
     icon._ncdmZoom = zoom or 0
     icon._ncdmAspectRatio = aspectRatioCrop or 1.0
 
-    -- One-time setup (mask removal, overlay strip, SetTexCoord hook)
+    -- One-time setup (stores original state without modifying)
     SetupIconOnce(icon)
-    
-    -- ONLY when actually styling: remove Blizzard's visual elements
-    -- This should only run once when styling is applied, not every frame
-    if not icon._ncdmStyled then
-        icon._ncdmStyled = true
-        
-        -- Remove Blizzard's mask textures (only when styling)
-        local textures = { icon.Icon, icon.icon }
-        for _, tex in ipairs(textures) do
-            if tex and tex.GetMaskTexture and tex.RemoveMaskTexture then
-                for i = 1, 10 do
-                    local mask = tex:GetMaskTexture(i)
-                    if mask then
-                        tex:RemoveMaskTexture(mask)
-                    end
-                end
-            end
-        end
-        
-        -- Strip Blizzard's overlay texture (only when styling)
-        StripBlizzardOverlay(icon)
-        
-        -- Hide NormalTexture border (only when styling)
-        if icon.NormalTexture then
-            icon.NormalTexture:SetAlpha(0)
-        end
-        if icon.GetNormalTexture then
-            local normalTex = icon:GetNormalTexture()
-            if normalTex then
-                normalTex:SetAlpha(0)
-            end
-        end
-
-        -- Block atlas borders (only when styling)
-        if icon.DebuffBorder then PreventAtlasBorder(icon.DebuffBorder) end
-        if icon.BuffBorder then PreventAtlasBorder(icon.BuffBorder) end
-        if icon.TempEnchantBorder then PreventAtlasBorder(icon.TempEnchantBorder) end
-    end
 
     -- Calculate dimensions (higher aspect ratio = flatter icon)
     local aspectRatio = aspectRatioCrop or 1.0
