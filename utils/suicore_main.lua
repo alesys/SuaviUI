@@ -3976,29 +3976,35 @@ function SUICore:CreateMinimapButton()
         self.db.profile.minimapButton.minimapPos = 180
     end
     
-    -- Create DataBroker object
-    local dataObj = LDB:NewDataObject(ADDON_NAME, {
-        type = "launcher",
-        icon = "Interface\\AddOns\\SuaviUI\\assets\\textures\\suaviLogo.tga",
-        label = "Suavi UI",
-        OnClick = function(clickedframe, button)
-            if button == "LeftButton" then
-                self:OpenConfig()
-            elseif button == "RightButton" then
-                -- Right click could toggle something or show a menu
-                -- For now, just open config
-                self:OpenConfig()
-            end
-        end,
-        OnTooltipShow = function(tooltip)
-            tooltip:SetText("|cFF30D1FFSuavi UI|r")
-            tooltip:AddLine("Left-click to open configuration", 1, 1, 1)
-            tooltip:AddLine("Right-click to open configuration", 1, 1, 1)
-        end,
-    })
+    -- Get or create DataBroker object
+    local dataObj = LDB:GetDataObject(ADDON_NAME)
+    
+    if not dataObj then
+        -- Store a reference to SUICore for closures
+        local suicore = self
+        
+        -- Create new DataBroker object
+        dataObj = LDB:NewDataObject(ADDON_NAME, {
+            type = "launcher",
+            icon = "Interface\\AddOns\\SuaviUI\\assets\\textures\\suaviLogo.tga",
+            label = "Suavi UI",
+            OnClick = function(clickedframe, button)
+                if suicore and suicore.OpenConfig then
+                    suicore:OpenConfig()
+                end
+            end,
+            OnTooltipShow = function(tooltip)
+                tooltip:SetText("|cFF30D1FFSuavi UI|r")
+                tooltip:AddLine("Left-click to open configuration", 1, 1, 1)
+                tooltip:AddLine("Right-click to open configuration", 1, 1, 1)
+            end,
+        })
+    end
     
     -- Register with LibDBIcon using separate minimapButton settings
-    LibDBIcon:Register(ADDON_NAME, dataObj, self.db.profile.minimapButton)
+    if dataObj then
+        LibDBIcon:Register(ADDON_NAME, dataObj, self.db.profile.minimapButton)
+    end
 end
 
 -- Helper Functions
