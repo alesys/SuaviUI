@@ -215,6 +215,31 @@ local function RestoreOriginalStyle(button, viewerSettingName)
         end
     end
 
+    -- Restore NCDM-stripped masks (if NCDM was applied)
+    if button._originalMasks then
+        local textures = { button.Icon, button.icon }
+        for _, tex in ipairs(textures) do
+            if tex and button._originalMasks[tostring(tex)] then
+                for _, mask in ipairs(button._originalMasks[tostring(tex)]) do
+                    if tex.AddMaskTexture then
+                        tex:AddMaskTexture(mask)
+                    end
+                end
+            end
+        end
+    end
+
+    -- Restore NCDM-stripped NormalTexture
+    if button._originalNormalAlpha and button.NormalTexture then
+        button.NormalTexture:SetAlpha(button._originalNormalAlpha)
+    end
+    if button._originalNormalAlpha and button.GetNormalTexture then
+        local normalTex = button:GetNormalTexture()
+        if normalTex then
+            normalTex:SetAlpha(button._originalNormalAlpha)
+        end
+    end
+
     -- Restore hidden overlay textures
     for _, region in next, { button:GetRegions() } do
         if region:IsObjectType("Texture") then
@@ -235,6 +260,11 @@ local function RestoreOriginalStyle(button, viewerSettingName)
     end
 
     button.suiSquareStyled = false
+    
+    -- Also restore NCDM styling if available (clears NCDM's styling flags)
+    if ns.NCDM and ns.NCDM.RestoreIcon then
+        ns.NCDM.RestoreIcon(button)
+    end
 end
 
 -- Process all children of a viewer

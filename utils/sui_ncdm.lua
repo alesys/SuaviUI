@@ -251,40 +251,51 @@ local function SetupIconOnce(icon)
     if not icon or icon._ncdmSetup then return end
     icon._ncdmSetup = true
     
-    -- Remove Blizzard's mask textures
-    local textures = { icon.Icon, icon.icon }
-    for _, tex in ipairs(textures) do
-        if tex and tex.GetMaskTexture and tex.RemoveMaskTexture then
-            for i = 1, 10 do
-                local mask = tex:GetMaskTexture(i)
-                if mask then
-                    tex:RemoveMaskTexture(mask)
+    -- Store original mask textures before stripping (for restoration later)
+    if not icon._originalMasks then
+        icon._originalMasks = {}
+        local textures = { icon.Icon, icon.icon }
+        for _, tex in ipairs(textures) do
+            if tex and tex.GetMaskTexture then
+                for i = 1, 10 do
+                    local mask = tex:GetMaskTexture(i)
+                    if mask then
+                        table.insert(icon._originalMasks, { texture = tex, mask = mask, slot = i })
+                    end
                 end
             end
         end
     end
     
-    -- Strip Blizzard's overlay texture
-    StripBlizzardOverlay(icon)
-    
-    -- Hide NormalTexture border
-    if icon.NormalTexture then
-        icon.NormalTexture:SetAlpha(0)
-    end
-    if icon.GetNormalTexture then
-        local normalTex = icon:GetNormalTexture()
-        if normalTex then
-            normalTex:SetAlpha(0)
+    -- Store original NormalTexture alpha (for restoration later)
+    if not icon._originalNormalAlpha then
+        if icon.NormalTexture then
+            icon._originalNormalAlpha = icon.NormalTexture:GetAlpha()
+        elseif icon.GetNormalTexture then
+            local normalTex = icon:GetNormalTexture()
+            if normalTex then
+                icon._originalNormalAlpha = normalTex:GetAlpha()
+            end
         end
     end
-
-    -- Block atlas borders (shifts CPU attribution to Blizzard's SetAtlas)
-    if icon.DebuffBorder then PreventAtlasBorder(icon.DebuffBorder) end
-    if icon.BuffBorder then PreventAtlasBorder(icon.BuffBorder) end
-    if icon.TempEnchantBorder then PreventAtlasBorder(icon.TempEnchantBorder) end
-
-    -- NOTE: Removed SetTexCoord hook to avoid taint during combat
-    -- TexCoord is now applied via the Layout hook instead (v1.34 approach)
+    
+    -- Store original overlay appearance
+    if not icon._overlayProcessed then
+        icon._overlayProcessed = true
+        -- Mark overlay textures so we can restore them later
+        for _, region in next, { icon:GetRegions() } do
+            if region:IsObjectType("Texture") then
+                local atlas = region:GetAtlas()
+                if atlas == "UI-HUD-CoolDownManager-IconOverlay" then
+                    region._originalAlpha = region:GetAlpha()
+                end
+            end
+        end
+    end
+    
+    -- NOTE: Do NOT strip masks/hide borders here!
+    -- Only do this when actually styling icons
+    -- This ensures icons look identical when addon is disabled
 end
 
 ---------------------------------------------------------------------------
@@ -299,6 +310,44 @@ local function SkinIcon(icon, size, aspectRatioCrop, zoom, borderSize, borderCol
 
     -- One-time setup (mask removal, overlay strip, SetTexCoord hook)
     SetupIconOnce(icon)
+    
+    -- ONLY when actually styling: remove Blizzard's visual elements
+    -- This should only run once when styling is applied, not every frame
+    if not icon._ncdmStyled then
+        icon._ncdmStyled = true
+        
+        -- Remove Blizzard's mask textures (only when styling)
+        local textures = { icon.Icon, icon.icon }
+        for _, tex in ipairs(textures) do
+            if tex and tex.GetMaskTexture and tex.RemoveMaskTexture then
+                for i = 1, 10 do
+                    local mask = tex:GetMaskTexture(i)
+                    if mask then
+                        tex:RemoveMaskTexture(mask)
+                    end
+                end
+            end
+        end
+        
+        -- Strip Blizzard's overlay texture (only when styling)
+        StripBlizzardOverlay(icon)
+        
+        -- Hide NormalTexture border (only when styling)
+        if icon.NormalTexture then
+            icon.NormalTexture:SetAlpha(0)
+        end
+        if icon.GetNormalTexture then
+            local normalTex = icon:GetNormalTexture()
+            if normalTex then
+                normalTex:SetAlpha(0)
+            end
+        end
+
+        -- Block atlas borders (only when styling)
+        if icon.DebuffBorder then PreventAtlasBorder(icon.DebuffBorder) end
+        if icon.BuffBorder then PreventAtlasBorder(icon.BuffBorder) end
+        if icon.TempEnchantBorder then PreventAtlasBorder(icon.TempEnchantBorder) end
+    end
 
     -- Calculate dimensions (higher aspect ratio = flatter icon)
     local aspectRatio = aspectRatioCrop or 1.0
@@ -2021,10 +2070,62 @@ _G.SuaviUI_RefreshCDMMouseover = SetupCDMMouseoverDetector
 _G.SuaviUI_RefreshUnitframesMouseover = SetupUnitframesMouseoverDetector
 
 ---------------------------------------------------------------------------
+-- RESTORE ICON: Remove NCDM styling and restore Blizzard visuals
+---------------------------------------------------------------------------
+local function RestoreIcon(icon)
+    if not icon then return end
+    
+    -- Restore NCDM-stripped masks
+    if icon._originalMasks then
+        local textures = { icon.Icon, icon.icon }
+        for _, tex in ipairs(textures) do
+            if tex and icon._originalMasks[tostring(tex)] then
+                for _, mask in ipairs(icon._originalMasks[tostring(tex)]) do
+                    if tex.AddMaskTexture then
+                        tex:AddMaskTexture(mask)
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Restore NCDM-stripped NormalTexture
+    if icon._originalNormalAlpha then
+        if icon.NormalTexture then
+            icon.NormalTexture:SetAlpha(icon._originalNormalAlpha)
+        end
+        if icon.GetNormalTexture then
+            local normalTex = icon:GetNormalTexture()
+            if normalTex then
+                normalTex:SetAlpha(icon._originalNormalAlpha)
+            end
+        end
+    end
+    
+    -- Restore overlay textures hidden by StripBlizzardOverlay
+    for _, region in next, { icon:GetRegions() } do
+        if region:IsObjectType("Texture") then
+            local atlas = region:GetAtlas()
+            if atlas == "UI-HUD-CoolDownManager-IconOverlay" and region:GetAlpha() == 0 then
+                region:SetAlpha(1)
+            end
+        end
+    end
+    
+    -- Reset NCDM styling flag so it can be applied again if needed
+    icon._ncdmStyled = false
+    icon._ncdmZoom = nil
+    icon._ncdmAspectRatio = nil
+    icon.__cdmSkinned = nil
+    icon.__cdmSkinPending = nil
+end
+
+---------------------------------------------------------------------------
 -- EXPOSE MODULE
 ---------------------------------------------------------------------------
 NCDM.Refresh = RefreshAll
 NCDM.LayoutViewer = LayoutViewer
+NCDM.RestoreIcon = RestoreIcon
 ns.NCDM = NCDM
 
 
