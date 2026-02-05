@@ -1247,6 +1247,8 @@ local function CreateGeneralQoLPage(parent)
                     else
                         LibDBIcon:Show("SuaviUI")
                     end
+                    -- Force refresh the button to update visibility
+                    LibDBIcon:Refresh("SuaviUI")
                 end
             end)
             showMinimapIconCheck:SetPoint("TOPLEFT", PADDING, y)

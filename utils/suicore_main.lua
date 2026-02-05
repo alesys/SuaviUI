@@ -3967,7 +3967,13 @@ function SUICore:CreateMinimapButton()
     if not self.db.profile.minimapButton then
         self.db.profile.minimapButton = {
             hide = false,
+            minimapPos = 180,  -- Default position for LibDBIcon (9 o'clock)
         }
+    end
+    
+    -- Ensure minimapPos exists (for library compatibility)
+    if not self.db.profile.minimapButton.minimapPos then
+        self.db.profile.minimapButton.minimapPos = 180
     end
     
     -- Create DataBroker object
