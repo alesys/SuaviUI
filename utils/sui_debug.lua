@@ -57,15 +57,16 @@ local function CreateDebugWindow()
     if debugWindow then return debugWindow end
     
     local frame = CreateFrame("Frame", "SUI_DebugWindow", UIParent, "BackdropTemplate")
-    frame:SetSize(600, 500)
-    frame:SetPoint("CENTER", UIParent, "CENTER")
+    frame:SetSize(800, 600)
+    -- Position at top-left, making it very obvious
+    frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 10, -30)
     frame:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 2,
+        edgeSize = 3,
     })
-    frame:SetBackdropColor(0.05, 0.05, 0.08, 0.98)
-    frame:SetBackdropBorderColor(0.2, 0.2, 0.3, 1)
+    frame:SetBackdropColor(0.05, 0.05, 0.08, 0.99)
+    frame:SetBackdropBorderColor(0.4, 0.8, 1.0, 1)  -- Bright cyan border
     frame:SetMovable(true)
     frame:EnableMouse(true)
     frame:RegisterForDrag("LeftButton")
@@ -75,10 +76,11 @@ local function CreateDebugWindow()
     frame:SetClampedToScreen(true)
     frame:Hide()
     
-    -- Title bar
+    -- Title bar with prominent styling
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 15, -10)
     title:SetText("|cFF56D1FFSuaviUI Debug Window|r")
+    title:SetFont(title:GetFont(), 14, "OUTLINE")
     
     -- Close button
     local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
@@ -216,9 +218,12 @@ _G.SuaviUI_Debug = AddDebugLog
 _G.SuaviUI_DebugWindow = DebugWindow
 
 ---------------------------------------------------------------------------
--- SLASH COMMAND
+-- SLASH COMMANDS
 ---------------------------------------------------------------------------
-SLASH_SUICDEBUG1 = "/sucdebug"
+-- Primary slash commands: /suidebug, /suid (new), /sucdebug (legacy)
+SLASH_SUICDEBUG1 = "/suidebug"
+SLASH_SUICDEBUG2 = "/suid"
+SLASH_SUICDEBUG3 = "/sucdebug"
 SlashCmdList["SUICDEBUG"] = function(msg)
     msg = msg and msg:lower():trim() or ""
     
@@ -231,6 +236,6 @@ SlashCmdList["SUICDEBUG"] = function(msg)
     else
         -- Default: show window
         DebugWindow:Show()
-        print("|cFF56D1FFSuaviUI:|r Debug window opened. Use |cFFFFFF00/sucdebug clear|r or |cFFFFFF00/sucdebug hide|r")
+        print("|cFF56D1FFSuaviUI:|r Debug window opened. Use |cFFFFFF00/suidebug clear|r or |cFFFFFF00/suidebug hide|r")
     end
 end

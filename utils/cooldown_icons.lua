@@ -166,10 +166,9 @@ local function ApplySquareStyle(button, viewerSettingName)
 end
 
 local function RestoreOriginalStyle(button, viewerSettingName)
-    if not button.suiSquareStyled then
-        return
-    end
-
+    -- FIXED: Removed guard check - always attempt restoration
+    -- This prevents buttons from getting stuck in partially-styled states
+    
     local width, height = GetViewerIconSize(viewerSettingName)
     button:SetSize(width, height)
 
@@ -393,16 +392,25 @@ function StyledIcons:Enable()
         for viewerName, _ in pairs(viewersSettingKey) do
             local viewerFrame = _G[viewerName]
             if viewerFrame then
+                -- FIXED: Hook now checks actual settings, not module state
+                -- This makes it self-healing when settings change
                 hooksecurefunc(viewerFrame, "RefreshLayout", function()
-                    if not isModuleStyledEnabled then
-                        return
-                    end
+                    -- Always check current settings, ignore module state
+                    local settingName = viewersSettingKey[viewerName]
+                    if not settingName then return end
+                    
                     -- Wrap in pcall to prevent affecting Blizzard's Edit Mode flow
                     -- which can trigger EncounterWarnings bugs
                     pcall(function()
-                        StyledIcons:RefreshViewer(viewerName)
+                        -- Check if square icons are enabled for this viewer
+                        local enabled = IsSquareIconsEnabled(settingName)
+                        ProcessViewer(viewerFrame, settingName, enabled)
+                        
+                        -- Handle utility size normalization
                         if viewerName == "UtilityCooldownViewer" then
-                            StyledIcons:ApplyNormalizedSize()
+                            if enabled and IsNormalizedSizeEnabled() then
+                                StyledIcons:ApplyNormalizedSize()
+                            end
                         end
                     end)
                 end)
@@ -507,6 +515,16 @@ end)
 -- If Blizzard_CooldownManager is already loaded (e.g., /reload), try immediately
 if C_AddOns.IsAddOnLoaded("Blizzard_CooldownManager") then
     C_Timer.After(0.1, TryInitialize)
+end
+
+-- ============================================================================
+-- GLOBAL CALLBACK FOR UI INTEGRATION
+-- ============================================================================
+-- This function can be called from the options panel when square icon settings change
+_G.SuaviUI_RefreshSquareIcons = function()
+    if ns.StyledIcons and ns.StyledIcons.OnSettingChanged then
+        ns.StyledIcons:OnSettingChanged()
+    end
 end
 
 -- ============================================================================
