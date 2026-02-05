@@ -231,6 +231,26 @@ LEM.SettingType = {
 }
 ```
 
+### Orientation (Rotation) Experiment — Hidden
+
+We implemented rotation-based orientation modes for **SuaviPower**, **SuaviFrames**, and **SuaviCasts**, but the UI setting is currently **hidden** due to visual issues when leaving Edit Mode.
+
+**Design:**
+- Modes: **Normal**, **+90° CW**, **+90° CCW**
+- StatusBars remain horizontal; textures and text are rotated.
+- Backwards compatibility: old values **Horizontal/Vertical** map to **Normal/+90° CW**.
+
+**Code paths:**
+- utils/resourcebars/Constants.lua (orientation constants + helpers)
+- utils/resourcebars/LEMSettingsLoader.lua (sidebar setting, currently removed)
+- utils/resourcebars/Bars/Abstract/Bar.lua (rotation application)
+- utils/unitframes_editmode.lua (sidebar setting, currently removed)
+- utils/sui_unitframes.lua (rotation for bars/text/absorbs)
+- utils/CastbarMixin.lua (rotation for castbar)
+- utils/castbar_editmode.lua (sidebar setting, currently removed)
+
+**Status:** hidden from all Edit Mode side panels until the rotation visuals are corrected.
+
 ### Settings Structure
 
 ```lua

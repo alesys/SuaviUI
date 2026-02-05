@@ -231,6 +231,107 @@ function SUICore:ApplyDefaultProfileOnFirstInstall()
 end
 
 ---=================================================================================
+--- COMPLETE PROFILE RESET
+---=================================================================================
+
+-- Completely reset the current profile including all Edit Mode layouts and LibEQOL registrations
+-- This is more comprehensive than ResetProfile() which only resets profile data
+function SUICore:ResetProfileCompletely()
+    if not self.db then
+        print("|cffFF5757SuaviUI:|r Cannot reset - database not initialized")
+        return false
+    end
+    
+    -- Step 1: Reset profile data (standard AceDB reset)
+    self.db:ResetProfile()
+    
+    -- Step 2: Clear all Edit Mode layouts for the current character
+    -- This removes all saved Edit Mode positions/settings
+    if C_EditMode and C_EditMode.OnEditModeExit then
+        -- Make sure we're not in Edit Mode before clearing
+        if EditModeManagerFrame and EditModeManagerFrame:IsShown() then
+            EditModeManagerFrame:Hide()
+        end
+    end
+    
+    -- Clear the Edit_Layouts CVar which stores all Edit Mode layouts
+    -- Format: "layoutName1 layoutString1 layoutName2 layoutString2 ..."
+    pcall(function() SetCVar("Edit_Layouts", "") end)
+    
+    -- Step 3: Clear LibEQOL frame registrations if available
+    -- This prevents orphaned Edit Mode settings for our custom frames
+    if LibStub then
+        local LEM = LibStub("LibEQOLEditMode-1.0", true)
+        if LEM and LEM.selectionRegistry then
+            -- Clear our registered frames from LibEQOL
+            local framesToClear = {}
+            for systemName, _ in pairs(LEM.selectionRegistry) do
+                -- Only clear SuaviUI frames
+                if systemName:match("^SuaviUI") or 
+                   systemName:match("Essential") or 
+                   systemName:match("Utility") or
+                   systemName:match("BuffIcon") then
+                    table.insert(framesToClear, systemName)
+                end
+            end
+            
+            for _, systemName in ipairs(framesToClear) do
+                LEM.selectionRegistry[systemName] = nil
+                if LEM.frameHandlers then
+                    LEM.frameHandlers[systemName] = nil
+                end
+                if LEM.defaultPositions then
+                    LEM.defaultPositions[systemName] = nil
+                end
+                if LEM.settingSheets then
+                    LEM.settingSheets[systemName] = nil
+                end
+            end
+        end
+    end
+    
+    -- Step 4: Clear runtime frame properties that might persist
+    -- These are stored on the actual frame objects
+    local viewersToClean = {
+        _G.EssentialCooldownViewer,
+        _G.UtilityCooldownViewer,
+        _G.BuffIconCooldownViewer,
+    }
+    
+    for _, viewer in ipairs(viewersToClean) do
+        if viewer then
+            -- Clear NCDM-specific properties
+            viewer.__cdmLayoutDirection = nil
+            viewer._ncdmInitialized = nil
+            viewer._ncdmHidden = nil
+            
+            -- Clear CMC-specific properties
+            viewer.__cmc_initialized = nil
+            viewer.__cmc_lastRefresh = nil
+        end
+    end
+    
+    -- Step 5: Clear cooldown coordinator state
+    if _G.SuaviUI and _G.SuaviUI.CooldownCoordinator then
+        local coordinator = _G.SuaviUI.CooldownCoordinator
+        if coordinator._pendingTimer then
+            coordinator._pendingTimer:Cancel()
+            coordinator._pendingTimer = nil
+        end
+        coordinator._pendingSource = nil
+        coordinator._pendingParts = nil
+        coordinator._pendingOpts = nil
+    end
+    
+    -- Clear global refresh state
+    _G.SuaviUI_CooldownRefreshInProgress = nil
+    _G.SuaviUI_CooldownRefreshPhase = nil
+    _G.SuaviUI_CooldownRefreshSource = nil
+    
+    return true
+end
+
+---=================================================================================
 --- CHARACTER-SPECIFIC PROFILE MANAGEMENT
 ---=================================================================================
 

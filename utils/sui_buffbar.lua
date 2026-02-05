@@ -66,32 +66,6 @@ local function GetDB()
     return nil
 end
 
-local function ApplySquareBuffOverrides(settings)
-    local profile = SUICore and SUICore.db and SUICore.db.profile
-    if not profile or not profile.cooldownManager_squareIcons_BuffIcons then
-        return settings
-    end
-
-    local overridden = {}
-    for key, value in pairs(settings or {}) do
-        overridden[key] = value
-    end
-
-    overridden.aspectRatioCrop = 1.0
-
-    local borderKey = profile.cooldownManager_squareIconsBorder_BuffIcons
-    if borderKey ~= nil then
-        overridden.borderSize = borderKey
-    end
-
-    local zoomKey = profile.cooldownManager_squareIconsZoom_BuffIcons
-    if zoomKey ~= nil then
-        overridden.zoom = zoomKey
-    end
-
-    return overridden
-end
-
 local function GetBuffSettings()
     local db = GetDB()
     if db and db.buff then
@@ -104,10 +78,10 @@ local function GetBuffSettings()
                 buff.aspectRatioCrop = 1.0  -- square
             end
         end
-        return ApplySquareBuffOverrides(buff)
+        return buff
     end
     -- Return defaults if no DB
-    return ApplySquareBuffOverrides({
+    return {
         enabled = true,
         iconSize = 42,
         borderSize = 2,
@@ -115,7 +89,7 @@ local function GetBuffSettings()
         zoom = 0,
         padding = 0,
         opacity = 1.0,
-    })
+    }
 end
 
 local function GetTrackedBarSettings()
@@ -383,9 +357,15 @@ local function ApplyIconStyle(icon, settings)
     SetupIconOnce(icon)
 
     local size = settings.iconSize or 42
-    local aspectRatio = settings.aspectRatioCrop or 1.0
-    local zoom = settings.zoom or 0
-    local borderSize = settings.borderSize or 2
+    
+    -- Only apply square styling if enabled in settings
+    local profile = SUICore and SUICore.db and SUICore.db.profile
+    local squareIconsEnabled = profile and profile.cooldownManager_squareIcons_BuffIcons or false
+    
+    -- If square icons disabled, use circular aspect ratio (1.0 means circle, not square)
+    local aspectRatio = squareIconsEnabled and (settings.aspectRatioCrop or 1.0) or 1.0
+    local zoom = squareIconsEnabled and (settings.zoom or 0) or 0
+    local borderSize = squareIconsEnabled and (settings.borderSize or 2) or 0
 
     -- Calculate dimensions using crop-based aspect ratio
     local width, height = size, size

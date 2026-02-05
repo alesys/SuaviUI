@@ -886,14 +886,19 @@ end
 ---------------------------------------------------------------------------
 -- WIDGET: SUB-TABS (Horizontal tabs within a page)
 ---------------------------------------------------------------------------
-function GUI:CreateSubTabs(parent, tabs)
+function GUI:CreateSubTabs(parent, tabs, options)
+    options = options or {}
+    local rows = options.rows or 1
+    local perRow = options.perRow or math.ceil(#tabs / rows)
     local container = CreateFrame("Frame", nil, parent)
-    container:SetHeight(L.subTabs.containerHeight)
+    local containerHeight = (rows == 1) and L.subTabs.containerHeight or (L.subTabs.height * rows + L.subTabs.spacing * (rows - 1))
+    container:SetHeight(containerHeight)
     
     local tabButtons = {}
     local tabContents = {}
     local buttonWidth = L.subTabs.defaultWidth
     local spacing = L.subTabs.spacing
+    local contentOffset = (rows == 1) and 30 or (L.subTabs.height * rows + L.subTabs.spacing * (rows - 1) + 6)
     
     for i, tabInfo in ipairs(tabs) do
         -- Tab button
@@ -918,7 +923,7 @@ function GUI:CreateSubTabs(parent, tabs)
         
         -- Content frame for this tab
         local content = CreateFrame("Frame", nil, container)
-        content:SetPoint("TOPLEFT", 0, -30)
+        content:SetPoint("TOPLEFT", 0, -contentOffset)
         content:SetPoint("BOTTOMRIGHT", 0, 0)
         content:Hide()
         content:EnableMouse(false)  -- Container frame - let children handle clicks
@@ -936,29 +941,47 @@ function GUI:CreateSubTabs(parent, tabs)
         local containerWidth = container:GetWidth()
         if containerWidth < 1 then return end  -- Not sized yet
 
-        local separatorSpacing = L.subTabs.separatorSpacing  -- Extra spacing after tabs with isSeparator
-        local availableWidth = containerWidth - (L.space.md * 2)  -- Padding each side
+        if rows == 1 then
+            local separatorSpacing = L.subTabs.separatorSpacing  -- Extra spacing after tabs with isSeparator
+            local availableWidth = containerWidth - (L.space.md * 2)  -- Padding each side
 
-        -- Count separators to account for extra spacing
-        local separatorCount = 0
-        for _, tabInfo in ipairs(tabs) do
-            if tabInfo.isSeparator then separatorCount = separatorCount + 1 end
-        end
+            -- Count separators to account for extra spacing
+            local separatorCount = 0
+            for _, tabInfo in ipairs(tabs) do
+                if tabInfo.isSeparator then separatorCount = separatorCount + 1 end
+            end
 
-        local totalSpacing = (#tabButtons - 1) * spacing + (separatorCount * separatorSpacing)
-        local newButtonWidth = math.floor((availableWidth - totalSpacing) / #tabButtons)
-        newButtonWidth = math.max(newButtonWidth, 50)  -- minimum 50px
+            local totalSpacing = (#tabButtons - 1) * spacing + (separatorCount * separatorSpacing)
+            local newButtonWidth = math.floor((availableWidth - totalSpacing) / #tabButtons)
+            newButtonWidth = math.max(newButtonWidth, 50)  -- minimum 50px
 
-        local xOffset = 10
-        for i, btn in ipairs(tabButtons) do
-            btn:SetWidth(newButtonWidth)
-            btn:ClearAllPoints()
-            btn:SetPoint("TOPLEFT", xOffset, 0)
-            xOffset = xOffset + newButtonWidth + spacing
+            local xOffset = 10
+            for i, btn in ipairs(tabButtons) do
+                btn:SetWidth(newButtonWidth)
+                btn:ClearAllPoints()
+                btn:SetPoint("TOPLEFT", xOffset, 0)
+                xOffset = xOffset + newButtonWidth + spacing
 
-            -- Add extra spacing after separator tabs
-            if tabs[i] and tabs[i].isSeparator then
-                xOffset = xOffset + separatorSpacing
+                -- Add extra spacing after separator tabs
+                if tabs[i] and tabs[i].isSeparator then
+                    xOffset = xOffset + separatorSpacing
+                end
+            end
+        else
+            local availableWidth = containerWidth - (L.space.md * 2)
+            local totalSpacing = (perRow - 1) * spacing
+            local newButtonWidth = math.floor((availableWidth - totalSpacing) / perRow)
+            newButtonWidth = math.max(newButtonWidth, 50)
+
+            for i, btn in ipairs(tabButtons) do
+                local row = math.floor((i - 1) / perRow)
+                local col = (i - 1) % perRow
+                local x = 10 + col * (newButtonWidth + spacing)
+                local y = -row * (L.subTabs.height + spacing)
+
+                btn:SetWidth(newButtonWidth)
+                btn:ClearAllPoints()
+                btn:SetPoint("TOPLEFT", x, y)
             end
         end
     end
@@ -2938,6 +2961,204 @@ function GUI:CreateFormDropdown(parent, label, options, dbKey, dbTable, onChange
         end
     end
 
+    return container
+end
+
+function GUI:CreateFormDropdownWithTexturePreview(parent, label, dbKey, dbTable, onChange)
+    if parent._hasContent ~= nil then parent._hasContent = true end
+    local container = CreateFrame("Frame", nil, parent)
+    container:SetHeight(L.formRowHeight)
+
+    -- Label on left (off-white text)
+    local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    SetFont(text, L.font.normal, "", C.text)
+    text:SetText(label or "Texture")
+    text:SetPoint("LEFT", 0, 0)
+    text:SetPoint("RIGHT", container, "LEFT", 210, 0)
+
+    -- Dropdown button (same style as CreateFormDropdown)
+    local dropdown = CreateFrame("Button", nil, container, "BackdropTemplate")
+    dropdown:SetHeight(L.dropdown.height)
+    dropdown:SetPoint("LEFT", container, "LEFT", L.formControlStart, 0)
+    dropdown:SetPoint("RIGHT", container, "RIGHT", 0, 0)
+    dropdown:SetBackdrop({
+        bgFile = "Interface\\\\Buttons\\\\WHITE8x8",
+        edgeFile = "Interface\\\\Buttons\\\\WHITE8x8",
+        edgeSize = 1,
+    })
+    dropdown:SetBackdropColor(0.08, 0.08, 0.08, 1)
+    dropdown:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
+
+    -- Chevron zone
+    local CHEVRON_ZONE_WIDTH = 22
+    local CHEVRON_BG_ALPHA = 0.15
+    local CHEVRON_BG_ALPHA_HOVER = 0.25
+    local CHEVRON_TEXT_ALPHA = 0.7
+    
+    local chevronZone = CreateFrame("Frame", nil, dropdown, "BackdropTemplate")
+    chevronZone:SetWidth(CHEVRON_ZONE_WIDTH)
+    chevronZone:SetPoint("TOPRIGHT", dropdown, "TOPRIGHT", -1, -1)
+    chevronZone:SetPoint("BOTTOMRIGHT", dropdown, "BOTTOMRIGHT", -1, 1)
+    chevronZone:SetBackdrop({ bgFile = "Interface\\\\Buttons\\\\WHITE8x8" })
+    chevronZone:SetBackdropColor(C.accent[1], C.accent[2], C.accent[3], CHEVRON_BG_ALPHA)
+
+    local separator = chevronZone:CreateTexture(nil, "ARTWORK")
+    separator:SetWidth(1)
+    separator:SetPoint("TOPLEFT", chevronZone, "TOPLEFT", 0, 0)
+    separator:SetPoint("BOTTOMLEFT", chevronZone, "BOTTOMLEFT", 0, 0)
+    separator:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.3)
+
+    local chevronLeft = chevronZone:CreateTexture(nil, "OVERLAY")
+    chevronLeft:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], CHEVRON_TEXT_ALPHA)
+    chevronLeft:SetSize(7, 2)
+    chevronLeft:SetPoint("CENTER", chevronZone, "CENTER", -2, -1)
+    chevronLeft:SetRotation(math.rad(-45))
+
+    local chevronRight = chevronZone:CreateTexture(nil, "OVERLAY")
+    chevronRight:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], CHEVRON_TEXT_ALPHA)
+    chevronRight:SetSize(7, 2)
+    chevronRight:SetPoint("CENTER", chevronZone, "CENTER", 2, -1)
+    chevronRight:SetRotation(math.rad(45))
+
+    -- Selected text
+    dropdown.selected = dropdown:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    SetFont(dropdown.selected, L.font.small, "", C.text)
+    dropdown.selected:SetPoint("LEFT", 8, 0)
+    dropdown.selected:SetPoint("RIGHT", chevronZone, "LEFT", -5, 0)
+    dropdown.selected:SetJustifyH("LEFT")
+    dropdown.selected:SetText(dbTable[dbKey] or "Select...")
+
+    -- Hover effect
+    dropdown:SetScript("OnEnter", function(self)
+        pcall(self.SetBackdropBorderColor, self, unpack(C.accent))
+        chevronZone:SetBackdropColor(C.accent[1], C.accent[2], C.accent[3], CHEVRON_BG_ALPHA_HOVER)
+        separator:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.5)
+        chevronLeft:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 1)
+        chevronRight:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 1)
+    end)
+    dropdown:SetScript("OnLeave", function(self)
+        pcall(self.SetBackdropBorderColor, self, 0.35, 0.35, 0.35, 1)
+        chevronZone:SetBackdropColor(C.accent[1], C.accent[2], C.accent[3], CHEVRON_BG_ALPHA)
+        separator:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.3)
+        chevronLeft:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], CHEVRON_TEXT_ALPHA)
+        chevronRight:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], CHEVRON_TEXT_ALPHA)
+    end)
+
+    -- Menu frame
+    local menuFrame = CreateFrame("Frame", nil, dropdown, "BackdropTemplate")
+    menuFrame:SetPoint("TOPLEFT", dropdown, "BOTTOMLEFT", 0, -2)
+    menuFrame:SetPoint("TOPRIGHT", dropdown, "BOTTOMRIGHT", 0, -2)
+    menuFrame:SetBackdrop({
+        bgFile = "Interface\\\\Buttons\\\\WHITE8x8",
+        edgeFile = "Interface\\\\Buttons\\\\WHITE8x8",
+        edgeSize = 1,
+    })
+    menuFrame:SetBackdropColor(0.1, 0.1, 0.1, 0.98)
+    menuFrame:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+    menuFrame:SetFrameStrata("TOOLTIP")
+    menuFrame:SetClipsChildren(true)
+    menuFrame:Hide()
+
+    -- Scroll frame
+    local scrollFrame = CreateFrame("ScrollFrame", nil, menuFrame)
+    scrollFrame:SetPoint("TOPLEFT", 0, 0)
+    scrollFrame:SetPoint("BOTTOMRIGHT", 0, 0)
+    scrollFrame:EnableMouseWheel(true)
+
+    local scrollContent = CreateFrame("Frame", nil, scrollFrame)
+    scrollContent:SetWidth(menuFrame:GetWidth() or 200)
+    scrollFrame:SetScrollChild(scrollContent)
+    menuFrame.scrollContent = scrollContent
+
+    scrollFrame:SetScript("OnMouseWheel", function(self, delta)
+        local currentScroll = self:GetVerticalScroll()
+        local maxScroll = math.max(0, scrollContent:GetHeight() - menuFrame:GetHeight())
+        local newScroll = currentScroll - (delta * 20)
+        newScroll = math.max(0, math.min(newScroll, maxScroll))
+        self:SetVerticalScroll(newScroll)
+    end)
+
+    menuFrame:SetScript("OnShow", function(self)
+        scrollContent:SetWidth(self:GetWidth() - 2)
+    end)
+
+    -- Build menu with texture previews
+    local function BuildMenu()
+        if not LSM then return end
+
+        -- Clear existing
+        for _, child in ipairs({scrollContent:GetChildren()}) do child:Hide() end
+
+        -- Get and sort textures
+        local textures = LSM:HashTable(LSM.MediaType.STATUSBAR)
+        local sortedTextures = {}
+        for textureName in pairs(textures) do
+            table.insert(sortedTextures, textureName)
+        end
+        table.sort(sortedTextures)
+
+        local yOff = -4
+        local itemHeight = 20
+        local maxVisibleItems = 12
+        local numItems = #sortedTextures
+
+        for i, textureName in ipairs(sortedTextures) do
+            local texturePath = textures[textureName]
+            
+            local btn = CreateFrame("Button", nil, scrollContent)
+            btn:SetHeight(itemHeight)
+            btn:SetPoint("TOPLEFT", 4, yOff)
+            btn:SetPoint("TOPRIGHT", -4, yOff)
+            
+            -- Texture preview background
+            local preview = btn:CreateTexture(nil, "BACKGROUND")
+            preview:SetAllPoints()
+            preview:SetTexture(texturePath)
+            preview:SetAlpha(0.8)
+            
+            -- Text label (on top of texture)
+            local btnText = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            SetFont(btnText, 11, "OUTLINE", C.textBright)
+            btnText:SetText(textureName)
+            btnText:SetPoint("LEFT", 4, 0)
+            btnText:SetShadowColor(0, 0, 0, 1)
+            btnText:SetShadowOffset(1, -1)
+            
+            btn:SetScript("OnClick", function()
+                dbTable[dbKey] = textureName
+                dropdown.selected:SetText(textureName)
+                if onChange then onChange() end
+                menuFrame:Hide()
+            end)
+            btn:SetScript("OnEnter", function()
+                preview:SetAlpha(1)
+                btnText:SetTextColor(1, 1, 0.3, 1)
+            end)
+            btn:SetScript("OnLeave", function()
+                preview:SetAlpha(0.8)
+                btnText:SetTextColor(unpack(C.textBright))
+            end)
+            
+            yOff = yOff - itemHeight
+        end
+
+        local totalHeight = math.abs(yOff) + 4
+        local maxHeight = (maxVisibleItems * itemHeight) + 8
+        scrollContent:SetHeight(totalHeight)
+        menuFrame:SetHeight(math.min(totalHeight, maxHeight))
+    end
+
+    dropdown:SetScript("OnClick", function()
+        if menuFrame:IsShown() then
+            menuFrame:Hide()
+        else
+            BuildMenu()
+            menuFrame:Show()
+        end
+    end)
+
+    container.dropdown = dropdown
+    container.menuFrame = menuFrame
     return container
 end
 

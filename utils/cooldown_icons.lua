@@ -95,17 +95,18 @@ local function ApplySquareStyle(button, viewerSettingName)
 
     button:SetSize(width, width)
 
-    if button.Icon then
-        button.Icon:ClearAllPoints()
-        button.Icon:SetPoint("TOPLEFT", button, "TOPLEFT", -config.paddingFixup / 2, config.paddingFixup / 2)
-        button.Icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", config.paddingFixup / 2, -config.paddingFixup / 2)
+    local iconTexture = button.Icon or button.icon or button.texture or button.Texture
+    if iconTexture then
+        iconTexture:ClearAllPoints()
+        iconTexture:SetPoint("TOPLEFT", button, "TOPLEFT", -config.paddingFixup / 2, config.paddingFixup / 2)
+        iconTexture:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", config.paddingFixup / 2, -config.paddingFixup / 2)
 
         -- Calculate zoom-based texture coordinates
         local zoomKey = "cooldownManager_squareIconsZoom_" .. viewerSettingName
         local zoom = profile[zoomKey] or 0
         local crop = zoom * 0.5
-        if button.Icon.SetTexCoord then
-            button.Icon:SetTexCoord(crop, 1 - crop, crop, 1 - crop)
+        if iconTexture.SetTexCoord then
+            iconTexture:SetTexCoord(crop, 1 - crop, crop, 1 - crop)
         end
     end
 
@@ -166,27 +167,46 @@ local function ApplySquareStyle(button, viewerSettingName)
 end
 
 local function RestoreOriginalStyle(button, viewerSettingName)
-    if not button.suiSquareStyled then
-        return
-    end
+    -- REMOVED EARLY RETURN - always restore to ensure cleanup even if flag not set
+    -- if not button.suiSquareStyled then
+    --     return
+    -- end
 
     local width, height = GetViewerIconSize(viewerSettingName)
     button:SetSize(width, height)
 
-    if button.Icon then
-        button.Icon:ClearAllPoints()
-        button.Icon:SetPoint("CENTER", button, "CENTER", 0, 0)
-        button.Icon:SetSize(width, height)
-        -- Reset texture coordinates
-        if button.Icon.SetTexCoord then
-            button.Icon:SetTexCoord(0, 1, 0, 1)
+    local iconTexture = button.Icon or button.icon or button.texture or button.Texture
+    if iconTexture then
+        iconTexture:ClearAllPoints()
+        iconTexture:SetPoint("CENTER", button, "CENTER", 0, 0)
+        iconTexture:SetSize(width, height)
+
+        -- Fully reset texture coordinates to remove zoom
+        if iconTexture.SetTexCoord then
+            iconTexture:SetTexCoord(0, 1, 0, 1)
+        end
+
+        -- Re-attach any existing mask texture if present on the frame
+        local maskTexture = button.IconMask or button.mask or button.Mask or button.iconMask
+        if maskTexture and iconTexture.AddMaskTexture and iconTexture.GetMaskTexture then
+            local hasMask = false
+            for i = 1, 10 do
+                if iconTexture:GetMaskTexture(i) == maskTexture then
+                    hasMask = true
+                    break
+                end
+            end
+            if not hasMask then
+                iconTexture:AddMaskTexture(maskTexture)
+            end
         end
     end
 
+    -- Restore cooldown swipe to default circular texture
     for i = 1, select("#", button:GetChildren()) do
         local child = select(i, button:GetChildren())
         if child and child.SetSwipeTexture then
-            child:SetSwipeTexture(6707800)
+            child:SetSwipeTexture(6707800)  -- Blizzard default
             child:ClearAllPoints()
             child:SetPoint("CENTER", button, "CENTER", 0, 0)
             child:SetSize(width, height)
@@ -198,7 +218,7 @@ local function RestoreOriginalStyle(button, viewerSettingName)
     for _, region in next, { button:GetRegions() } do
         if region:IsObjectType("Texture") then
             local atlas = region:GetAtlas()
-            if region.__sui_set6707800 then
+            if region.__sui_set6707800 or region:GetTexture() == BASE_SQUARE_MASK then
                 region:SetTexture(6707800)
                 region.__sui_set6707800 = nil
             elseif atlas == "UI-HUD-CoolDownManager-IconOverlay" then
@@ -207,8 +227,10 @@ local function RestoreOriginalStyle(button, viewerSettingName)
         end
     end
 
+    -- Hide square border
     if button.suiSquareBorder then
         button.suiSquareBorder:Hide()
+        button.suiSquareBorder:SetBackdrop(nil)  -- Clear backdrop completely
     end
 
     button.suiSquareStyled = false
@@ -441,7 +463,10 @@ function StyledIcons:OnSettingChanged()
     end
 
     -- Trigger a refresh of the cooldown manager if available
-    if ns.CooldownManager and ns.CooldownManager.ForceRefreshAll then
+    local coordinator = (ns and ns.CooldownCoordinator) or (_G.SuaviUI and _G.SuaviUI.CooldownCoordinator)
+    if coordinator and coordinator.RequestRefresh then
+        coordinator:RequestRefresh("icons", { icons = true, bars = true, essential = true, utility = true }, { delay = 0 })
+    elseif ns.CooldownManager and ns.CooldownManager.ForceRefreshAll then
         ns.CooldownManager.ForceRefreshAll()
     end
 end
@@ -560,7 +585,10 @@ SlashCmdList.SUISTYLEFORCE = function()
         StyledIcons:Enable()
     end
     StyledIcons:RefreshAll()
-    if ns.CooldownManager and ns.CooldownManager.ForceRefreshAll then
+    local coordinator = (ns and ns.CooldownCoordinator) or (_G.SuaviUI and _G.SuaviUI.CooldownCoordinator)
+    if coordinator and coordinator.RequestRefresh then
+        coordinator:RequestRefresh("icons", { icons = true, bars = true, essential = true, utility = true }, { delay = 0 })
+    elseif ns.CooldownManager and ns.CooldownManager.ForceRefreshAll then
         ns.CooldownManager.ForceRefreshAll()
     end
     print("  Done!")

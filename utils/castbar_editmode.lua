@@ -13,6 +13,15 @@ local ADDON_NAME, ns = ...
 local LEM = LibStub("LibEQOLEditMode-1.0", true)
 local LSM = LibStub("LibSharedMedia-3.0", true)
 
+local function IsRotatedOrientation(value)
+    local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
+    local RB = SUICore and SUICore.ResourceBars
+    if RB and RB.IsRotated then
+        return RB.IsRotated(value)
+    end
+    return value == "Vertical" or value == "+90° CW" or value == "+90° CCW"
+end
+
 ---------------------------------------------------------------------------
 -- MODULE TABLE
 ---------------------------------------------------------------------------
@@ -447,6 +456,11 @@ local function BuildCastbarSettings(unitKey)
             -- Initialize texture pool for previews
             dropdown.texturePool = {}
 
+            -- Get texture display names from ResourceBars
+            local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
+            local RB = SUICore and SUICore.ResourceBars
+            local TEXTURE_NAMES = RB and RB.TEXTURE_DISPLAY_NAMES or {}
+
             -- Hook cleanup on menu close
             if not dropdown._CB_Texture_Dropdown_OnMenuClosed_hooked then
                 hooksecurefunc(dropdown, "OnMenuClosed", function()
@@ -482,8 +496,9 @@ local function BuildCastbarSettings(unitKey)
             -- Create button for each texture with preview
             for index, textureName in ipairs(sortedTextures) do
                 local texturePath = textures[textureName]
+                local displayName = TEXTURE_NAMES[textureName] or textureName
 
-                local button = rootDescription:CreateButton(textureName, function()
+                local button = rootDescription:CreateButton(displayName, function()
                     dropdown:SetDefaultText(textureName)
                     settingObject.set(layoutName, textureName)
                 end)
@@ -623,7 +638,7 @@ local function BuildCastbarSettings(unitKey)
         end,
     })
     order = order + 1
-    
+
     -- Width (only visible in Manual mode)
     table.insert(settings, {
         parentId = "CATEGORY_POSITION_" .. unitKey,

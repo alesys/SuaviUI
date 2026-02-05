@@ -4,6 +4,7 @@
     <Script file="constants.lua"/>
     <Script file="sui_debug.lua"/>
     <Script file="backwards.lua"/>
+    <Script file="cooldown_coordinator.lua"/>
     <Script file="cooldownmanager.lua"/>
     <Script file="cooldown_editmode.lua"/>
     <Script file="cooldown_icons.lua"/>

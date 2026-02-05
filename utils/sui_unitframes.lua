@@ -24,6 +24,36 @@ SUI_UF.auraPreviewMode = {}  -- Tracks buff/debuff preview state (keyed by "unit
 -- Reference to castbar module
 local SUI_Castbar = ns.SUI_Castbar
 
+local function GetRotationAngle(orientation)
+    local RB = SUICore and SUICore.ResourceBars
+    if RB and RB.GetRotationAngle then
+        return RB.GetRotationAngle(orientation)
+    end
+    if orientation == "Vertical" or orientation == "+90° CW" then
+        return -math.rad(90)
+    elseif orientation == "+90° CCW" then
+        return math.rad(90)
+    end
+    return 0
+end
+
+local function ApplyStatusBarRotation(statusBar, angle)
+    if not statusBar then return end
+    angle = angle or 0
+    statusBar:SetOrientation("HORIZONTAL")
+    local tex = statusBar.GetStatusBarTexture and statusBar:GetStatusBarTexture()
+    if tex and tex.SetRotation then
+        tex:SetRotation(angle)
+    end
+end
+
+local function ApplyFontRotation(fontString, angle)
+    angle = angle or 0
+    if fontString and fontString.SetRotation then
+        fontString:SetRotation(angle)
+    end
+end
+
 -- Edit Mode: Slider registry for real-time sync during drag
 -- Format: { unitKey = { x = sliderRef, y = sliderRef, coordText = fontStringRef } }
 SUI_UF.editModeSliders = {}
@@ -620,6 +650,8 @@ end
 local function UpdateHealth(frame)
     if not frame or not frame.unit or not frame.healthBar then return end
     local unit = frame.unit
+    local settings = GetUnitSettings(frame.unitKey) or {}
+    local angle = GetRotationAngle(settings.orientation)
     
     -- Don't update if unit doesn't exist
     if not UnitExists(unit) then
@@ -721,15 +753,7 @@ local function UpdateAbsorbs(frame)
     if not frame.absorbBar then return end
 
     local unit = frame.unit
-    local settings = GetUnitSettings(frame.unitKey)
-
-    -- Check if enabled
-    if not settings or not settings.absorbs or settings.absorbs.enabled == false then
-        frame.absorbBar:Hide()
-        if frame.absorbOverflowBar then frame.absorbOverflowBar:Hide() end
-        if frame.healAbsorbBar then frame.healAbsorbBar:Hide() end
-        return
-    end
+    local settings = GetUnitSettings(frame.unitKey) or {}
 
     if not UnitExists(unit) then
         frame.absorbBar:Hide()
@@ -766,6 +790,14 @@ local function UpdateAbsorbs(frame)
         frame.absorbBar:Hide()
         if frame.absorbOverflowBar then frame.absorbOverflowBar:Hide() end
         return
+    end
+
+    ApplyStatusBarRotation(frame.absorbBar, angle)
+    if frame.absorbOverflowBar then
+        ApplyStatusBarRotation(frame.absorbOverflowBar, angle)
+    end
+    if frame.healAbsorbBar then
+        ApplyStatusBarRotation(frame.healAbsorbBar, angle)
     end
 
     -- For secret values OR non-zero absorbs, proceed with display
@@ -1330,6 +1362,32 @@ local function UpdateFrame(frame)
             local r, g, b, a = GetHealthBarColor(frame.unit, settings)
             frame.healthBar:SetStatusBarColor(r, g, b, a)
         end
+        
+        -- Apply rotation-based orientation (can change dynamically)
+        if settings then
+            local angle = GetRotationAngle(settings.orientation)
+            ApplyStatusBarRotation(frame.healthBar, angle)
+
+            if frame.powerBar then
+                ApplyStatusBarRotation(frame.powerBar, angle)
+            end
+
+            if frame.absorbBar then
+                ApplyStatusBarRotation(frame.absorbBar, angle)
+            end
+
+            if frame.absorbOverflowBar then
+                ApplyStatusBarRotation(frame.absorbOverflowBar, angle)
+            end
+
+            if frame.healAbsorbBar then
+                ApplyStatusBarRotation(frame.healAbsorbBar, angle)
+            end
+
+            ApplyFontRotation(frame.healthText, angle)
+            ApplyFontRotation(frame.powerText, angle)
+            ApplyFontRotation(frame.nameText, angle)
+        end
     end
 
     UpdateHealth(frame)
@@ -1433,6 +1491,11 @@ local function CreateBossFrame(unit, frameKey, bossIndex)
     healthBar:SetMinMaxValues(0, 100)
     healthBar:SetValue(100)
     healthBar:EnableMouse(false)
+    
+    -- Apply rotation-based orientation
+    local angle = GetRotationAngle(settings.orientation)
+    ApplyStatusBarRotation(healthBar, angle)
+    
     frame.healthBar = healthBar
 
     -- Absorb bar (StatusBar handles secret values via SetValue)
@@ -1489,6 +1552,10 @@ local function CreateBossFrame(unit, frameKey, bossIndex)
         powerBar:SetMinMaxValues(0, 100)
         powerBar:SetValue(100)
         powerBar:EnableMouse(false)
+        
+        -- Apply rotation-based orientation
+        ApplyStatusBarRotation(powerBar, angle)
+        
         frame.powerBar = powerBar
 
         -- Power bar separator (1px black line above power bar)
@@ -1734,6 +1801,11 @@ local function CreateUnitFrame(unit, unitKey)
     healthBar:SetMinMaxValues(0, 100)
     healthBar:SetValue(100)
     healthBar:EnableMouse(false)
+    
+    -- Apply rotation-based orientation
+    local angle = GetRotationAngle(settings.orientation)
+    ApplyStatusBarRotation(healthBar, angle)
+    
     frame.healthBar = healthBar
 
     -- Absorb bar (StatusBar handles secret values via SetValue)
@@ -1791,6 +1863,10 @@ local function CreateUnitFrame(unit, unitKey)
         local powerColor = settings.powerBarColor or { 0, 0.5, 1, 1 }
         powerBar:SetStatusBarColor(powerColor[1], powerColor[2], powerColor[3], powerColor[4] or 1)
         powerBar:EnableMouse(false)
+        
+        -- Apply rotation-based orientation
+        ApplyStatusBarRotation(powerBar, angle)
+        
         frame.powerBar = powerBar
 
         -- Power bar separator (1px black line above power bar)

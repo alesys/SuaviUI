@@ -5,6 +5,16 @@ local LSM = RB.LSM
 local LEM = RB.LEM
 local L = RB.L
 
+local function GetRotationAngle(orientation)
+    if RB and RB.GetRotationAngle then
+        return RB.GetRotationAngle(orientation)
+    end
+    if orientation == "Vertical" then
+        return -math.rad(90)
+    end
+    return 0
+end
+
 ------------------------------------------------------------
 -- BAR MIXIN - BASE FOR ALL RESOURCE BARS
 ------------------------------------------------------------
@@ -433,8 +443,16 @@ function BarMixin:ApplyTextVisibilitySettings(layoutName, data)
 
     self.TextFrame:SetShown(data.showText ~= false)
 
+    local angle = GetRotationAngle(data.orientation)
+    if self.TextValue.SetRotation then
+        self.TextValue:SetRotation(angle)
+    end
+
     for _, fragmentedPowerBarText in ipairs(self.FragmentedPowerBarTexts) do
         fragmentedPowerBarText:SetShown(data.showFragmentedPowerBarText ~= false)
+        if fragmentedPowerBarText.SetRotation then
+            fragmentedPowerBarText:SetRotation(angle)
+        end
     end
 end
 
@@ -580,6 +598,7 @@ function BarMixin:ApplyLayout(layoutName, force)
     self:ApplyMaskAndBorderSettings(layoutName, data)
     self:ApplyForegroundSettings(layoutName, data)
     self:ApplyBackgroundSettings(layoutName, data)
+    self:ApplyRotationSettings(layoutName, data)
 
     self:UpdateTicksLayout(layoutName, data)
 
@@ -656,29 +675,55 @@ function BarMixin:ApplyFillDirectionSettings(layoutName, data)
     data = data or self:GetData(layoutName)
     if not data then return end
 
-    if data.fillDirection == "Top to Bottom" or data.fillDirection == "Bottom to Top" then
-        self.StatusBar:SetOrientation("VERTICAL")
-    else
-        self.StatusBar:SetOrientation("HORIZONTAL")
-    end
+    -- Rotation-based orientation keeps status bars horizontal
+    self.StatusBar:SetOrientation("HORIZONTAL")
 
+    -- Set reverse fill based on direction
     if data.fillDirection == "Right to Left" or data.fillDirection == "Top to Bottom" then
         self.StatusBar:SetReverseFill(true)
     else
         self.StatusBar:SetReverseFill(false)
     end
 
+    -- Apply orientation to fragmented power bars
     for _, fragmentedPowerBar in ipairs(self.FragmentedPowerBars) do
-        if data.fillDirection == "Top to Bottom" or data.fillDirection == "Bottom to Top" then
-            fragmentedPowerBar:SetOrientation("VERTICAL")
-        else
-            fragmentedPowerBar:SetOrientation("HORIZONTAL")
-        end
+        fragmentedPowerBar:SetOrientation("HORIZONTAL")
 
         if data.fillDirection == "Right to Left" or data.fillDirection == "Top to Bottom" then
             fragmentedPowerBar:SetReverseFill(true)
         else
             fragmentedPowerBar:SetReverseFill(false)
+        end
+    end
+end
+
+function BarMixin:ApplyRotationSettings(layoutName, data)
+    data = data or self:GetData(layoutName)
+    if not data then return end
+
+    local angle = GetRotationAngle(data.orientation)
+
+    local statusTex = self.StatusBar and self.StatusBar.GetStatusBarTexture and self.StatusBar:GetStatusBarTexture()
+    if statusTex and statusTex.SetRotation then
+        statusTex:SetRotation(angle)
+    end
+
+    if self.Background and self.Background.SetRotation then
+        self.Background:SetRotation(angle)
+    end
+
+    if self.Border and self.Border.SetRotation then
+        self.Border:SetRotation(angle)
+    end
+
+    if self.Mask and self.Mask.SetRotation then
+        self.Mask:SetRotation(angle)
+    end
+
+    for _, fragmentedPowerBar in ipairs(self.FragmentedPowerBars) do
+        local barTex = fragmentedPowerBar and fragmentedPowerBar.GetStatusBarTexture and fragmentedPowerBar:GetStatusBarTexture()
+        if barTex and barTex.SetRotation then
+            barTex:SetRotation(angle)
         end
     end
 end
@@ -694,7 +739,8 @@ function BarMixin:ApplyMaskAndBorderSettings(layoutName, data)
     if not style then return end
 
     local width, height = self.StatusBar:GetSize()
-    local verticalOrientation = self.StatusBar:GetOrientation() == "VERTICAL"
+    local angle = GetRotationAngle(data.orientation)
+    local rotated = angle ~= 0
 
     if self.Mask then
         self.StatusBar:GetStatusBarTexture():RemoveMaskTexture(self.Mask)
@@ -706,8 +752,8 @@ function BarMixin:ApplyMaskAndBorderSettings(layoutName, data)
 
     self.Mask:SetTexture(style.mask or [[Interface\AddOns\SuaviUI\assets\textures\white.png]])
     self.Mask:SetPoint("CENTER", self.StatusBar, "CENTER")
-    self.Mask:SetSize(verticalOrientation and height or width, verticalOrientation and width or height)
-    self.Mask:SetRotation(verticalOrientation and math.rad(90) or 0)
+    self.Mask:SetSize(rotated and height or width, rotated and width or height)
+    self.Mask:SetRotation(angle)
 
     self.StatusBar:GetStatusBarTexture():AddMaskTexture(self.Mask)
     self.Background:AddMaskTexture(self.Mask)
@@ -749,6 +795,9 @@ function BarMixin:ApplyMaskAndBorderSettings(layoutName, data)
             else
                 t:SetWidth(pThickness)
             end
+            if t.SetRotation then
+                t:SetRotation(angle)
+            end
             t:Show()
         end
     elseif style.type == "texture" then
@@ -756,8 +805,8 @@ function BarMixin:ApplyMaskAndBorderSettings(layoutName, data)
         self.Border:SetTexture(style.border)
         self.Border:ClearAllPoints()
         self.Border:SetPoint("CENTER", self.StatusBar, "CENTER")
-        self.Border:SetSize(verticalOrientation and height or width, verticalOrientation and width or height)
-        self.Border:SetRotation(verticalOrientation and math.rad(90) or 0)
+        self.Border:SetSize(rotated and height or width, rotated and width or height)
+        self.Border:SetRotation(angle)
 
         local borderColor = data.borderColor or defaults.borderColor
         self.Border:SetVertexColor(borderColor.r or 0, borderColor.g or 0, borderColor.b or 0, borderColor.a or 1)
@@ -931,7 +980,7 @@ function BarMixin:UpdateTicksLayout(layoutName, data)
         end
         t:SetColorTexture(tickColor.r or 0, tickColor.g or 0, tickColor.b or 0, tickColor.a or 1)
         t:ClearAllPoints()
-        if self.StatusBar:GetOrientation() == "VERTICAL" then
+        if RB.IsRotated(data.orientation) then
             local rawY = (i / max) * height
             local snappedY = RB.rounded(rawY / ppScale) * ppScale
             t:SetSize(width, pThickness)
@@ -1041,7 +1090,7 @@ function BarMixin:UpdateFragmentedPowerDisplay(layoutName, data, maxPower)
 
             if cpFrame then
                 cpFrame:ClearAllPoints()
-                if self.StatusBar:GetOrientation() == "VERTICAL" then
+                if RB.IsRotated(data.orientation) then
                     cpFrame:SetSize(barWidth, fragmentedBarHeight)
                     cpFrame:SetPoint("BOTTOM", self.Frame, "BOTTOM", 0, (pos - 1) * fragmentedBarHeight)
                 else
@@ -1124,7 +1173,7 @@ function BarMixin:UpdateFragmentedPowerDisplay(layoutName, data, maxPower)
 
             if essFrame then
                 essFrame:ClearAllPoints()
-                if self.StatusBar:GetOrientation() == "VERTICAL" then
+                if RB.IsRotated(data.orientation) then
                     essFrame:SetSize(barWidth, fragmentedBarHeight)
                     essFrame:SetPoint("BOTTOM", self.Frame, "BOTTOM", 0, (pos - 1) * fragmentedBarHeight)
                 else
@@ -1229,7 +1278,7 @@ function BarMixin:UpdateFragmentedPowerDisplay(layoutName, data, maxPower)
             if runeFrame then
                 runeFrame:ClearAllPoints()
 
-                if self.StatusBar:GetOrientation() == "VERTICAL" then
+                if RB.IsRotated(data.orientation) then
                     runeFrame:SetSize(barWidth, fragmentedBarHeight)
                     runeFrame:SetPoint("BOTTOM", self.Frame, "BOTTOM", 0, (pos - 1) * fragmentedBarHeight)
                 else
@@ -1281,7 +1330,7 @@ function BarMixin:UpdateFragmentedPowerDisplay(layoutName, data, maxPower)
 
             if mwFrame then
                 mwFrame:ClearAllPoints()
-                if self.StatusBar:GetOrientation() == "VERTICAL" then
+                if RB.IsRotated(data.orientation) then
                     mwFrame:SetSize(barWidth, fragmentedBarHeight)
                     mwFrame:SetPoint("BOTTOM", self.Frame, "BOTTOM", 0, (pos - 1) * fragmentedBarHeight)
                 else

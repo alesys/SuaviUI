@@ -520,6 +520,12 @@ local function ApplyExtraButtonSettings(buttonType)
             if buttonType == "extraActionButton" then
                 -- Use HasExtraActionBar() API to check if there's actually an extra action
                 hasContent = HasExtraActionBar and HasExtraActionBar()
+                if hasContent and ExtraActionBarFrame and ExtraActionBarFrame.button and ExtraActionBarFrame.button.action then
+                    local actionType = GetActionInfo and GetActionInfo(ExtraActionBarFrame.button.action)
+                    if not actionType then
+                        hasContent = false
+                    end
+                end
             elseif buttonType == "zoneAbility" then
                 -- Zone ability: check if there are any active buttons in the container
                 if ZoneAbilityFrame and ZoneAbilityFrame.SpellButtonContainer then
@@ -547,6 +553,12 @@ local function ApplyExtraButtonSettings(buttonType)
                 local hasContent = false
                 if buttonType == "extraActionButton" then
                     hasContent = HasExtraActionBar and HasExtraActionBar()
+                    if hasContent and ExtraActionBarFrame and ExtraActionBarFrame.button and ExtraActionBarFrame.button.action then
+                        local actionType = GetActionInfo and GetActionInfo(ExtraActionBarFrame.button.action)
+                        if not actionType then
+                            hasContent = false
+                        end
+                    end
                 elseif buttonType == "zoneAbility" then
                     -- Check if there are any active buttons in the container
                     if ZoneAbilityFrame and ZoneAbilityFrame.SpellButtonContainer then

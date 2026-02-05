@@ -38,6 +38,19 @@ local function GetFontOutline()
     return helpers and helpers.GetFontOutline and helpers.GetFontOutline() or "OUTLINE"
 end
 
+local function GetRotationAngle(orientation)
+    local RB = ns.Addon and ns.Addon.ResourceBars
+    if RB and RB.GetRotationAngle then
+        return RB.GetRotationAngle(orientation)
+    end
+    if orientation == "Vertical" or orientation == "+90° CW" then
+        return -math.rad(90)
+    elseif orientation == "+90° CCW" then
+        return math.rad(90)
+    end
+    return 0
+end
+
 local function GetTexturePath(textureName)
     local helpers = ns.CastbarHelpers
     return helpers and helpers.GetTexturePath and helpers.GetTexturePath(textureName) or "Interface\\Buttons\\WHITE8x8"
@@ -374,7 +387,31 @@ function CastbarMixin:ApplyStatusBarLayout(settings, barHeight, iconSize, iconSc
     local statusBar = self.statusBar
     if not statusBar then return end
     
+    -- Rotation-based orientation (default to horizontal for backward compatibility)
+    local angle = GetRotationAngle(settings.orientation)
+
+    statusBar:SetOrientation("HORIZONTAL")
     statusBar:SetHeight(barHeight)
+
+    local statusTex = statusBar.GetStatusBarTexture and statusBar:GetStatusBarTexture()
+    if statusTex and statusTex.SetRotation then
+        statusTex:SetRotation(angle)
+    end
+
+    if self.bgBar and self.bgBar.SetRotation then
+        self.bgBar:SetRotation(angle)
+    end
+
+    if self.spellText and self.spellText.SetRotation then
+        self.spellText:SetRotation(angle)
+    end
+    if self.timeText and self.timeText.SetRotation then
+        self.timeText:SetRotation(angle)
+    end
+    if self.empoweredLevelText and self.empoweredLevelText.SetRotation then
+        self.empoweredLevelText:SetRotation(angle)
+    end
+    
     statusBar:ClearAllPoints()
     
     local showIcon = settings.showIcon == true

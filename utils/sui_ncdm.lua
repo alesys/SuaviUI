@@ -586,6 +586,11 @@ local function LayoutViewer(viewerName, trackerKey)
     local viewer = _G[viewerName]
     if not viewer then return end
 
+    -- Avoid fighting CMC during coordinated refresh
+    if _G.SuaviUI_CooldownRefreshInProgress and _G.SuaviUI_CooldownRefreshPhase == "cmc" then
+        return
+    end
+
     -- Skip layout entirely if viewer is being dragged in EditMode
     -- This prevents interference with Blizzard's snap calculations
     if viewer.isDragging or viewer.isEditing then return end
@@ -609,7 +614,15 @@ local function LayoutViewer(viewerName, trackerKey)
     end
 
     -- Check for vertical layout mode
-    local layoutDirection = settings.layoutDirection or "HORIZONTAL"
+    -- Respect Edit Mode's isHorizontal setting if available, otherwise use NCDM's layoutDirection
+    local layoutDirection
+    if viewer.isHorizontal ~= nil then
+        -- Edit Mode is controlling orientation - respect it
+        layoutDirection = viewer.isHorizontal and "HORIZONTAL" or "VERTICAL"
+    else
+        -- No Edit Mode setting - use NCDM's own setting
+        layoutDirection = settings.layoutDirection or "HORIZONTAL"
+    end
     local isVertical = (layoutDirection == "VERTICAL")
 
     -- Store layout direction on viewer for power bar snap detection
@@ -1090,6 +1103,9 @@ local function HookViewer(viewerName, trackerKey)
 
     -- Step 5: OnSizeChanged hook - increment layout counter
     viewer:HookScript("OnSizeChanged", function(self, width, height)
+        if _G.SuaviUI_CooldownRefreshInProgress and _G.SuaviUI_CooldownRefreshPhase == "cmc" then
+            return
+        end
         -- Ignore size changes during our own layout to prevent loops
         if self.__cdmLayoutSuppressed or self.__cdmLayoutRunning then
             return
@@ -1352,7 +1368,16 @@ local function ApplyUtilityAnchor()
     utilViewer.__cdmAnchoredToEssential = true
 end
 
-_G.SuaviUI_RefreshNCDM = RefreshAll
+local function RequestNCDMRefresh()
+    local coordinator = (ns and ns.CooldownCoordinator) or (_G.SuaviUI and _G.SuaviUI.CooldownCoordinator)
+    if coordinator and coordinator.RequestRefresh then
+        coordinator:RequestRefresh("ncdm", { essential = true, utility = true }, { delay = 0 })
+        return
+    end
+    RefreshAll()
+end
+
+_G.SuaviUI_RefreshNCDM = RequestNCDMRefresh
 _G.SuaviUI_IncrementNCDMVersion = IncrementSettingsVersion
 _G.SuaviUI_ApplyUtilityAnchor = ApplyUtilityAnchor
 

@@ -256,8 +256,8 @@ local function BuildLemSettings(bar, defaults)
         },
         {
             parentId = L["CATEGORY_POSITION_AND_SIZE"],
-            order = 212,
-            name = L["WIDTH_MODE"],
+            order = 211,
+            name = L["SIZE_MODE"],
             kind = LEM.SettingType.Dropdown,
             default = defaults.widthMode,
             useOldStyle = true,
@@ -465,8 +465,9 @@ local function BuildLemSettings(bar, defaults)
 
                 for index, textureName in ipairs(sortedTextures) do
                     local texturePath = textures[textureName]
+                    local displayName = RB.TEXTURE_DISPLAY_NAMES[textureName] or textureName
 
-                    local button = rootDescription:CreateButton(textureName, function()
+                    local button = rootDescription:CreateButton(displayName, function()
                         dropdown:SetDefaultText(textureName)
                         settingObject.set(layoutName, textureName)
                     end)
@@ -540,8 +541,9 @@ local function BuildLemSettings(bar, defaults)
 
                 for index, textureName in ipairs(sortedTextures) do
                     local texturePath = textures[textureName]
+                    local displayName = RB.TEXTURE_DISPLAY_NAMES[textureName] or textureName
 
-                    local button = rootDescription:CreateButton(textureName, function()
+                    local button = rootDescription:CreateButton(displayName, function()
                         dropdown:SetDefaultText(textureName)
                         settingObject.set(layoutName, textureName)
                     end)

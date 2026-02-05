@@ -31,6 +31,23 @@ local function GetSetting(key, default)
     return profile[key]
 end
 
+local function GetCoordinator()
+    return (ns and ns.CooldownCoordinator) or (_G.SuaviUI and _G.SuaviUI.CooldownCoordinator)
+end
+
+local function RequestCoordinatedRefresh(parts, source, opts)
+    local coordinator = GetCoordinator()
+    if coordinator and coordinator.RequestRefresh then
+        coordinator:RequestRefresh(source or "cmc", parts, opts)
+        return true
+    end
+    return false
+end
+
+local function IsCoordinatorInProgress()
+    return _G.SuaviUI_CooldownRefreshInProgress
+end
+
 local function UpdateRuntime()
     if Runtime.isInEditMode or Runtime.hasSettingsOpened then
         Runtime.stop = true
@@ -751,46 +768,64 @@ EventHandler.frame:SetScript("OnEvent", function(_, event, arg1)
             CooldownManager.HookViewerRefreshLayout()
         end
         C_Timer.After(0, function()
-            CooldownManager.ForceRefreshAll()
+            if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
+                CooldownManager.ForceRefreshAll()
+            end
         end)
         return
     end
     local parts = EventHandler.EventRefreshMap[event]
     if event == "PLAYER_REGEN_DISABLED" then
         C_Timer.After(0, function()
-            CooldownManager.ForceRefreshAll()
+            if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
+                CooldownManager.ForceRefreshAll()
+            end
         end)
         return
     end
     if event == "SPELL_UPDATE_COOLDOWN" and GetSetting("cooldownManager_utility_dimWhenNotOnCD", false) then
         C_Timer.After(0, function()
-            CooldownManager.ForceRefresh({ utility = true })
+            if not RequestCoordinatedRefresh({ utility = true }, "cmc", { delay = 0 }) then
+                CooldownManager.ForceRefresh({ utility = true })
+            end
         end)
         return
     end
     if parts then
-        CooldownManager.ForceRefresh(parts)
+        if not RequestCoordinatedRefresh(parts, "cmc", { delay = 0 }) then
+            CooldownManager.ForceRefresh(parts)
+        end
     else
-        CooldownManager.ForceRefreshAll()
+        if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
+            CooldownManager.ForceRefreshAll()
+        end
     end
 end)
 
 if EventRegistry then
     EventRegistry:RegisterCallback("CooldownViewerSettings.OnDataChanged", function()
         PrintDebug("CooldownViewerSettings.OnDataChanged triggered refresh")
-        CooldownManager.ForceRefreshAll("CooldownViewerSettings.OnDataChanged")
+        if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
+            CooldownManager.ForceRefreshAll("CooldownViewerSettings.OnDataChanged")
+        end
     end)
     EventRegistry:RegisterCallback("CooldownViewerSettings.OnShow", function()
         PrintDebug("CooldownViewerSettings.OnShow triggered refresh")
-        CooldownManager.ForceRefreshAll("CooldownViewerSettings.OnShow")
+        if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
+            CooldownManager.ForceRefreshAll("CooldownViewerSettings.OnShow")
+        end
     end)
     EventRegistry:RegisterCallback("CooldownViewerSettings.OnHide", function()
         PrintDebug("CooldownViewerSettings.OnHide triggered refresh")
-        CooldownManager.ForceRefreshAll("CooldownViewerSettings.OnHide")
+        if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
+            CooldownManager.ForceRefreshAll("CooldownViewerSettings.OnHide")
+        end
     end)
 
     EventRegistry:RegisterCallback("EditMode.Exit", function()
-        CooldownManager.ForceRefreshAll()
+        if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
+            CooldownManager.ForceRefreshAll()
+        end
     end)
 end
 
@@ -806,14 +841,24 @@ function CooldownManager.HookViewerRefreshLayout()
         if v and v.RefreshLayout and not v.__suiCMCRefreshHooked then
             v.__suiCMCRefreshHooked = true
             hooksecurefunc(v, "RefreshLayout", function()
+                if IsCoordinatorInProgress() then
+                    return
+                end
                 -- Wrap in pcall to prevent affecting Blizzard's Edit Mode flow
                 -- which can trigger EncounterWarnings bugs
                 pcall(function()
-                    CooldownManager.ForceRefresh(viewerReasonPartsMap[n])
+                    if not RequestCoordinatedRefresh(viewerReasonPartsMap[n], "cmc", { delay = 0 }) then
+                        CooldownManager.ForceRefresh(viewerReasonPartsMap[n])
+                    end
                 end)
                 C_Timer.After(0, function()
+                    if IsCoordinatorInProgress() then
+                        return
+                    end
                     pcall(function()
-                        CooldownManager.ForceRefresh(viewerReasonPartsMap[n])
+                        if not RequestCoordinatedRefresh(viewerReasonPartsMap[n], "cmc", { delay = 0 }) then
+                            CooldownManager.ForceRefresh(viewerReasonPartsMap[n])
+                        end
                     end)
                 end)
             end)
@@ -824,7 +869,9 @@ end
 function CooldownManager.Initialize()
     RefreshViewerRefs()
     CooldownManager.HookViewerRefreshLayout()
-    CooldownManager.ForceRefreshAll()
+    if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
+        CooldownManager.ForceRefreshAll()
+    end
 end
 
 C_Timer.After(0, function()

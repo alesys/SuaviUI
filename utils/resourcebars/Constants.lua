@@ -56,6 +56,7 @@ RB.commonDefaults = {
     hideWhileMountedOrVehicule = false,
     barStrata = "MEDIUM",
     scale = 1,
+    orientation = "Normal",
     width = 200,
     minWidth = 0,
     widthMode = "Manual",
@@ -227,6 +228,69 @@ RB.availableWidthModes = {
     { text = RB.WIDTH_MODE.SYNC_TRACKED_BUFFS },
 }
 
+-- ORIENTATION CONSTANTS
+------------------------------------------------------------
+RB.ORIENTATION = {
+    NORMAL = "Normal",
+    CW = "+90° CW",
+    CCW = "+90° CCW",
+}
+
+RB.availableOrientations = {
+    { text = RB.ORIENTATION.NORMAL },
+    { text = RB.ORIENTATION.CW },
+    { text = RB.ORIENTATION.CCW },
+}
+
+-- Rotation helpers (backward compatible with old Horizontal/Vertical values)
+function RB.GetRotationAngle(orientation)
+    if orientation == RB.ORIENTATION.CW or orientation == "Vertical" then
+        return -math.rad(90)
+    elseif orientation == RB.ORIENTATION.CCW then
+        return math.rad(90)
+    end
+    return 0
+end
+
+function RB.IsRotated(orientation)
+    return RB.GetRotationAngle(orientation) ~= 0
+end
+
+-- Texture name mapping for display labels (LSM key → display name)
+-- This maps the actual texture names registered in LibSharedMedia to user-friendly display names
+RB.TEXTURE_DISPLAY_NAMES = {
+    -- Main Suavi gradient textures
+    ["Suavitex"] = "Pink Fadein Gradient",
+    ["Suavitex Reverse"] = "Pink Fadeout Gradient",
+    ["Suavitex v2"] = "Fadein Gradient",
+    ["Suavitex v2 Reverse"] = "Fadeout Gradient",
+    ["Suavitex v3"] = "Top Fade Gradient",
+    ["Suavitex v3 Inverse"] = "Bottom Fade Gradient",
+    
+    -- Fade textures
+    ["Suavifade Left"] = "Fade Left",
+    ["Suavifade Bottom"] = "Fade Bottom",
+    ["Suavifade Top"] = "Fade Top",
+    
+    -- Solid and stripes
+    ["Suavisolid"] = "Square",
+    ["Suavistripes"] = "Thin Stripes",
+    ["None"] = "Transparent",
+    
+    -- Line textures
+    ["Suavilinea"] = "Central Light Stripe",
+    ["Suavilineas"] = "Light Stripes",
+    ["Suavilineas2"] = "Light Stripes v2",
+    
+    -- Diagonal patterns
+    ["Suavidiag1"] = "Ascending Stripes",
+    ["Suavidiag2"] = "Descending Stripes",
+    
+    -- Custom textures
+    ["DJ"] = "Smooth DJ",
+    ["Suavihorde Left"] = "Horde Left",
+}
+
 RB.availableFillDirections = {
     { text = "Left to Right" },
     { text = "Right to Left" },
@@ -377,7 +441,8 @@ RB.L = {
     ["ANCHOR_POINT"] = "Anchor Point",
     ["RELATIVE_POINT"] = "Relative Point",
     ["BAR_SIZE"] = "Bar Scale",
-    ["WIDTH_MODE"] = "Width Mode",
+    ["ORIENTATION"] = "Orientation",
+    ["SIZE_MODE"] = "Size Mode",
     ["WIDTH"] = "Width",
     ["MINIMUM_WIDTH"] = "Minimum Width",
     ["MINIMUM_WIDTH_TOOLTIP"] = "Minimum width when syncing with another frame",

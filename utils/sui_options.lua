@@ -2768,7 +2768,7 @@ local function CreateGeneralQoLPage(parent)
         {name = "Tooltip", builder = BuildTooltipTab},
         {name = "Character Pane", builder = BuildCharacterPaneTab},
         {name = "Dragonriding", builder = BuildDragonridingTab},
-    })
+    }, { rows = 2, perRow = 4 })
     subTabs:SetPoint("TOPLEFT", 5, -5)
     subTabs:SetPoint("TOPRIGHT", -5, -5)
     subTabs:SetHeight(600)
@@ -5235,7 +5235,7 @@ local function CreateCooldownViewersPage(parent)
     local FORM_ROW = 30
 
     -- Set search context for auto-registration
-    GUI:SetSearchContext({tabIndex = 8, tabName = "CDM Styles"})
+    GUI:SetSearchContext({tabIndex = 8, tabName = "CDM Settings"})
 
     -- Refresh functions
     local function RefreshIcons()
@@ -5249,7 +5249,13 @@ local function CreateCooldownViewersPage(parent)
                 SUI.StyledIcons:ApplyNormalizedSize()
             end
         end
-        
+
+        local coordinator = (SUI and SUI.CooldownCoordinator) or (_G.SuaviUI and _G.SuaviUI.CooldownCoordinator)
+        if coordinator and coordinator.RequestRefresh then
+            coordinator:RequestRefresh("options", { icons = true, bars = true, essential = true, utility = true }, { delay = 0 })
+            return
+        end
+
         -- Force the viewer frames to refresh their layout immediately
         -- Wrap in pcall to avoid Blizzard EditMode bugs
         local viewers = {
@@ -5262,7 +5268,7 @@ local function CreateCooldownViewersPage(parent)
                 pcall(viewer.RefreshLayout, viewer)
             end
         end
-        
+
         -- Also call ForceRefreshAll for centering
         if SUI and SUI.CooldownManager and SUI.CooldownManager.ForceRefreshAll then
             SUI.CooldownManager.ForceRefreshAll()
@@ -5273,15 +5279,23 @@ local function CreateCooldownViewersPage(parent)
     if not db.cooldownManager_squareIcons_Essential then
         if not db.cooldownManager_squareIcons_Essential then db.cooldownManager_squareIcons_Essential = false end
         if not db.cooldownManager_squareIconsBorder_Essential then db.cooldownManager_squareIconsBorder_Essential = 4 end
+        if not db.cooldownManager_squareIconsBorder_Essential_Overlap then db.cooldownManager_squareIconsBorder_Essential_Overlap = false end
         if not db.cooldownManager_squareIconsZoom_Essential then db.cooldownManager_squareIconsZoom_Essential = 0 end
         if not db.cooldownManager_squareIcons_Utility then db.cooldownManager_squareIcons_Utility = false end
         if not db.cooldownManager_squareIconsBorder_Utility then db.cooldownManager_squareIconsBorder_Utility = 4 end
+        if not db.cooldownManager_squareIconsBorder_Utility_Overlap then db.cooldownManager_squareIconsBorder_Utility_Overlap = false end
         if not db.cooldownManager_squareIconsZoom_Utility then db.cooldownManager_squareIconsZoom_Utility = 0 end
         if not db.cooldownManager_squareIcons_BuffIcons then db.cooldownManager_squareIcons_BuffIcons = false end
         if not db.cooldownManager_squareIconsBorder_BuffIcons then db.cooldownManager_squareIconsBorder_BuffIcons = 4 end
+        if not db.cooldownManager_squareIconsBorder_BuffIcons_Overlap then db.cooldownManager_squareIconsBorder_BuffIcons_Overlap = false end
         if not db.cooldownManager_squareIconsZoom_BuffIcons then db.cooldownManager_squareIconsZoom_BuffIcons = 0 end
         if not db.cooldownManager_utility_dimWhenNotOnCD then db.cooldownManager_utility_dimWhenNotOnCD = false end
         if not db.cooldownManager_utility_dimOpacity then db.cooldownManager_utility_dimOpacity = 0.3 end
+        if not db.cooldownManager_alignBuffIcons_growFromDirection then db.cooldownManager_alignBuffIcons_growFromDirection = "Disable" end
+        if not db.cooldownManager_alignBuffBars_growFromDirection then db.cooldownManager_alignBuffBars_growFromDirection = "Disable" end
+        if not db.cooldownManager_centerEssential_growFromDirection then db.cooldownManager_centerEssential_growFromDirection = "TOP" end
+        if not db.cooldownManager_centerUtility_growFromDirection then db.cooldownManager_centerUtility_growFromDirection = "TOP" end
+        if not db.cooldownManager_debugRefreshLogs then db.cooldownManager_debugRefreshLogs = false end
     end
 
     -- =====================================================
@@ -5292,6 +5306,56 @@ local function CreateCooldownViewersPage(parent)
     infoDesc:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     infoDesc:SetJustifyH("LEFT")
     y = y - 48
+
+    -- =====================================================
+    -- LAYOUT HELPERS (CDM)
+    -- =====================================================
+    local layoutHeader = GUI:CreateSectionHeader(content, "LAYOUT HELPERS")
+    layoutHeader:SetPoint("TOPLEFT", PADDING, y)
+    y = y - layoutHeader.gap
+
+    local buffIconAlignOptions = {
+        { value = "Disable", text = "Disable" },
+        { value = "START", text = "Start" },
+        { value = "CENTER", text = "Center" },
+        { value = "END", text = "End" },
+    }
+
+    local buffBarAlignOptions = {
+        { value = "Disable", text = "Disable" },
+        { value = "BOTTOM", text = "Bottom" },
+        { value = "TOP", text = "Top" },
+    }
+
+    local centerGrowOptions = {
+        { value = "TOP", text = "Top" },
+        { value = "BOTTOM", text = "Bottom" },
+    }
+
+    local buffIconAlign = GUI:CreateFormDropdown(content, "Buff Icons Alignment", buffIconAlignOptions, "cooldownManager_alignBuffIcons_growFromDirection", db, RefreshIcons)
+    buffIconAlign:SetPoint("TOPLEFT", PADDING, y)
+    buffIconAlign:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
+    local buffBarAlign = GUI:CreateFormDropdown(content, "Buff Bars Growth", buffBarAlignOptions, "cooldownManager_alignBuffBars_growFromDirection", db, RefreshIcons)
+    buffBarAlign:SetPoint("TOPLEFT", PADDING, y)
+    buffBarAlign:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
+    local essentialGrow = GUI:CreateFormDropdown(content, "Essential Rows Grow From", centerGrowOptions, "cooldownManager_centerEssential_growFromDirection", db, RefreshIcons)
+    essentialGrow:SetPoint("TOPLEFT", PADDING, y)
+    essentialGrow:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
+    local utilityGrow = GUI:CreateFormDropdown(content, "Utility Rows Grow From", centerGrowOptions, "cooldownManager_centerUtility_growFromDirection", db, RefreshIcons)
+    utilityGrow:SetPoint("TOPLEFT", PADDING, y)
+    utilityGrow:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
+    local debugRefresh = GUI:CreateFormCheckbox(content, "Debug Refresh Logs", "cooldownManager_debugRefreshLogs", db, RefreshIcons)
+    debugRefresh:SetPoint("TOPLEFT", PADDING, y)
+    debugRefresh:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
 
     -- =====================================================
     -- UTILITY DIMMING
@@ -5342,6 +5406,11 @@ local function CreateCooldownViewersPage(parent)
     essentialBorderSlider.SetFormattedValue = function(value) return string.format("%.0fpx", value) end
     y = y - SLIDER_HEIGHT
 
+    local essentialOverlapCheck = GUI:CreateFormCheckbox(content, "Border Overlap", "cooldownManager_squareIconsBorder_Essential_Overlap", db, RefreshIcons)
+    essentialOverlapCheck:SetPoint("TOPLEFT", PADDING, y)
+    essentialOverlapCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
     local essentialZoomSlider = GUI:CreateFormSlider(content, "Icon Zoom", 0, 0.5, 0.05, "cooldownManager_squareIconsZoom_Essential", db, RefreshIcons, { deferOnDrag = true })
     essentialZoomSlider:SetPoint("TOPLEFT", PADDING, y)
     essentialZoomSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
@@ -5365,6 +5434,11 @@ local function CreateCooldownViewersPage(parent)
     utilityBorderSlider.SetFormattedValue = function(value) return string.format("%.0fpx", value) end
     y = y - SLIDER_HEIGHT
 
+    local utilityOverlapCheck = GUI:CreateFormCheckbox(content, "Border Overlap", "cooldownManager_squareIconsBorder_Utility_Overlap", db, RefreshIcons)
+    utilityOverlapCheck:SetPoint("TOPLEFT", PADDING, y)
+    utilityOverlapCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
     local utilityZoomSlider = GUI:CreateFormSlider(content, "Icon Zoom", 0, 0.5, 0.05, "cooldownManager_squareIconsZoom_Utility", db, RefreshIcons, { deferOnDrag = true })
     utilityZoomSlider:SetPoint("TOPLEFT", PADDING, y)
     utilityZoomSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
@@ -5387,6 +5461,11 @@ local function CreateCooldownViewersPage(parent)
     buffBorderSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     buffBorderSlider.SetFormattedValue = function(value) return string.format("%.0fpx", value) end
     y = y - SLIDER_HEIGHT
+
+    local buffOverlapCheck = GUI:CreateFormCheckbox(content, "Border Overlap", "cooldownManager_squareIconsBorder_BuffIcons_Overlap", db, RefreshIcons)
+    buffOverlapCheck:SetPoint("TOPLEFT", PADDING, y)
+    buffOverlapCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
 
     local buffZoomSlider = GUI:CreateFormSlider(content, "Icon Zoom", 0, 0.5, 0.05, "cooldownManager_squareIconsZoom_BuffIcons", db, RefreshIcons, { deferOnDrag = true })
     buffZoomSlider:SetPoint("TOPLEFT", PADDING, y)
@@ -5854,8 +5933,8 @@ local function CreateCooldownViewersPage(parent)
     trackedWidthSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - SLIDER_HEIGHT
 
-    -- Bar Texture
-    local trackedTextureDropdown = GUI:CreateFormDropdown(content, "Bar Texture", GetTextureList(), "texture", trackedData, RefreshTrackedBars)
+    -- Bar Texture (with texture preview)
+    local trackedTextureDropdown = GUI:CreateFormDropdownWithTexturePreview(content, "Bar Texture", "texture", trackedData, RefreshTrackedBars)
     trackedTextureDropdown:SetPoint("TOPLEFT", PADDING, y)
     trackedTextureDropdown:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - FORM_ROW
@@ -11169,18 +11248,29 @@ local function BuildProfileManagementTab(tabContent)
         if db then
             GUI:ShowConfirmation({
                 title = "Reset Profile?",
-                message = "Reset current profile to defaults?",
+                message = "This will reset ALL settings including:\n• Profile settings\n• Edit Mode layouts\n• Frame positions\n• Cooldown configurations",
                 warningText = "This cannot be undone.",
-                acceptText = "Reset",
+                acceptText = "Reset Everything",
                 cancelText = "Cancel",
                 isDestructive = true,
                 onAccept = function()
                     local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
-                    local dbRef = SUICore and SUICore.db
-                    if dbRef then
-                        dbRef:ResetProfile()
-                        print("|cff34D399SuaviUI:|r Profile reset to defaults.")
-                        print("|cff34D399SuaviUI:|r Please type |cFFFFD700/reload|r to apply changes.")
+                    if SUICore and SUICore.ResetProfileCompletely then
+                        local success = SUICore:ResetProfileCompletely()
+                        if success then
+                            print("|cff34D399SuaviUI:|r Profile and Edit Mode layouts completely reset.")
+                            print("|cff34D399SuaviUI:|r Please type |cFFFFD700/reload|r to apply changes.")
+                        else
+                            print("|cffFF5757SuaviUI:|r Reset failed. Check /luaerror for details.")
+                        end
+                    else
+                        -- Fallback to standard reset if comprehensive reset not available
+                        local dbRef = SUICore and SUICore.db
+                        if dbRef then
+                            dbRef:ResetProfile()
+                            print("|cff34D399SuaviUI:|r Profile reset to defaults.")
+                            print("|cff34D399SuaviUI:|r Please type |cFFFFD700/reload|r to apply changes.")
+                        end
                     end
                 end,
             })
@@ -12154,7 +12244,7 @@ function GUI:InitializeOptions()
 
     -- Row 2: Cooldown System (CDM removed - see CDM_SETTINGS_REFERENCE.md)
     GUI:AddTab(frame, "Effects", CreateCDEffectsPage)
-    GUI:AddTab(frame, "CDM Styles", CreateCooldownViewersPage)
+    GUI:AddTab(frame, "CDM Settings", CreateCooldownViewersPage)
     GUI:AddTab(frame, "Keybinds", CreateCDKeybindsPage)
     GUI:AddTab(frame, "Custom Trackers", CreateCustomTrackersPage)
 
