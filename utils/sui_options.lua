@@ -425,14 +425,9 @@ local function CreateGeneralQoLPage(parent)
             db.general = db.general or {}
             local scaleSlider = GUI:CreateFormSlider(tabContent, "Global UI Scale", 0.3, 2.0, 0.01,
                 "uiScale", db.general, function(val)
-                    pcall(function() UIParent:SetScale(val) end)
+                    -- Use Blizzard's CVar system to set scale (handles snap grid recalculation properly)
+                    pcall(function() C_CVar.SetCVar("uiScale", val) end)
                     if SUICore and SUICore.UIMult then SUICore:UIMult() end
-                    -- Refresh Edit Mode snap grid when scale changes
-                    if _G.EditModeManagerFrame and _G.EditModeManagerFrame:IsShown() then
-                        -- Trigger a grid recalculation by hiding and showing Edit Mode
-                        RunSlashCmd("/editmode")
-                        C_Timer.After(0.05, function() RunSlashCmd("/editmode") end)
-                    end
                 end, { deferOnDrag = true, precision = 7 })
             scaleSlider:SetPoint("TOPLEFT", PADDING, y)
             scaleSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
