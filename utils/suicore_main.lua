@@ -3977,7 +3977,7 @@ function SUICore:CreateMinimapButton()
     end
     
     -- Get or create DataBroker object
-    local dataObj = LDB:GetDataObject(ADDON_NAME)
+    local dataObj = LDB:GetDataObjectByName(ADDON_NAME)
     
     if not dataObj then
         -- Store a reference to SUICore for closures
