@@ -427,6 +427,12 @@ local function CreateGeneralQoLPage(parent)
                 "uiScale", db.general, function(val)
                     pcall(function() UIParent:SetScale(val) end)
                     if SUICore and SUICore.UIMult then SUICore:UIMult() end
+                    -- Refresh Edit Mode snap grid when scale changes
+                    if _G.EditModeManagerFrame and _G.EditModeManagerFrame:IsShown() then
+                        -- Trigger a grid recalculation by hiding and showing Edit Mode
+                        RunSlashCmd("/editmode")
+                        C_Timer.After(0.05, function() RunSlashCmd("/editmode") end)
+                    end
                 end, { deferOnDrag = true, precision = 7 })
             scaleSlider:SetPoint("TOPLEFT", PADDING, y)
             scaleSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)

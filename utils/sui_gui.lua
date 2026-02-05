@@ -2513,7 +2513,7 @@ function GUI:CreateFormSlider(parent, label, min, max, step, dbKey, dbTable, onC
 
     -- Editbox for value (far right)
     local editBox = CreateFrame("EditBox", nil, container, "BackdropTemplate")
-    editBox:SetSize(60, 22)
+    editBox:SetSize(85, 22)
     editBox:SetPoint("RIGHT", 0, 0)
     editBox:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
