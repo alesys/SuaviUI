@@ -304,6 +304,10 @@ end
 local function SkinIcon(icon, size, aspectRatioCrop, zoom, borderSize, borderColorTable)
     if not icon then return end
 
+    -- [TEMPORARILY DISABLED] CDM styling code causing visual issues
+    -- TODO: Investigate and fix styling application
+    return
+
     -- Store zoom and aspect ratio for the texture coordinate calculation
     icon._ncdmZoom = zoom or 0
     icon._ncdmAspectRatio = aspectRatioCrop or 1.0

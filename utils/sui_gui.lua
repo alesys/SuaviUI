@@ -3801,7 +3801,14 @@ function GUI:CreateMainFrame()
     end)
     editModeBtn:SetPoint("LEFT", cdmBtn, "RIGHT", 10, 0)
     
+    -- Reload UI button
+    local reloadBtn = CreateBottomButton("Reload UI", function()
+        ReloadUI()
+    end)
+    reloadBtn:SetPoint("LEFT", editModeBtn, "RIGHT", 10, 0)
+    
     -- Panel Scale controls (right side of bottom panel)
+
     -- Helper to apply scale (used on release and manual entry)
     local function ApplyScale(value)
         value = math.max(0.8, math.min(1.5, value))
