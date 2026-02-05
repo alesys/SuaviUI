@@ -1260,6 +1260,17 @@ local function CreateGeneralQoLPage(parent)
             showMinimapIconCheck:SetPoint("TOPLEFT", PADDING, y)
             showMinimapIconCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
+
+            local minimapMouseoverCheck = GUI:CreateFormCheckbox(tabContent, "Show On Minimap Mouseover Only", "showOnMouseover", minimapBtnDB, function(dbVal)
+                local LibDBIcon = LibStub("LibDBIcon-1.0", true)
+                if LibDBIcon then
+                    LibDBIcon:ShowOnEnter("SuaviUI", dbVal)
+                    LibDBIcon:Refresh("SuaviUI")
+                end
+            end)
+            minimapMouseoverCheck:SetPoint("TOPLEFT", PADDING, y)
+            minimapMouseoverCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+            y = y - FORM_ROW
         end
 
         local panelAlphaSlider = GUI:CreateFormSlider(tabContent, "SUI Panel Transparency", 0.3, 1.0, 0.01, "configPanelAlpha", db, function(val)

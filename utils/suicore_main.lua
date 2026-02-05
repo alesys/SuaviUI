@@ -3123,6 +3123,7 @@ local defaults = {
         minimapButton = {
             hide = false,
             minimapPos = 180,  -- 9 o'clock position (left side)
+            showOnMouseover = false,  -- Show only on minimap hover (LibDBIcon feature)
         },
         
         -- Datatext Panel (fixed below minimap - slot-based architecture)
