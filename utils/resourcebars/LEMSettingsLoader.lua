@@ -297,7 +297,7 @@ local function BuildLemSettings(bar, defaults)
             end,
             isEnabled = function(layoutName)
                 local data = GetBarData(config, layoutName)
-                return data and data.widthMode == "Manual"
+                return data and data.widthMode == RB.WIDTH_MODE.MANUAL
             end,
         },
         {
@@ -324,7 +324,7 @@ local function BuildLemSettings(bar, defaults)
             tooltip = L["MINIMUM_WIDTH_TOOLTIP"],
             isEnabled = function(layoutName)
                 local data = GetBarData(config, layoutName)
-                return data ~= nil and data.widthMode ~= "Manual"
+                return data ~= nil and data.widthMode ~= RB.WIDTH_MODE.MANUAL
             end,
         },
         {

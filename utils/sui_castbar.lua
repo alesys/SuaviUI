@@ -9,6 +9,7 @@ local SUICore = ns.Addon
 local LSM = LibStub("LibSharedMedia-3.0")
 local LEM = LibStub("LibEQOLEditMode-1.0", true)
 local IsSecretValue = function(v) return ns.Utils and ns.Utils.IsSecretValue and ns.Utils.IsSecretValue(v) or false end
+local Constants = ns.Constants or {}
 
 ---------------------------------------------------------------------------
 -- MODULE TABLE
@@ -385,11 +386,11 @@ end
 -- POSITIONING HELPERS
 ---------------------------------------------------------------------------
 local function PositionCastbarByAnchor(anchorFrame, castSettings, unitFrame, barHeight)
-    local anchor = castSettings.anchor or "none"
+    local anchor = castSettings.anchor or (Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.NONE) or "none"
     
     anchorFrame:ClearAllPoints()
     
-    if anchor == "essential" then
+    if anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.ESSENTIAL) or "essential") then
         local offsetX = Scale(castSettings.offsetX or 0)
         local offsetY = math.floor(Scale(castSettings.offsetY or -25) + 0.5)
         local widthAdj = Scale(castSettings.widthAdjustment or 0)
@@ -400,7 +401,7 @@ local function PositionCastbarByAnchor(anchorFrame, castSettings, unitFrame, bar
         else
             anchorFrame:SetPoint("TOPLEFT", unitFrame, "BOTTOMLEFT", offsetX, offsetY)
         end
-    elseif anchor == "utility" then
+    elseif anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.UTILITY) or "utility") then
         local offsetX = Scale(castSettings.offsetX or 0)
         local offsetY = math.floor(Scale(castSettings.offsetY or -25) + 0.5)
         local widthAdj = Scale(castSettings.widthAdjustment or 0)
@@ -411,7 +412,7 @@ local function PositionCastbarByAnchor(anchorFrame, castSettings, unitFrame, bar
         else
             anchorFrame:SetPoint("TOPLEFT", unitFrame, "BOTTOMLEFT", offsetX, offsetY)
         end
-    elseif anchor == "unitframe" then
+    elseif anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.UNIT_FRAME) or "unitframe") then
         local offsetX = Scale(castSettings.offsetX or 0)
         local offsetY = math.floor(Scale(castSettings.offsetY or -25) + 0.5)
         local widthAdj = Scale(castSettings.widthAdjustment or 0)
@@ -426,11 +427,12 @@ local function PositionCastbarByAnchor(anchorFrame, castSettings, unitFrame, bar
 end
 
 local function SetCastbarSize(anchorFrame, castSettings, unitFrame, barHeight)
-    local anchor = castSettings.anchor or "none"
+    local anchor = castSettings.anchor or (Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.NONE) or "none"
     
-    if anchor == "essential" or anchor == "utility" then
+    if anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.ESSENTIAL) or "essential")
+        or anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.UTILITY) or "utility") then
         anchorFrame:SetSize(1, barHeight)
-    elseif anchor == "none" then
+    elseif anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.NONE) or "none") then
         local frameWidth = unitFrame:GetWidth() or 250
         local castWidth = Scale((castSettings.width and castSettings.width > 0) and castSettings.width or frameWidth)
         anchorFrame:SetSize(castWidth, barHeight)
@@ -445,7 +447,7 @@ end
 -- ELEMENT POSITIONING HELPERS
 ---------------------------------------------------------------------------
 local function ShouldShowIcon(anchorFrame, castSettings)
-    return castSettings.showIcon == true
+    return castSettings.showIcon ~= false
 end
 
 local function UpdateIconPosition(anchorFrame, castSettings, iconSize, iconScale, iconBorderSize)
@@ -727,7 +729,7 @@ local function SimulateCast(castbar, castSettings, unitKey, bossIndex)
         isEditModeActive = LEM:IsInEditMode()
     end
     
-    if castSettings.anchor == "none" and not isEditModeActive then
+    if castSettings.anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.NONE) or "none") and not isEditModeActive then
         -- Old-style manual dragging (only when NOT in Edit Mode)
         castbar:SetMovable(true)
         castbar:EnableMouse(true)
@@ -1137,6 +1139,9 @@ function SUI_Castbar:CreateCastbar(unitFrame, unit, unitKey)
         -- Store mixin reference on frame for easy access
         anchorFrame._castbarMixin = mixin
         anchorFrame._suiCastbarUnit = unitKey
+        if mixin.Refresh then
+            mixin:Refresh(nil, true)
+        end
     end
     
     return anchorFrame
@@ -2384,13 +2389,17 @@ function SUI_Castbar:CreateBossCastbar(unitFrame, unit, bossIndex)
         mixin.unit = "boss" .. bossIndex
         mixin.bossIndex = bossIndex
         mixin.statusBar = anchorFrame.statusBar
-        mixin.iconFrame = anchorFrame.iconFrame
-        mixin.timerText = anchorFrame.timerText
-        mixin.spellNameText = anchorFrame.spellText
-        mixin.sparkTexture = anchorFrame.spark
-        mixin.borderTexture = nil -- Boss castbars may not have border same way
-        mixin.backgroundTexture = anchorFrame.statusBar and anchorFrame.statusBar.background
-        mixin._initialized = true
+        mixin.bgBar = anchorFrame.bgBar
+        mixin.border = anchorFrame.statusBar and anchorFrame.statusBar.Border
+        mixin.icon = anchorFrame.icon
+        mixin.iconTexture = anchorFrame.iconTexture
+        mixin.iconBorder = anchorFrame.iconBorder
+        mixin.spellText = anchorFrame.spellText
+        mixin.timeText = anchorFrame.timeText
+        mixin.empoweredLevelText = anchorFrame.empoweredLevelText
+        mixin.stageOverlays = anchorFrame.stageOverlays
+        mixin.empoweredStages = anchorFrame.empoweredStages
+        mixin.config = { unitKey = "boss", unit = "boss" .. bossIndex, bossIndex = bossIndex }
         anchorFrame._castbarMixin = mixin
         anchorFrame._suiCastbarUnit = "boss" .. bossIndex
     end
@@ -2460,6 +2469,11 @@ end
 ---------------------------------------------------------------------------
 function SUI_Castbar:RefreshCastbar(castbar, unitKey, castSettings, unitFrame)
     if not castSettings or not unitFrame then return end
+
+    if castbar and castbar._castbarMixin and castbar._castbarMixin.Refresh then
+        castbar._castbarMixin:Refresh(nil, true)
+        return
+    end
     
     -- Simple: always recreate the castbar when settings change
     local unit = (castbar and castbar.unit) or unitKey
@@ -2481,6 +2495,27 @@ function SUI_Castbar:RefreshBossCastbar(castbar, bossKey, castSettings, unitFram
     
     local bossIndex = (castbar and castbar.bossIndex) or (bossKey and tonumber(bossKey:match("boss(%d+)")))
     if not bossIndex then return end
+
+    if castbar then
+        local frameWidth = unitFrame:GetWidth() or 250
+        local castWidth = Scale((castSettings.width and castSettings.width > 0) and castSettings.width or frameWidth)
+        local barHeight, iconSize, iconScale = GetSizingValues(castSettings)
+        local borderSize = Scale(castSettings.borderSize or 1)
+        local iconBorderSize = Scale(castSettings.iconBorderSize or 1)
+
+        castbar:SetSize(castWidth, barHeight)
+        castbar:ClearAllPoints()
+        castbar:SetPoint("TOP", unitFrame, "BOTTOM", Scale(castSettings.offsetX or 0), Scale(castSettings.offsetY or -25))
+
+        if castbar.statusBar then
+            castbar.statusBar:SetStatusBarTexture(GetTexturePath(castSettings.texture))
+        end
+
+        UpdateIconPosition(castbar, castSettings, iconSize, iconScale, iconBorderSize)
+        UpdateStatusBarPosition(castbar, castSettings, barHeight, iconSize, iconScale, borderSize)
+        UpdateCastbarElements(castbar, "boss", castSettings)
+        return
+    end
     
     -- Simple: always recreate the castbar when settings change
     local unit = (castbar and castbar.unit) or ("boss" .. bossIndex)

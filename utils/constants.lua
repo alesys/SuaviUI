@@ -97,6 +97,35 @@ local UNIT_TYPES = {
     BOSS = "boss",
 }
 
+---------------------------------------------------------------------------
+-- CASTBAR ANCHORS
+---------------------------------------------------------------------------
+local CASTBAR_ANCHOR = {
+    NONE = "none",
+    UNIT_FRAME = "unitframe",
+    ESSENTIAL = "essential",
+    UTILITY = "utility",
+}
+
+local CASTBAR_ANCHOR_TEXT = {
+    NONE = "None (Free Position)",
+    UNIT_FRAME = "Unit Frame",
+    ESSENTIAL = "Essential Cooldowns",
+    UTILITY = "Utility Cooldowns",
+}
+
+local CASTBAR_ANCHOR_OPTIONS = {
+    { text = CASTBAR_ANCHOR_TEXT.NONE, value = CASTBAR_ANCHOR.NONE },
+    { text = CASTBAR_ANCHOR_TEXT.UNIT_FRAME, value = CASTBAR_ANCHOR.UNIT_FRAME },
+}
+
+local CASTBAR_PLAYER_ANCHOR_OPTIONS = {
+    { text = CASTBAR_ANCHOR_TEXT.NONE, value = CASTBAR_ANCHOR.NONE },
+    { text = CASTBAR_ANCHOR_TEXT.UNIT_FRAME, value = CASTBAR_ANCHOR.UNIT_FRAME },
+    { text = CASTBAR_ANCHOR_TEXT.ESSENTIAL, value = CASTBAR_ANCHOR.ESSENTIAL },
+    { text = CASTBAR_ANCHOR_TEXT.UTILITY, value = CASTBAR_ANCHOR.UTILITY },
+}
+
 -- Boss unit keys
 local BOSS_UNIT_KEYS = {
     "boss1",
@@ -184,6 +213,17 @@ local TEXT_JUSTIFICATION = {
 }
 
 ---------------------------------------------------------------------------
+-- WIDTH MODE CONSTANTS (Single source of truth for width sync modes)
+---------------------------------------------------------------------------
+local WIDTH_MODE = {
+    MANUAL = "Manual",
+    SYNC_UNIT_FRAME = "Sync With Unit Frame",
+    SYNC_ESSENTIAL = "Sync With Essential Cooldowns",
+    SYNC_UTILITY = "Sync With Utility Cooldowns",
+    SYNC_TRACKED_BUFFS = "Sync With Tracked Buffs",
+}
+
+---------------------------------------------------------------------------
 -- EXPORT FUNCTIONS
 ---------------------------------------------------------------------------
 -- Normalize anchor point from user-friendly text to API format
@@ -221,10 +261,15 @@ ns.Constants = {
     UNIT_TYPES = UNIT_TYPES,
     BOSS_UNIT_KEYS = BOSS_UNIT_KEYS,
     RESOURCE_TYPES = RESOURCE_TYPES,
+    CASTBAR_ANCHOR = CASTBAR_ANCHOR,
+    CASTBAR_ANCHOR_TEXT = CASTBAR_ANCHOR_TEXT,
+    CASTBAR_ANCHOR_OPTIONS = CASTBAR_ANCHOR_OPTIONS,
+    CASTBAR_PLAYER_ANCHOR_OPTIONS = CASTBAR_PLAYER_ANCHOR_OPTIONS,
     DEFAULTS = DEFAULTS,
     TEXTURE_PATHS = TEXTURE_PATHS,
     OUTLINE_TYPES = OUTLINE_TYPES,
     TEXT_JUSTIFICATION = TEXT_JUSTIFICATION,
+    WIDTH_MODE = WIDTH_MODE,
     
     -- Functions
     NormalizeAnchorPoint = NormalizeAnchorPoint,

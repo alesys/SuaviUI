@@ -53,6 +53,16 @@ end
 
 -- Use constants from the constants module
 local Constants = ns.Constants or {}
+
+-- Width Mode constants (single source of truth)
+local WIDTH_MODE = Constants.WIDTH_MODE or {
+    MANUAL = "Manual",
+    SYNC_UNIT_FRAME = "Sync With Unit Frame",
+    SYNC_ESSENTIAL = "Sync With Essential Cooldowns",
+    SYNC_UTILITY = "Sync With Utility Cooldowns",
+    SYNC_TRACKED_BUFFS = "Sync With Tracked Buffs",
+}
+
 local ANCHOR_POINT_MAP = Constants.ANCHOR_POINT_MAP or {
     ["Top Left"] = "TOPLEFT",
     ["Top"] = "TOP",
@@ -198,7 +208,11 @@ end
 function CastbarMixin:GetUnitFrame()
     local SUI_UF = ns.SUI_UnitFrames
     if SUI_UF and SUI_UF.frames then
-        return SUI_UF.frames[self.unitKey]
+        local key = self.unitKey
+        if key == "boss" and self.bossIndex then
+            key = "boss" .. self.bossIndex
+        end
+        return SUI_UF.frames[key]
     end
     return nil
 end
@@ -236,30 +250,63 @@ function CastbarMixin:ApplyLayout(layoutName, force)
 end
 
 function CastbarMixin:ApplySize(settings, unitFrame, barHeight)
-    local anchor = settings.anchor or "none"
+    local anchor = settings.anchor or (Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.NONE) or "none"
+    local widthMode = settings.widthMode or WIDTH_MODE.MANUAL
     local frame = self.Frame
     
-    if anchor == "essential" or anchor == "utility" then
-        -- Size determined by cooldown manager bar
-        frame:SetSize(1, barHeight)
-    elseif anchor == "none" then
-        local castWidth = Scale((settings.width and settings.width > 0) and settings.width or 250)
-        frame:SetSize(castWidth, barHeight)
-    else
-        -- Anchored to unit frame
-        local frameWidth = unitFrame and unitFrame:GetWidth() or 250
-        local castWidth = Scale((settings.width and settings.width > 0) and settings.width or frameWidth)
-        frame:SetSize(castWidth, barHeight)
+    -- Determine width based on Width Mode (mirror resource bar implementation)
+    local castWidth = nil
+    
+    if widthMode == WIDTH_MODE.SYNC_UNIT_FRAME then
+        if unitFrame and unitFrame.GetWidth then
+            local ufWidth = unitFrame:GetWidth()
+            if ufWidth and ufWidth > 0 then
+                castWidth = ufWidth
+            end
+        end
+    elseif widthMode == WIDTH_MODE.SYNC_ESSENTIAL then
+        local bar = _G["EssentialCooldownViewer"]
+        if bar and bar.IsShown and bar:IsShown() and bar.GetWidth then
+            castWidth = bar:GetWidth()
+        end
+    elseif widthMode == WIDTH_MODE.SYNC_UTILITY then
+        local bar = _G["UtilityCooldownViewer"]
+        if bar and bar.IsShown and bar:IsShown() and bar.GetWidth then
+            castWidth = bar:GetWidth()
+        end
+    elseif widthMode == WIDTH_MODE.SYNC_TRACKED_BUFFS then
+        local bar = _G["BuffIconCooldownViewer"]
+        if bar and bar.IsShown and bar:IsShown() and bar.GetWidth then
+            castWidth = bar:GetWidth()
+        end
     end
+    
+    if widthMode ~= WIDTH_MODE.MANUAL then
+        castWidth = (castWidth and castWidth > 0) and castWidth
+            or ((settings.width and settings.width > 0) and settings.width or 250)
+    else
+        castWidth = (settings.width and settings.width > 0) and settings.width or 250
+    end
+    
+    -- Apply width adjustment if in synced mode
+    if widthMode ~= WIDTH_MODE.MANUAL and settings.widthAdjustment then
+        castWidth = castWidth + (settings.widthAdjustment or 0)
+    end
+    
+    castWidth = Scale(castWidth)
+    local minWidth = (LEM and LEM.IsInEditMode and LEM:IsInEditMode()) and 2 or 1
+    castWidth = math.max(minWidth, castWidth or minWidth)
+    
+    frame:SetSize(castWidth, barHeight)
 end
 
 function CastbarMixin:ApplyPosition(settings, unitFrame, barHeight)
-    local anchor = settings.anchor or "none"
+    local anchor = settings.anchor or (Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.NONE) or "none"
     local frame = self.Frame
     
     frame:ClearAllPoints()
     
-    if anchor == "essential" then
+    if anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.ESSENTIAL) or "essential") then
         local bar = _G["EssentialCooldownViewer"]
         if bar then
             local offsetY = Scale(settings.offsetY or -25)
@@ -270,7 +317,7 @@ function CastbarMixin:ApplyPosition(settings, unitFrame, barHeight)
         else
             frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
         end
-    elseif anchor == "utility" then
+    elseif anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.UTILITY) or "utility") then
         local bar = _G["UtilityCooldownViewer"]
         if bar then
             local offsetY = Scale(settings.offsetY or -25)
@@ -281,7 +328,7 @@ function CastbarMixin:ApplyPosition(settings, unitFrame, barHeight)
         else
             frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
         end
-    elseif anchor == "unitframe" and unitFrame then
+    elseif anchor == ((Constants.CASTBAR_ANCHOR and Constants.CASTBAR_ANCHOR.UNIT_FRAME) or "unitframe") and unitFrame then
         local offsetX = Scale(settings.offsetX or 0)
         local offsetY = Scale(settings.offsetY or -25)
         local widthAdj = Scale(settings.widthAdjustment or 0)
@@ -413,14 +460,15 @@ end
 function CastbarMixin:ApplyColors(settings)
     -- Bar color
     if self.statusBar then
-        local barColor = settings.barColor or {1, 0.7, 0, 1}
+        local barColor = settings.color or settings.barColor or {1, 0.7, 0, 1}
         self.statusBar:SetStatusBarColor(GetSafeColor(barColor))
     end
     
     -- Background color
     if self.bgBar then
         local bgColor = settings.bgColor or {0.15, 0.15, 0.15, 1}
-        self.bgBar:SetColorTexture(GetSafeColor(bgColor))
+        local r, g, b, a = GetSafeColor(bgColor)
+        self.bgBar:SetVertexColor(r, g, b, a)
     end
     
     -- Border color
@@ -577,6 +625,12 @@ end
 function CastbarMixin:StopPreviewMode()
     self.isPreviewMode = false
     self.Frame:SetScript("OnUpdate", nil)
+    
+    -- Hide the castbar if unit is not actually casting
+    local unit = self.unit
+    if unit and not UnitCastingInfo(unit) and not UnitChannelInfo(unit) then
+        self.Frame:Hide()
+    end
 end
 
 function CastbarMixin:SetupPreviewOnUpdate()
@@ -608,6 +662,68 @@ end
 ---------------------------------------------------------------------------
 -- LEM INTEGRATION
 ---------------------------------------------------------------------------
+function CastbarMixin:InitCooldownManagerWidthHook(layoutName)
+    local settings = self:GetSettings()
+    if not settings then return end
+
+    self._SUI_Essential_Utility_hook_widthMode = settings.widthMode
+    self._SUI_Tracked_Buff_hook_widthMode = settings.widthMode
+
+    local v = _G["EssentialCooldownViewer"]
+    if v and not (self._SUI_Essential_hooked or false) then
+        local hookEssentialCooldowns = function(_, width)
+            if self._SUI_Essential_Utility_hook_widthMode ~= WIDTH_MODE.SYNC_ESSENTIAL then
+                return
+            end
+            if (width == nil) or (type(width) == "number" and math.floor(width) > 1) then
+                self:ApplyLayout(layoutName, true)
+            end
+        end
+
+        hooksecurefunc(v, "SetSize", hookEssentialCooldowns)
+        hooksecurefunc(v, "Show", hookEssentialCooldowns)
+        hooksecurefunc(v, "Hide", hookEssentialCooldowns)
+
+        self._SUI_Essential_hooked = true
+    end
+
+    v = _G["UtilityCooldownViewer"]
+    if v and not (self._SUI_Utility_hooked or false) then
+        local hookUtilityCooldowns = function(width)
+            if self._SUI_Essential_Utility_hook_widthMode ~= WIDTH_MODE.SYNC_UTILITY then
+                return
+            end
+            if (width == nil) or (type(width) == "number" and math.floor(width) > 1) then
+                self:ApplyLayout(layoutName, true)
+            end
+        end
+
+        hooksecurefunc(v, "SetSize", hookUtilityCooldowns)
+        hooksecurefunc(v, "Show", hookUtilityCooldowns)
+        hooksecurefunc(v, "Hide", hookUtilityCooldowns)
+
+        self._SUI_Utility_hooked = true
+    end
+
+    v = _G["BuffIconCooldownViewer"]
+    if v and not (self._SUI_tBuffs_hooked or false) then
+        local hookTrackedBuffs = function(width)
+            if self._SUI_Tracked_Buff_hook_widthMode ~= WIDTH_MODE.SYNC_TRACKED_BUFFS then
+                return
+            end
+            if (width == nil) or (type(width) == "number" and math.floor(width) > 1) then
+                self:ApplyLayout(layoutName, true)
+            end
+        end
+
+        hooksecurefunc(v, "SetSize", hookTrackedBuffs)
+        hooksecurefunc(v, "Show", hookTrackedBuffs)
+        hooksecurefunc(v, "Hide", hookTrackedBuffs)
+
+        self._SUI_tBuffs_hooked = true
+    end
+end
+
 function CastbarMixin:RegisterWithLEM(defaults)
     if not LEM then return false end
     
@@ -636,6 +752,7 @@ function CastbarMixin:RegisterWithLEM(defaults)
     end)
     
     if success then
+        self:InitCooldownManagerWidthHook()
         -- Register callbacks
         LEM:RegisterCallback("enter", function()
             self:ApplyVisibilitySettings()
@@ -649,6 +766,7 @@ function CastbarMixin:RegisterWithLEM(defaults)
         end)
         
         LEM:RegisterCallback("layout", function(layoutName)
+            self:InitCooldownManagerWidthHook(layoutName)
             self:ApplyVisibilitySettings(layoutName)
             self:ApplyLayout(layoutName, true)
             self:ApplySettings(layoutName, true)

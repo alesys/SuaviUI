@@ -79,7 +79,7 @@ local C = GUI.Colors
 GUI.Layout = {
     -- Form layout (label on left, control on right)
     formLabelWidth = 180,        -- Width allocated for labels
-    formControlStart = 180,      -- X position where controls start
+    formControlStart = 220,  -- Increased to prevent label overlap with controls      -- X position where controls start
     formRowHeight = 28,          -- Standard row height
     formGap = 6,                 -- Gap between label and control
     
@@ -2085,7 +2085,7 @@ function GUI:CreateFormToggle(parent, label, dbKey, dbTable, onChange, registryI
     local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Option")
-    text:SetPoint("LEFT", 0, 0)
+    text:SetPoint("LEFT", 0, 0); text:SetPoint("RIGHT", container, "LEFT", 210, 0)  -- Constrain label width to avoid overlap
 
     -- Toggle track (the pill-shaped background)
     local track = CreateFrame("Button", nil, container, "BackdropTemplate")
@@ -2215,7 +2215,7 @@ function GUI:CreateFormToggleInverted(parent, label, dbKey, dbTable, onChange)
     local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Option")
-    text:SetPoint("LEFT", 0, 0)
+    text:SetPoint("LEFT", 0, 0); text:SetPoint("RIGHT", container, "LEFT", 210, 0)  -- Constrain label width to avoid overlap
 
     -- Toggle track
     local track = CreateFrame("Button", nil, container, "BackdropTemplate")
@@ -2330,7 +2330,7 @@ function GUI:CreateFormCheckboxOriginal(parent, label, dbKey, dbTable, onChange)
     local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Option")
-    text:SetPoint("LEFT", 0, 0)
+    text:SetPoint("LEFT", 0, 0); text:SetPoint("RIGHT", container, "LEFT", 210, 0)  -- Constrain label width to avoid overlap
 
     -- Checkbox aligned with other widgets (starts at 180px from left)
     local box = CreateFrame("Button", nil, container, "BackdropTemplate")
@@ -2424,7 +2424,7 @@ function GUI:CreateFormSlider(parent, label, min, max, step, dbKey, dbTable, onC
     local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Setting")
-    text:SetPoint("LEFT", 0, 0)
+    text:SetPoint("LEFT", 0, 0); text:SetPoint("RIGHT", container, "LEFT", 210, 0)  -- Constrain label width to avoid overlap
     container.label = text
 
     -- Track container (for the filled + unfilled portions)
@@ -2690,7 +2690,7 @@ function GUI:CreateFormDropdown(parent, label, options, dbKey, dbTable, onChange
     local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Setting")
-    text:SetPoint("LEFT", 0, 0)
+    text:SetPoint("LEFT", 0, 0); text:SetPoint("RIGHT", container, "LEFT", 210, 0)  -- Constrain label width to avoid overlap
 
     -- Dropdown button (right side)
     local dropdown = CreateFrame("Button", nil, container, "BackdropTemplate")
@@ -2953,7 +2953,7 @@ function GUI:CreateFormColorPicker(parent, label, dbKey, dbTable, onChange, opti
     local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Color")
-    text:SetPoint("LEFT", 0, 0)
+    text:SetPoint("LEFT", 0, 0); text:SetPoint("RIGHT", container, "LEFT", 210, 0)  -- Constrain label width to avoid overlap
 
     -- Color swatch aligned with other widgets (starts at 180px from left)
     local swatch = CreateFrame("Button", nil, container, "BackdropTemplate")
@@ -3572,8 +3572,10 @@ function GUI:CreateMainFrame()
     
     -- Edit Mode button
     local editModeBtn = CreateBottomButton("Edit Mode", function()
+        -- Use slash command to open Edit Mode without tainting
         if EditModeManagerFrame then
-            ShowUIPanel(EditModeManagerFrame)
+            DEFAULT_CHAT_FRAME.editBox:SetText("/editmode")
+            ChatEdit_SendText(DEFAULT_CHAT_FRAME.editBox, 0)
         end
     end)
     editModeBtn:SetPoint("LEFT", cdmBtn, "RIGHT", 10, 0)

@@ -13,7 +13,7 @@ local FONT_FLAGS = "OUTLINE"
 
 -- Bar dimensions
 local BAR_WIDTH = 250
-local BAR_HEIGHT = 20
+local BAR_HEIGHT = 32
 
 -- Locals for performance
 local floor = math.floor

@@ -335,6 +335,7 @@ local extraActionMover = nil
 local zoneAbilityHolder = nil
 local zoneAbilityMover = nil
 local extraButtonMoversVisible = false
+local HookExtraButtonPositioning
 
 -- Get settings for a specific extra button type
 local function GetExtraButtonDB(buttonType)
@@ -349,11 +350,13 @@ local function CreateExtraButtonHolder(buttonType, displayName)
     local settings = GetExtraButtonDB(buttonType)
     if not settings then return nil, nil end
 
-    -- Create holder frame
+    -- Create holder frame (MUST be movable for LEM dragging)
     local holder = CreateFrame("Frame", "SUI_" .. buttonType .. "Holder", UIParent)
     holder:SetSize(64, 64)
     holder:SetMovable(true)
     holder:SetClampedToScreen(true)
+    holder:EnableMouse(true)
+    holder:RegisterForDrag("LeftButton")
 
     -- Load saved position or default to center-bottom
     local pos = settings.position
@@ -376,12 +379,12 @@ local function CreateExtraButtonHolder(buttonType, displayName)
         edgeFile = "Interface\\Buttons\\WHITE8x8",
         edgeSize = 2,
     })
-    mover:SetBackdropColor(0.2, 0.8, 0.6, 0.5)  -- SUI mint color
-    mover:SetBackdropBorderColor(0.2, 1.0, 0.6, 1)
+    mover:SetBackdropColor(0.2, 0.8, 1, 0.3)  -- Light blue to match Edit Mode
+    mover:SetBackdropBorderColor(0.3, 0.8, 1, 1)  -- Light blue border
     mover:EnableMouse(true)
     mover:SetMovable(true)
     mover:RegisterForDrag("LeftButton")
-    mover:SetFrameStrata("FULLSCREEN_DIALOG")
+    mover:SetFrameStrata("DIALOG")  -- Match Edit Mode panel strata
     mover:Hide()
 
     -- Label text
@@ -418,7 +421,7 @@ local function ApplyExtraButtonSettings(buttonType)
     end
 
     local settings = GetExtraButtonDB(buttonType)
-    if not settings or not settings.enabled then return end
+    if not settings or (not settings.enabled and not settings._editModeActive) then return end
 
     local blizzFrame
     local holder, mover
@@ -433,7 +436,18 @@ local function ApplyExtraButtonSettings(buttonType)
         mover = zoneAbilityMover
     end
 
-    if not blizzFrame or not holder then return end
+    if not holder then return end
+    if not blizzFrame then
+        ActionBars.extraButtonRetry = ActionBars.extraButtonRetry or {}
+        local retries = ActionBars.extraButtonRetry[buttonType] or 0
+        if retries < 10 then
+            ActionBars.extraButtonRetry[buttonType] = retries + 1
+            C_Timer.After(0.5, function()
+                ApplyExtraButtonSettings(buttonType)
+            end)
+        end
+        return
+    end
 
     -- Apply scale
     local scale = settings.scale or 1.0
@@ -477,31 +491,111 @@ local function ApplyExtraButtonSettings(buttonType)
     end
     
     -- Handle "Always Show" for positioning purposes
-    -- Show holder when: Edit Mode active OR Always Show enabled
+    -- Show holder when: Edit Mode active OR Always Show enabled OR button has content
     if holder then
-        if settings._editModeActive or settings.alwaysShow then
-            holder:Show()
-            -- Also make the Blizzard frame visible if in Edit Mode
-            if settings._editModeActive then
-                blizzFrame:Show()
+        local function SetHolderVisible(isVisible)
+            if isVisible then
+                holder:Show()
+                holder:EnableMouse(true)
+                if blizzFrame then
+                    blizzFrame:Show()
+                    blizzFrame:EnableMouse(true)
+                end
+            else
+                holder:Hide()
+                holder:EnableMouse(false)
+                -- Completely disable the Blizzard frame to prevent any mouse interaction
+                if blizzFrame then
+                    blizzFrame:Hide()
+                    blizzFrame:EnableMouse(false)
+                end
             end
+        end
+
+        if settings._editModeActive or settings.alwaysShow then
+            SetHolderVisible(true)
         else
-            -- Normal visibility management by Blizzard
-            -- Don't explicitly hide - let Blizzard control it
+            -- Check if button actually has content (not just frame visibility)
+            local hasContent = false
+            if buttonType == "extraActionButton" then
+                -- Use HasExtraActionBar() API to check if there's actually an extra action
+                hasContent = HasExtraActionBar and HasExtraActionBar()
+            elseif buttonType == "zoneAbility" then
+                -- Zone ability: check if there are any active buttons in the container
+                if ZoneAbilityFrame and ZoneAbilityFrame.SpellButtonContainer then
+                    for button in ZoneAbilityFrame.SpellButtonContainer:EnumerateActive() do
+                        hasContent = true
+                        break  -- Just need one active button to know there's content
+                    end
+                end
+            end
+            
+            SetHolderVisible(hasContent)
         end
     end
+    
+    -- Setup visibility tracking hook (only once per button)
+    if blizzFrame and not blizzFrame._suiVisibilityHooked then
+        blizzFrame._suiVisibilityHooked = true
+        
+        -- Mirror Blizzard frame visibility changes to our holder
+        -- But only show if button actually has content
+        blizzFrame:HookScript("OnShow", function()
+            local s = GetExtraButtonDB(buttonType)
+            if holder and not (s and (s._editModeActive or s.alwaysShow)) then
+                -- Verify there's actually content before showing
+                local hasContent = false
+                if buttonType == "extraActionButton" then
+                    hasContent = HasExtraActionBar and HasExtraActionBar()
+                elseif buttonType == "zoneAbility" then
+                    -- Check if there are any active buttons in the container
+                    if ZoneAbilityFrame and ZoneAbilityFrame.SpellButtonContainer then
+                        for button in ZoneAbilityFrame.SpellButtonContainer:EnumerateActive() do
+                            hasContent = true
+                            break
+                        end
+                    end
+                end
+                if hasContent then
+                    holder:Show()
+                    holder:EnableMouse(true)
+                    blizzFrame:Show()
+                    blizzFrame:EnableMouse(true)
+                else
+                    -- No content - hide both holder and Blizzard frame to prevent mouse blocking
+                    holder:Hide()
+                    holder:EnableMouse(false)
+                    blizzFrame:Hide()
+                    blizzFrame:EnableMouse(false)
+                end
+            end
+        end)
+        
+        blizzFrame:HookScript("OnHide", function()
+            local s = GetExtraButtonDB(buttonType)
+            if holder and not (s and (s._editModeActive or s.alwaysShow)) then
+                holder:Hide()
+                holder:EnableMouse(false)
+            end
+        end)
+    end
+
+    -- Ensure positioning hooks are installed once frames exist
+    HookExtraButtonPositioning()
 end
 
 -- Flag to prevent recursive SetPoint hooks
 local hookingSetPoint = false
 
 -- Hook Blizzard frames to prevent them from repositioning
-local function HookExtraButtonPositioning()
+HookExtraButtonPositioning = function()
     -- Hook ExtraActionBarFrame
     if ExtraActionBarFrame and not ExtraActionBarFrame._quiHooked then
         ExtraActionBarFrame._quiHooked = true
         hooksecurefunc(ExtraActionBarFrame, "SetPoint", function(self)
             if hookingSetPoint or InCombatLockdown() then return end
+            -- Don't interfere during Edit Mode - let LEM handle positioning
+            if EditModeManagerFrame and EditModeManagerFrame:IsShown() then return end
             if extraActionHolder and GetExtraButtonDB("extraActionButton") then
                 local settings = GetExtraButtonDB("extraActionButton")
                 if settings and settings.enabled then
@@ -520,6 +614,8 @@ local function HookExtraButtonPositioning()
         ZoneAbilityFrame._quiHooked = true
         hooksecurefunc(ZoneAbilityFrame, "SetPoint", function(self)
             if hookingSetPoint or InCombatLockdown() then return end
+            -- Don't interfere during Edit Mode - let LEM handle positioning
+            if EditModeManagerFrame and EditModeManagerFrame:IsShown() then return end
             if zoneAbilityHolder and GetExtraButtonDB("zoneAbility") then
                 local settings = GetExtraButtonDB("zoneAbility")
                 if settings and settings.enabled then
@@ -593,14 +689,11 @@ local function InitializeExtraButtons()
         -- Register with Edit Mode if available
         C_Timer.After(1.5, function()
             if _G.SuaviUI_AB_EditMode_Register then
-                local extraSettings = GetExtraButtonDB("extraActionButton")
-                local zoneSettings = GetExtraButtonDB("zoneAbility")
-                
-                if extraActionHolder and extraSettings and extraSettings.enabled then
+                if extraActionHolder then
                     _G.SuaviUI_AB_EditMode_Register("extraActionButton", extraActionHolder)
                 end
                 
-                if zoneAbilityHolder and zoneSettings and zoneSettings.enabled then
+                if zoneAbilityHolder then
                     _G.SuaviUI_AB_EditMode_Register("zoneAbility", zoneAbilityHolder)
                 end
             end

@@ -74,6 +74,15 @@ function SUICore:UIMult()
     if SUICore.db and SUICore.db.profile and SUICore.db.profile.general then
         uiScale = SUICore.db.profile.general.uiScale or 1.0
     end
+    -- Ensure perfect is initialized (can be nil if profile changes before pixel init)
+    if not SUICore.perfect then
+        local _, screenHeight = GetPhysicalScreenSize()
+        if screenHeight and screenHeight > 0 then
+            SUICore.perfect = 768 / screenHeight
+        else
+            SUICore.perfect = 1.0
+        end
+    end
     SUICore.mult = SUICore.perfect / uiScale
 end
 
