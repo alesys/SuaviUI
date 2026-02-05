@@ -311,9 +311,13 @@ local function SkinIcon(icon, size, aspectRatioCrop, zoom, borderSize, borderCol
     -- One-time setup (mask removal, overlay strip, SetTexCoord hook)
     SetupIconOnce(icon)
     
+    -- Check if there's actual styling to apply
+    -- Only strip Blizzard's visual elements if we have custom styling
+    local hasCustomStyling = (borderSize and borderSize > 0) or (zoom and zoom ~= 0) or (size and size > 0)
+    
     -- ONLY when actually styling: remove Blizzard's visual elements
     -- This should only run once when styling is applied, not every frame
-    if not icon._ncdmStyled then
+    if hasCustomStyling and not icon._ncdmStyled then
         icon._ncdmStyled = true
         
         -- Remove Blizzard's mask textures (only when styling)
