@@ -72,7 +72,8 @@ SLASH_SUAVIUI_EM1 = "/em"
 SLASH_SUAVIUI_EM2 = "/ed"
 SlashCmdList["SUAVIUI_EM"] = function()
     if EditModeManagerFrame then
-        ShowUIPanel(EditModeManagerFrame)
+        -- Use the Blizzard slash command to avoid tainting EditMode
+        RunSlashCmd("/editmode")
     else
         print("|cff34D399SuaviUI:|r Edit Mode not available.")
     end

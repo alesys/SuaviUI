@@ -4121,8 +4121,9 @@ function SUI_UF:EnableEditMode()
                 if EditModeManagerFrame.SaveLayoutChanges then
                     EditModeManagerFrame:SaveLayoutChanges()
                 end
-                -- Then exit
-                HideUIPanel(EditModeManagerFrame)
+                -- Then exit using slash command to avoid EditMode taint
+                -- (direct HideUIPanel calls cause EncounterWarnings secret value errors)
+                RunSlashCmd("/editmode")
             else
                 -- Fallback for /sui editmode case
                 SUI_UF:DisableEditMode()
