@@ -167,10 +167,11 @@ local function ApplySquareStyle(button, viewerSettingName)
 end
 
 local function RestoreOriginalStyle(button, viewerSettingName)
-    -- REMOVED EARLY RETURN - always restore to ensure cleanup even if flag not set
-    -- if not button.suiSquareStyled then
-    --     return
-    -- end
+    -- Only restore if button was previously styled by us
+    -- DO NOT restore Blizzard's default state - that causes unwanted modifications
+    if not button.suiSquareStyled then
+        return
+    end
 
     local width, height = GetViewerIconSize(viewerSettingName)
     button:SetSize(width, height)
@@ -303,10 +304,15 @@ function StyledIcons.UpdateIconStyle(icon, viewerSettingName)
     if not icon or not viewerSettingName then
         return
     end
-    if IsSquareIconsEnabled(viewerSettingName) then
+    local enabled = IsSquareIconsEnabled(viewerSettingName)
+    
+    if enabled then
         ApplySquareStyle(icon, viewerSettingName)
     else
-        RestoreOriginalStyle(icon, viewerSettingName)
+        -- Only restore if this icon was previously styled by us
+        if icon.suiSquareStyled then
+            RestoreOriginalStyle(icon, viewerSettingName)
+        end
     end
 end
 

@@ -198,9 +198,29 @@ end
 ---------------------------------------------------------------------------
 local function ApplyTexCoord(icon)
     if not icon then return end
+    
+    -- Check if square icons styling OR NCDM zoom is enabled
+    local profile = SUICore and SUICore.db and SUICore.db.profile
+    if not profile then return end
+    
+    -- Only apply TexCoord if square icons enabled OR if there's custom zoom
+    local hasSquareStyle = profile.cooldownManager_squareIcons_Essential or 
+                           profile.cooldownManager_squareIcons_Utility or
+                           profile.cooldownManager_squareIcons_BuffIcons
+    
     local z = icon._ncdmZoom or 0
+    if z == 0 and not hasSquareStyle then
+        -- No styling needed - leave TexCoord at default (0, 1, 0, 1)
+        local tex = icon.Icon or icon.icon
+        if tex and tex.SetTexCoord then
+            tex:SetTexCoord(0, 1, 0, 1)
+        end
+        return
+    end
+    
     local aspectRatio = icon._ncdmAspectRatio or 1.0
-    local baseCrop = 0.08
+    -- Only apply base crop if styling is enabled
+    local baseCrop = (hasSquareStyle or z > 0) and 0.08 or 0
 
     -- Start with base crop + zoom
     local left = baseCrop + z
