@@ -43,6 +43,40 @@ function SuaviUI:OnInitialize()
     self:CheckMediaRegistration()
 end
 
+-- Blizzard EncounterWarnings bug workaround
+-- EncounterWarningsViewElements:Init (line 75) crashes with "attempt to compare a secret value"
+-- when Edit Mode triggers RefreshEncounterEvents with placeholder encounterWarningInfo that
+-- contains protected nil fields (text, isDeadly, etc.). Wrap ShowWarning in pcall to absorb it.
+do
+    local function PatchEncounterWarnings()
+        if EncounterWarnings and EncounterWarnings.ShowWarning and not EncounterWarnings._suaviPatched then
+            EncounterWarnings._suaviPatched = true
+            local orig = EncounterWarnings.ShowWarning
+            EncounterWarnings.ShowWarning = function(self, ...)
+                local ok, err = pcall(orig, self, ...)
+                if not ok and type(err) == "string" and err:find("secret value") then
+                    -- Silently absorb the Blizzard EncounterWarnings secret-value crash
+                    return
+                elseif not ok then
+                    error(err, 2)
+                end
+            end
+        end
+    end
+    -- Patch immediately if already loaded, otherwise wait for ADDON_LOADED
+    PatchEncounterWarnings()
+    if not (EncounterWarnings and EncounterWarnings._suaviPatched) then
+        local f = CreateFrame("Frame")
+        f:RegisterEvent("ADDON_LOADED")
+        f:SetScript("OnEvent", function(self, _, addonName)
+            if addonName == "Blizzard_EncounterWarnings" then
+                PatchEncounterWarnings()
+                self:UnregisterAllEvents()
+            end
+        end)
+    end
+end
+
 -- Quick Keybind Mode shortcut (/kb)
 SLASH_SUIKB1 = "/kb"
 SlashCmdList["SUIKB"] = function()

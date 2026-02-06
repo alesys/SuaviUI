@@ -1,5 +1,8 @@
 local ADDON_NAME, ns = ...
 local SUICore = ns.Addon
+
+-- TEMP: Force-disable CDM viewer reanchoring to avoid moving BuffIcon/BuffBar viewers
+local FORCE_DISABLE_CDM_NUDGE = true
 local LibEditModeOverride = LibStub("LibEditModeOverride-1.0", true)
 
 -- Extra nudge targets: Blizzard Edit Mode unit frame anchors
@@ -1055,11 +1058,13 @@ local function SetupEditModeHooks()
         -- Let Blizzard's native Edit Mode handle CDM viewers and standard Edit Mode frames
         -- SUICore:ShowViewerOverlays()
         -- SUICore:ShowBlizzardFrameOverlays()
-        SUICore:ShowMinimapOverlay()  -- Show nudge overlay on SUI minimap
-        SUICore:EnableMinimapEditMode()  -- Temporarily allow minimap movement
+        -- Old minimap overlay disabled: now handled by minimap_editmode.lua via LibEQOL
+        -- SUICore:ShowMinimapOverlay()
+        -- SUICore:EnableMinimapEditMode()
     end)
 
     hooksecurefunc(EditModeManagerFrame, "ExitEditMode", function()
+        if FORCE_DISABLE_CDM_NUDGE then return end
         -- NudgeFrame is lazy-loaded, only hide if it exists
         if SUICore.nudgeFrame then
             SUICore.nudgeFrame:Hide()
@@ -1067,8 +1072,9 @@ local function SetupEditModeHooks()
         SUICore:DisableClickDetection()
         -- SUICore:HideViewerOverlays()
         -- SUICore:HideBlizzardFrameOverlays()
-        SUICore:HideMinimapOverlay()  -- Hide minimap overlay
-        SUICore:DisableMinimapEditMode()  -- Restore minimap lock setting
+        -- Old minimap overlay disabled: now handled by minimap_editmode.lua via LibEQOL
+        -- SUICore:HideMinimapOverlay()
+        -- SUICore:DisableMinimapEditMode()
         SUICore.selectedViewer = nil
         -- Clear central selection (in case a CDM viewer was selected)
         if SUICore.ClearEditModeSelection then
@@ -1157,6 +1163,7 @@ end
 local viewerAnchorFixFrame = CreateFrame("Frame")
 viewerAnchorFixFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 viewerAnchorFixFrame:SetScript("OnEvent", function(self, event, isInitialLogin, isReloadingUi)
+    if FORCE_DISABLE_CDM_NUDGE then return end
     -- Only run on reload, not fresh launch (fresh launch has correct anchors)
     if not isReloadingUi then return end
 

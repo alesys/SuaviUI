@@ -10,6 +10,14 @@ local ADDON_NAME, ns = ...
 local SUICore = ns.Addon
 local LSM = LibStub("LibSharedMedia-3.0")
 
+-- TEMP: Force-disable NCDM to prevent any cooldown icon layout/spacing changes
+local FORCE_DISABLE_NCDM = true
+if FORCE_DISABLE_NCDM then
+    ns.NCDM = ns.NCDM or {}
+    ns.NCDM.disabled = true
+    return
+end
+
 -- Enable CDM immediately when file loads (before any events fire)
 pcall(function() SetCVar("cooldownViewerEnabled", 1) end)
 

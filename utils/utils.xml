@@ -28,6 +28,7 @@
     <Script file="unitframes_editmode.lua"/>
     <Script file="castbar_editmode.lua"/>
     <Script file="suicore_minimap.lua"/>
+    <Script file="minimap_editmode.lua"/>
     <Script file="sui_dungeon_data.lua"/>
     <Script file="sui_datatexts.lua"/>
     <Script file="sui_datapanels.lua"/>

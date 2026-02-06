@@ -98,6 +98,11 @@ function Runtime:IsReady(viewerNameOrFrame)
 end
 
 CMC_DEBUG = false
+-- CDM layout is controlled by the user-facing "Use Centered Styling" toggle
+-- When disabled, all centering/alignment routines early-return.
+local function FORCE_DISABLE_CDM_LAYOUT()
+    return not GetSetting("cooldownManager_useCenteredStyling", false)
+end
 local PrintDebug = function(...)
     if CMC_DEBUG then
         print("[CMC]", ...)
@@ -395,6 +400,10 @@ function ViewerAdapters.UpdateBuffIcons()
     -- Why: Position Buff Icon viewer children based on isHorizontal, iconDirection, and alignment.
     -- When: On aura events, settings changes, or explicit refresh calls when the feature is enabled.
 
+    if FORCE_DISABLE_CDM_LAYOUT() then
+        return
+    end
+
     if not Runtime:IsReady(BuffIconCooldownViewer)
         or GetSetting("cooldownManager_alignBuffIcons_growFromDirection", "START") == "Disable" then
         return
@@ -479,6 +488,9 @@ end
 function ViewerAdapters.UpdateBuffBarsIfNeeded()
     -- Why: Align Buff Bar frames from chosen growth direction when enabled and changes detected.
     -- When: On aura events, settings changes, or explicit refresh calls when the feature is enabled.
+    if FORCE_DISABLE_CDM_LAYOUT() then
+        return
+    end
     if not Runtime:IsReady(BuffBarCooldownViewer)
         or GetSetting("cooldownManager_alignBuffBars_growFromDirection", "BOTTOM") == "Disable" then
         return
@@ -633,6 +645,9 @@ local sizeSavedValues = {
 function ViewerAdapters.CenterAllRows(viewer, fromDirection)
     -- Why: Core centering routine that groups children into rows/columns and applies offsets.
     -- When: `UpdateEssentialIfNeeded` or `UpdateUtilityIfNeeded` determines changes require recompute.
+    if FORCE_DISABLE_CDM_LAYOUT() then
+        return
+    end
     if not Runtime:IsReady(viewer) then
         return
     end
@@ -706,11 +721,17 @@ function ViewerAdapters.CenterAllRows(viewer, fromDirection)
 end
 
 function CooldownManager.UpdateEssentialIfNeeded()
+    if FORCE_DISABLE_CDM_LAYOUT() then
+        return
+    end
     local growKey = "cooldownManager_centerEssential_growFromDirection"
     ViewerAdapters.CenterAllRows(EssentialCooldownViewer, GetSetting(growKey, "TOP"))
 end
 
 function CooldownManager.UpdateUtilityIfNeeded()
+    if FORCE_DISABLE_CDM_LAYOUT() then
+        return
+    end
     local growKey = "cooldownManager_centerUtility_growFromDirection"
     ViewerAdapters.CenterAllRows(UtilityCooldownViewer, GetSetting(growKey, "TOP"))
 end
@@ -724,6 +745,16 @@ end
 
 function CooldownManager.ForceRefresh(parts)
     parts = parts or { icons = true, bars = true, essential = true, utility = true }
+    if FORCE_DISABLE_CDM_LAYOUT() then
+        -- Centering is OFF: tell Blizzard to re-layout so positions reset to default
+        for _, name in ipairs({ "EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer", "BuffBarCooldownViewer" }) do
+            local v = viewers[name]
+            if v and v.RefreshLayout then
+                pcall(v.RefreshLayout, v)
+            end
+        end
+        return
+    end
     if parts.icons then
         StateTracker.MarkBuffIconsDirty()
     end

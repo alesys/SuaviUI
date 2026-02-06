@@ -125,7 +125,7 @@ GUI.Layout = {
         height = 6,              -- Form slider track height
         thumbWidth = 14,         -- Form slider thumb width
         thumbHeight = 14,        -- Form slider thumb height
-        rightInset = 70,         -- Space reserved for value input on right
+        rightInset = 95,         -- Space reserved for value input on right
     },
     
     -- Spacing scale (Tailwind-inspired)

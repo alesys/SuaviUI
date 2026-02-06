@@ -345,6 +345,47 @@ local function GetExtraButtonDB(buttonType)
         and SUICore.db.profile.actionBars.bars[buttonType]
 end
 
+-- Extra Action Button content check (avoid empty frame on reload)
+local function HasExtraActionContent()
+    if not HasExtraActionBar then
+        return false
+    end
+    local okHas, hasBar = pcall(HasExtraActionBar)
+    if not okHas or not hasBar then
+        return false
+    end
+    if not ExtraActionBarFrame or not ExtraActionBarFrame.button then
+        return false
+    end
+
+    local button = ExtraActionBarFrame.button
+    local action = button.action or (button.GetAttribute and button:GetAttribute("action"))
+    if not action then
+        return false
+    end
+
+    if GetActionInfo then
+        local okInfo, actionType = pcall(GetActionInfo, action)
+        if not okInfo or not actionType then
+            return false
+        end
+    end
+
+    if GetActionTexture then
+        local okTex, tex = pcall(GetActionTexture, action)
+        if okTex and tex then
+            return true
+        end
+    end
+
+    local icon = button.icon or button.Icon
+    if icon and icon.GetTexture and not icon:GetTexture() then
+        return false
+    end
+
+    return true
+end
+
 -- Create holder frame and mover overlay for an extra button type
 local function CreateExtraButtonHolder(buttonType, displayName)
     local settings = GetExtraButtonDB(buttonType)
@@ -518,14 +559,7 @@ local function ApplyExtraButtonSettings(buttonType)
             -- Check if button actually has content (not just frame visibility)
             local hasContent = false
             if buttonType == "extraActionButton" then
-                -- Use HasExtraActionBar() API to check if there's actually an extra action
-                hasContent = HasExtraActionBar and HasExtraActionBar()
-                if hasContent and ExtraActionBarFrame and ExtraActionBarFrame.button and ExtraActionBarFrame.button.action then
-                    local actionType = GetActionInfo and GetActionInfo(ExtraActionBarFrame.button.action)
-                    if not actionType then
-                        hasContent = false
-                    end
-                end
+                hasContent = HasExtraActionContent()
             elseif buttonType == "zoneAbility" then
                 -- Zone ability: check if there are any active buttons in the container
                 if ZoneAbilityFrame and ZoneAbilityFrame.SpellButtonContainer then
@@ -552,13 +586,7 @@ local function ApplyExtraButtonSettings(buttonType)
                 -- Verify there's actually content before showing
                 local hasContent = false
                 if buttonType == "extraActionButton" then
-                    hasContent = HasExtraActionBar and HasExtraActionBar()
-                    if hasContent and ExtraActionBarFrame and ExtraActionBarFrame.button and ExtraActionBarFrame.button.action then
-                        local actionType = GetActionInfo and GetActionInfo(ExtraActionBarFrame.button.action)
-                        if not actionType then
-                            hasContent = false
-                        end
-                    end
+                    hasContent = HasExtraActionContent()
                 elseif buttonType == "zoneAbility" then
                     -- Check if there are any active buttons in the container
                     if ZoneAbilityFrame and ZoneAbilityFrame.SpellButtonContainer then

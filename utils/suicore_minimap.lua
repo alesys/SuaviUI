@@ -962,6 +962,16 @@ local function UpdateButtonVisibility()
             ExpansionLandingPageMinimapButton:ClearAllPoints()
             ExpansionLandingPageMinimapButton:SetPoint("LEFT", Minimap, "LEFT", -5, 0)
             ExpansionLandingPageMinimapButton:Show()
+            -- Re-run Blizzard's icon init so .title/.description are populated
+            -- (reparenting can skip the normal event-driven initialization)
+            if ExpansionLandingPageMinimapButton.UpdateIcon then
+                pcall(ExpansionLandingPageMinimapButton.UpdateIcon, ExpansionLandingPageMinimapButton)
+            end
+            -- Safety net: if title is still nil, SetTooltip() would error on SetText(nil)
+            if not ExpansionLandingPageMinimapButton.title then
+                ExpansionLandingPageMinimapButton.title = EXPANSION_LANDING_PAGE_TITLE or ""
+                ExpansionLandingPageMinimapButton.description = ""
+            end
         else
             ExpansionLandingPageMinimapButton:SetParent(hiddenButtonParent)
             ExpansionLandingPageMinimapButton:Hide()
@@ -1106,21 +1116,35 @@ end
 local function SetupAddonButtonHiding()
     local settings = GetSettings()
     if not settings or not settings.enabled or not LibDBIcon then return end
+
+    local function GetSuaviButtonMouseover()
+        if SUICore and SUICore.db and SUICore.db.profile and SUICore.db.profile.minimapButton then
+            return SUICore.db.profile.minimapButton.showOnMouseover
+        end
+        return false
+    end
+
+    local function ShouldShowOnEnter(buttonName, defaultValue)
+        if buttonName == ADDON_NAME then
+            return GetSuaviButtonMouseover()
+        end
+        return defaultValue
+    end
     
     if settings.hideAddonButtons then
         local buttons = LibDBIcon:GetButtonList()
         for i = 1, #buttons do
-            LibDBIcon:ShowOnEnter(buttons[i], true)
+            LibDBIcon:ShowOnEnter(buttons[i], ShouldShowOnEnter(buttons[i], true))
         end
         
         -- Hook for new buttons
         LibDBIcon.RegisterCallback(Minimap_Module, "LibDBIcon_IconCreated", function(_, _, buttonName)
-            LibDBIcon:ShowOnEnter(buttonName, true)
+            LibDBIcon:ShowOnEnter(buttonName, ShouldShowOnEnter(buttonName, true))
         end)
     else
         local buttons = LibDBIcon:GetButtonList()
         for i = 1, #buttons do
-            LibDBIcon:ShowOnEnter(buttons[i], false)
+            LibDBIcon:ShowOnEnter(buttons[i], ShouldShowOnEnter(buttons[i], false))
         end
         LibDBIcon.UnregisterCallback(Minimap_Module, "LibDBIcon_IconCreated")
     end
@@ -1175,23 +1199,15 @@ local function SetupMinimapDragging()
         MinimapCluster:EnableMouse(false)
     end
     
-    -- Setup dragging - MUST enable mouse for drag to work
+    -- Ensure mouse interaction for minimap clicks, but dragging is now handled via Edit Mode
     Minimap:EnableMouse(true)
-    Minimap:SetMovable(not settings.lock)
     Minimap:SetClampedToScreen(true)
-    Minimap:RegisterForDrag("LeftButton")
-    
-    Minimap:SetScript("OnDragStart", function(self)
-        if self:IsMovable() then
-            self:StartMoving()
-        end
-    end)
-    
-    Minimap:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        local point, _, relPoint, x, y = self:GetPoint()
-        settings.position = {point, relPoint, x, y}
-    end)
+    -- Don't force SetMovable(false) if currently in Edit Mode (LEM manages movable state)
+    local LEM = LibStub and LibStub("LibEQOLEditMode-1.0", true)
+    local inEditMode = LEM and LEM.IsInEditMode and LEM:IsInEditMode()
+    if not inEditMode then
+        Minimap:SetMovable(false)
+    end
     
     -- Apply saved position (handles both array format from drag and keyed format from defaults)
     local pos = settings.position
@@ -1378,6 +1394,7 @@ function Minimap_Module:Initialize()
     SetupMouseWheelZoom()
     SetupAutoZoom()
 
+
     -- Start performance-optimized ticker updates
     StartUpdateTickers()
 
@@ -1485,28 +1502,19 @@ function Minimap_Module:Refresh()
     SetupAddonButtonHiding()
     UpdateDungeonEyePosition()
 
-    -- Update lock/movable state and ensure drag is registered
-    Minimap:SetMovable(not settings.lock)
+    -- Ensure minimap remains interactive
     Minimap:EnableMouse(true)
-    Minimap:RegisterForDrag("LeftButton")
     
-    -- Re-setup drag scripts (may have been lost)
-    Minimap:SetScript("OnDragStart", function(self)
-        if self:IsMovable() then
-            self:StartMoving()
+    -- Guard: Don't force SetMovable(false) or reposition during Edit Mode — LEM manages that
+    local LEM = LibStub and LibStub("LibEQOLEditMode-1.0", true)
+    local inEditMode = LEM and LEM.IsInEditMode and LEM:IsInEditMode()
+    if not inEditMode then
+        Minimap:SetMovable(false)
+        -- Restore saved position from profile (validate position data exists)
+        if settings.position and settings.position[1] and settings.position[2] then
+            Minimap:ClearAllPoints()
+            Minimap:SetPoint(settings.position[1], UIParent, settings.position[2], settings.position[3] or 0, settings.position[4] or 0)
         end
-    end)
-    
-    Minimap:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        local point, _, relPoint, x, y = self:GetPoint()
-        settings.position = {point, relPoint, x, y}
-    end)
-    
-    -- Restore saved position from profile (validate position data exists)
-    if settings.position and settings.position[1] and settings.position[2] then
-        Minimap:ClearAllPoints()
-        Minimap:SetPoint(settings.position[1], UIParent, settings.position[2], settings.position[3] or 0, settings.position[4] or 0)
     end
 end
 

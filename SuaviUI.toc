@@ -6,7 +6,7 @@
 ## AddonCompartmentFuncOnLeave: SuaviUI_CompartmentOnLeave
 ## Notes: Complete |cFF30D1FFUI|r customization suite with configurable frames and widgets
 ## Author: Suavicremas
-## Version: 0.1.10-alpha
+## Version: 0.1.11-alpha
 ## DefaultState: Enabled
 ## LoadOnDemand: 0
 ## OptionalDeps: SenseiClassResourceBar

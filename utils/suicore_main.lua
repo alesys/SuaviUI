@@ -2859,6 +2859,7 @@ local defaults = {
         },
 
         -- CooldownManagerCentered (layout/centering defaults)
+        cooldownManager_useCenteredStyling = false,
         cooldownManager_alignBuffIcons_growFromDirection = "START",
         cooldownManager_alignBuffBars_growFromDirection = "BOTTOM",
         cooldownManager_centerEssential_growFromDirection = "TOP",
@@ -3941,6 +3942,13 @@ function SUICore:OnEnable()
         end
     end)
 
+    -- DEFERRED 1.2s: Minimap icon visibility state (mouseover-only) after icon creation
+    C_Timer.After(1.2, function()
+        if self.ApplyMinimapButtonSettings then
+            self:ApplyMinimapButtonSettings()
+        end
+    end)
+
     -- DEFERRED 2.0s: Safety retry for late-loading frames
     C_Timer.After(2.0, function()
         if not InCombatLockdown() then
@@ -3969,12 +3977,16 @@ function SUICore:CreateMinimapButton()
         self.db.profile.minimapButton = {
             hide = false,
             minimapPos = 180,  -- Default position for LibDBIcon (9 o'clock)
+            showOnMouseover = false,
         }
     end
     
     -- Ensure minimapPos exists (for library compatibility)
     if not self.db.profile.minimapButton.minimapPos then
         self.db.profile.minimapButton.minimapPos = 180
+    end
+    if self.db.profile.minimapButton.showOnMouseover == nil then
+        self.db.profile.minimapButton.showOnMouseover = false
     end
     
     -- Get or create DataBroker object
@@ -4004,7 +4016,41 @@ function SUICore:CreateMinimapButton()
     
     -- Register with LibDBIcon using separate minimapButton settings
     if dataObj then
-        LibDBIcon:Register(ADDON_NAME, dataObj, self.db.profile.minimapButton)
+        if not LibDBIcon:GetMinimapButton(ADDON_NAME) then
+            LibDBIcon:Register(ADDON_NAME, dataObj, self.db.profile.minimapButton)
+        end
+        -- Apply mouseover-only visibility on load
+        if self.ApplyMinimapButtonSettings then
+            self:ApplyMinimapButtonSettings()
+        end
+    end
+end
+
+function SUICore:ApplyMinimapButtonSettings()
+    local LibDBIcon = LibStub("LibDBIcon-1.0", true)
+    if not LibDBIcon or not self.db or not self.db.profile or not self.db.profile.minimapButton then
+        return
+    end
+
+    local db = self.db.profile.minimapButton
+    local button = LibDBIcon:GetMinimapButton(ADDON_NAME)
+    if not button then
+        return
+    end
+
+    LibDBIcon:ShowOnEnter(ADDON_NAME, db.showOnMouseover)
+
+    if db.hide then
+        LibDBIcon:Hide(ADDON_NAME)
+    else
+        LibDBIcon:Show(ADDON_NAME)
+    end
+
+    LibDBIcon:Refresh(ADDON_NAME)
+
+    -- Ensure visible state when mouseover-only is disabled
+    if not db.showOnMouseover and not db.hide then
+        button:SetAlpha(1)
     end
 end
 

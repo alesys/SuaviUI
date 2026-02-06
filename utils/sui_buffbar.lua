@@ -2,6 +2,9 @@
 local SUICore = ns.Addon
 local LSM = LibStub("LibSharedMedia-3.0")
 
+-- TEMP: Force-disable CDM buff icon/bar layout adjustments
+local FORCE_DISABLE_CDM_BUFFBAR = true
+
 if _G.SuaviUI and _G.SuaviUI.CooldownManagerCentered then
     return
 end
@@ -955,6 +958,7 @@ local iconState = {
 }
 
 LayoutBuffIcons = function()
+    if FORCE_DISABLE_CDM_BUFFBAR then return end
     if not BuffIconCooldownViewer then return end
     if isIconLayoutRunning then return end  -- Re-entry guard
     if IsLayoutSuppressed() then return end
@@ -1129,6 +1133,7 @@ local barState = {
 }
 
 LayoutBuffBars = function()
+    if FORCE_DISABLE_CDM_BUFFBAR then return end
     if not BuffBarCooldownViewer then return end
     if isBarLayoutRunning then return end  -- Re-entry guard
     if IsLayoutSuppressed() then return end
@@ -1367,6 +1372,7 @@ local function BuildIconHash(count, settings)
 end
 
 local function CheckIconChanges()
+    if FORCE_DISABLE_CDM_BUFFBAR then return end
     if not BuffIconCooldownViewer then return end
     if isIconLayoutRunning then return end
     if IsLayoutSuppressed() then return end
@@ -1395,6 +1401,7 @@ local function CheckIconChanges()
 end
 
 local function CheckBarChanges()
+    if FORCE_DISABLE_CDM_BUFFBAR then return end
     if not BuffBarCooldownViewer then return end
     if isBarLayoutRunning then return end  -- Skip if already laying out
 
@@ -1413,6 +1420,7 @@ end
 local forcePopulateDone = false
 
 local function ForcePopulateBuffIcons()
+    if FORCE_DISABLE_CDM_BUFFBAR then return end
     if forcePopulateDone then return end
     if InCombatLockdown() then return end
 
@@ -1463,6 +1471,7 @@ end
 local initialized = false
 
 local function Initialize()
+    if FORCE_DISABLE_CDM_BUFFBAR then return end
     if initialized then return end
     initialized = true
 
@@ -1617,6 +1626,7 @@ eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:SetScript("OnEvent", function(self, event, ...)
+    if FORCE_DISABLE_CDM_BUFFBAR then return end
     if event == "PLAYER_LOGIN" then
         C_Timer.After(1, Initialize)
         -- Additional force populate attempts
@@ -1658,6 +1668,7 @@ SUI_BuffBar.Initialize = Initialize
 
 -- Force refresh function (can be called from GUI)
 function SUI_BuffBar.Refresh()
+    if FORCE_DISABLE_CDM_BUFFBAR then return end
     -- Reset states to force recalculation
     iconState.isInitialized = false
     iconState.lastCount = 0

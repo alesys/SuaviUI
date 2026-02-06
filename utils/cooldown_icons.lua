@@ -9,6 +9,10 @@ local StyledIcons = {}
 ns.StyledIcons = StyledIcons
 SuaviUI.StyledIcons = StyledIcons
 
+-- TEMP: Force-disable CDM icon styling (square icons + size normalization)
+-- Re-enabled to allow square styling from the CDM Options panel.
+local FORCE_DISABLE_CDM_STYLING = false
+
 local isModuleStyledEnabled = false
 local areHooksInitialized = false
 
@@ -42,6 +46,9 @@ local function GetProfile()
 end
 
 local function IsAnyStyledFeatureEnabled()
+    if FORCE_DISABLE_CDM_STYLING then
+        return false
+    end
     local profile = GetProfile()
     if not profile then
         return false
@@ -334,6 +341,12 @@ function StyledIcons.UpdateIconStyle(icon, viewerSettingName)
     if not icon or not viewerSettingName then
         return
     end
+    if FORCE_DISABLE_CDM_STYLING then
+        if icon.suiSquareStyled then
+            RestoreOriginalStyle(icon, viewerSettingName)
+        end
+        return
+    end
     local enabled = IsSquareIconsEnabled(viewerSettingName)
     
     if enabled then
@@ -439,6 +452,9 @@ function StyledIcons:Shutdown()
 end
 
 function StyledIcons:Enable()
+    if FORCE_DISABLE_CDM_STYLING then
+        return
+    end
     if isModuleStyledEnabled then
         return
     end
@@ -480,6 +496,9 @@ function StyledIcons:Disable()
 end
 
 function StyledIcons:Initialize()
+    if FORCE_DISABLE_CDM_STYLING then
+        return
+    end
     if not IsAnyStyledFeatureEnabled() then
         return
     end
@@ -487,6 +506,12 @@ function StyledIcons:Initialize()
 end
 
 function StyledIcons:OnSettingChanged()
+    if FORCE_DISABLE_CDM_STYLING then
+        if isModuleStyledEnabled then
+            self:Disable()
+        end
+        return
+    end
     local shouldBeEnabled = IsAnyStyledFeatureEnabled()
 
     if shouldBeEnabled and not isModuleStyledEnabled then

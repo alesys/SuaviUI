@@ -423,11 +423,32 @@ local function CreateGeneralQoLPage(parent)
 
         if db then
             db.general = db.general or {}
+
+            local scaleReloadPromptShown = false
+            local function PromptScaleReload()
+                if scaleReloadPromptShown then return end
+                scaleReloadPromptShown = true
+                GUI:ShowConfirmation({
+                    title = "Reload UI required",
+                    message = "To fully apply this UI scale (including Edit Mode snapping), you need to reload the UI. Reload now or do it later?",
+                    acceptText = "Reload now",
+                    cancelText = "Do it later",
+                    onAccept = function()
+                        scaleReloadPromptShown = false
+                        if SuaviUI and SuaviUI.SafeReload then SuaviUI:SafeReload() else ReloadUI() end
+                    end,
+                    onCancel = function()
+                        scaleReloadPromptShown = false
+                    end,
+                })
+            end
+
             local scaleSlider = GUI:CreateFormSlider(tabContent, "Global UI Scale", 0.3, 2.0, 0.01,
                 "uiScale", db.general, function(val)
                     -- Use Blizzard's CVar system to set scale (handles snap grid recalculation properly)
                     pcall(function() C_CVar.SetCVar("uiScale", val) end)
                     if SUICore and SUICore.UIMult then SUICore:UIMult() end
+                    PromptScaleReload()
                 end, { deferOnDrag = true, precision = 7 })
             scaleSlider:SetPoint("TOPLEFT", PADDING, y)
             scaleSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
@@ -440,12 +461,14 @@ local function CreateGeneralQoLPage(parent)
             local function ApplyPreset(val, name)
                 db.general = db.general or {}
                 db.general.uiScale = val
-                pcall(function() UIParent:SetScale(val) end)
+                -- Use Blizzard CVar so Edit Mode snap grid recalculates correctly
+                pcall(function() C_CVar.SetCVar("uiScale", val) end)
                 local msg = "|cff34D399[SuaviUI]|r UI scale set to " .. val
                 if name then msg = msg .. " (" .. name .. ")" end
                 DEFAULT_CHAT_FRAME:AddMessage(msg)
                 if SUICore and SUICore.UIMult then SUICore:UIMult() end
                 scaleSlider.SetValue(val, true)
+                PromptScaleReload()
             end
 
             local function AutoScale()
@@ -3907,48 +3930,11 @@ local function CreateMinimapPage(parent)
             enableCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            local lockCheck = GUI:CreateFormCheckbox(tabContent, "Lock SUI Minimap", "lock", mm, RefreshMinimap)
-            lockCheck:SetPoint("TOPLEFT", PAD, y)
-            lockCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local sizeSlider = GUI:CreateFormSlider(tabContent, "Map Dimensions (Pixels)", 120, 380, 1, "size", mm, RefreshMinimap)
-            sizeSlider:SetPoint("TOPLEFT", PAD, y)
-            sizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local scaleSlider = GUI:CreateFormSlider(tabContent, "Minimap Scale", 0.5, 2.0, 0.01, "scale", mm, RefreshMinimap, { deferOnDrag = true })
-            scaleSlider:SetPoint("TOPLEFT", PAD, y)
-            scaleSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local scaleDesc = GUI:CreateLabel(tabContent, "Scales minimap and datatext panel together without changing base pixel size.", 11, C.textMuted)
-            scaleDesc:SetPoint("TOPLEFT", PAD, y + 4)
-            scaleDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            scaleDesc:SetJustifyH("LEFT")
-            y = y - 20
-
-            y = y - 10
-
-            -- SECTION 2: Frame Styling
-            local styleHeader = GUI:CreateSectionHeader(tabContent, "Frame Styling")
-            styleHeader:SetPoint("TOPLEFT", PAD, y)
-            y = y - styleHeader.gap
-
-            local borderSlider = GUI:CreateFormSlider(tabContent, "Border Size", 1, 16, 1, "borderSize", mm, RefreshMinimap)
-            borderSlider:SetPoint("TOPLEFT", PAD, y)
-            borderSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local borderColor = GUI:CreateFormColorPicker(tabContent, "Custom Border Color", "borderColor", mm, RefreshMinimap)
-            borderColor:SetPoint("TOPLEFT", PAD, y)
-            borderColor:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local classBorderCheck = GUI:CreateFormCheckbox(tabContent, "Use Class Color for Edge", "useClassColorBorder", mm, RefreshMinimap)
-            classBorderCheck:SetPoint("TOPLEFT", PAD, y)
-            classBorderCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
+            local editModeNote = GUI:CreateLabel(tabContent, "Minimap position, size, scale, shape, and border styling are now configured in Edit Mode sidepanel.", 11, C.textMuted)
+            editModeNote:SetPoint("TOPLEFT", PAD, y)
+            editModeNote:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+            editModeNote:SetJustifyH("LEFT")
+            y = y - 30
 
             y = y - 10
 
@@ -5289,28 +5275,27 @@ local function CreateCooldownViewersPage(parent)
         end
     end
     
-    -- Initialize cooldownManager table if needed
-    if not db.cooldownManager_squareIcons_Essential then
-        if not db.cooldownManager_squareIcons_Essential then db.cooldownManager_squareIcons_Essential = false end
-        if not db.cooldownManager_squareIconsBorder_Essential then db.cooldownManager_squareIconsBorder_Essential = 4 end
-        if not db.cooldownManager_squareIconsBorder_Essential_Overlap then db.cooldownManager_squareIconsBorder_Essential_Overlap = false end
-        if not db.cooldownManager_squareIconsZoom_Essential then db.cooldownManager_squareIconsZoom_Essential = 0 end
-        if not db.cooldownManager_squareIcons_Utility then db.cooldownManager_squareIcons_Utility = false end
-        if not db.cooldownManager_squareIconsBorder_Utility then db.cooldownManager_squareIconsBorder_Utility = 4 end
-        if not db.cooldownManager_squareIconsBorder_Utility_Overlap then db.cooldownManager_squareIconsBorder_Utility_Overlap = false end
-        if not db.cooldownManager_squareIconsZoom_Utility then db.cooldownManager_squareIconsZoom_Utility = 0 end
-        if not db.cooldownManager_squareIcons_BuffIcons then db.cooldownManager_squareIcons_BuffIcons = false end
-        if not db.cooldownManager_squareIconsBorder_BuffIcons then db.cooldownManager_squareIconsBorder_BuffIcons = 4 end
-        if not db.cooldownManager_squareIconsBorder_BuffIcons_Overlap then db.cooldownManager_squareIconsBorder_BuffIcons_Overlap = false end
-        if not db.cooldownManager_squareIconsZoom_BuffIcons then db.cooldownManager_squareIconsZoom_BuffIcons = 0 end
-        if not db.cooldownManager_utility_dimWhenNotOnCD then db.cooldownManager_utility_dimWhenNotOnCD = false end
-        if not db.cooldownManager_utility_dimOpacity then db.cooldownManager_utility_dimOpacity = 0.3 end
-        if not db.cooldownManager_alignBuffIcons_growFromDirection then db.cooldownManager_alignBuffIcons_growFromDirection = "Disable" end
-        if not db.cooldownManager_alignBuffBars_growFromDirection then db.cooldownManager_alignBuffBars_growFromDirection = "Disable" end
-        if not db.cooldownManager_centerEssential_growFromDirection then db.cooldownManager_centerEssential_growFromDirection = "TOP" end
-        if not db.cooldownManager_centerUtility_growFromDirection then db.cooldownManager_centerUtility_growFromDirection = "TOP" end
-        if not db.cooldownManager_debugRefreshLogs then db.cooldownManager_debugRefreshLogs = false end
-    end
+    -- Initialize cooldownManager defaults (only when nil to avoid wiping user settings)
+    if db.cooldownManager_squareIcons_Essential == nil then db.cooldownManager_squareIcons_Essential = false end
+    if db.cooldownManager_squareIconsBorder_Essential == nil then db.cooldownManager_squareIconsBorder_Essential = 4 end
+    if db.cooldownManager_squareIconsBorder_Essential_Overlap == nil then db.cooldownManager_squareIconsBorder_Essential_Overlap = false end
+    if db.cooldownManager_squareIconsZoom_Essential == nil then db.cooldownManager_squareIconsZoom_Essential = 0 end
+    if db.cooldownManager_squareIcons_Utility == nil then db.cooldownManager_squareIcons_Utility = false end
+    if db.cooldownManager_squareIconsBorder_Utility == nil then db.cooldownManager_squareIconsBorder_Utility = 4 end
+    if db.cooldownManager_squareIconsBorder_Utility_Overlap == nil then db.cooldownManager_squareIconsBorder_Utility_Overlap = false end
+    if db.cooldownManager_squareIconsZoom_Utility == nil then db.cooldownManager_squareIconsZoom_Utility = 0 end
+    if db.cooldownManager_squareIcons_BuffIcons == nil then db.cooldownManager_squareIcons_BuffIcons = false end
+    if db.cooldownManager_squareIconsBorder_BuffIcons == nil then db.cooldownManager_squareIconsBorder_BuffIcons = 4 end
+    if db.cooldownManager_squareIconsBorder_BuffIcons_Overlap == nil then db.cooldownManager_squareIconsBorder_BuffIcons_Overlap = false end
+    if db.cooldownManager_squareIconsZoom_BuffIcons == nil then db.cooldownManager_squareIconsZoom_BuffIcons = 0 end
+    if db.cooldownManager_useCenteredStyling == nil then db.cooldownManager_useCenteredStyling = false end
+    if db.cooldownManager_utility_dimWhenNotOnCD == nil then db.cooldownManager_utility_dimWhenNotOnCD = false end
+    if db.cooldownManager_utility_dimOpacity == nil then db.cooldownManager_utility_dimOpacity = 0.3 end
+    if db.cooldownManager_alignBuffIcons_growFromDirection == nil then db.cooldownManager_alignBuffIcons_growFromDirection = "Disable" end
+    if db.cooldownManager_alignBuffBars_growFromDirection == nil then db.cooldownManager_alignBuffBars_growFromDirection = "Disable" end
+    if db.cooldownManager_centerEssential_growFromDirection == nil then db.cooldownManager_centerEssential_growFromDirection = "TOP" end
+    if db.cooldownManager_centerUtility_growFromDirection == nil then db.cooldownManager_centerUtility_growFromDirection = "TOP" end
+    if db.cooldownManager_debugRefreshLogs == nil then db.cooldownManager_debugRefreshLogs = false end
 
     -- =====================================================
     -- HEADER INFO
@@ -5390,20 +5375,25 @@ local function CreateCooldownViewersPage(parent)
     y = y - SLIDER_HEIGHT
 
     -- =====================================================
-    -- SQUARE ICONS STYLING
+    -- CDM STYLING
     -- =====================================================
     y = y - 10 -- Section spacing
-    local squareHeader = GUI:CreateSectionHeader(content, "SQUARE ICONS STYLING")
+    local squareHeader = GUI:CreateSectionHeader(content, "CDM STYLING")
     squareHeader:SetPoint("TOPLEFT", PADDING, y)
     y = y - squareHeader.gap
 
-    local squareDesc = GUI:CreateLabel(content, "Transform circular cooldown icons into square icons with borders and zoom effects.", 11, C.textMuted)
-    squareDesc:SetPoint("TOPLEFT", PADDING, y)
-    squareDesc:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    squareDesc:SetJustifyH("LEFT")
+    local cdmStyleDesc = GUI:CreateLabel(content, "Controls centering (dynamic alignment) and square icon styling for CDM viewers.", 11, C.textMuted)
+    cdmStyleDesc:SetPoint("TOPLEFT", PADDING, y)
+    cdmStyleDesc:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    cdmStyleDesc:SetJustifyH("LEFT")
     y = y - 24
 
-    -- Essential Cooldowns Square Styling
+    local centeredMasterCheck = GUI:CreateFormCheckbox(content, "Use Centered Styling", "cooldownManager_useCenteredStyling", db, RefreshIcons)
+    centeredMasterCheck:SetPoint("TOPLEFT", PADDING, y)
+    centeredMasterCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    y = y - FORM_ROW
+
+    -- Essential Cooldowns
     y = y - 10
     local essentialSubHeader = GUI:CreateLabel(content, "Essential Cooldowns", 12, C.textMuted)
     essentialSubHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -5431,7 +5421,7 @@ local function CreateCooldownViewersPage(parent)
     essentialZoomSlider.SetFormattedValue = function(value) return string.format("%.0f%%", value * 100) end
     y = y - SLIDER_HEIGHT
 
-    -- Utility Cooldowns Square Styling
+    -- Utility Cooldowns
     y = y - 10
     local utilitySubHeader = GUI:CreateLabel(content, "Utility Cooldowns", 12, C.textMuted)
     utilitySubHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -5459,7 +5449,7 @@ local function CreateCooldownViewersPage(parent)
     utilityZoomSlider.SetFormattedValue = function(value) return string.format("%.0f%%", value * 100) end
     y = y - SLIDER_HEIGHT
 
-    -- Buff Icons Square Styling
+    -- Buff Icons
     y = y - 10
     local buffSubHeader = GUI:CreateLabel(content, "Buff Icons", 12, C.textMuted)
     buffSubHeader:SetPoint("TOPLEFT", PADDING, y)
