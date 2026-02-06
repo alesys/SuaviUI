@@ -45,6 +45,10 @@ git push origin vX.X.X
 - `.DS_Store` - macOS metadata
 - `DS_Store` - macOS metadata (without dot)
 - `.previews/` - Screenshot previews
+- `.claude/` - Claude AI context files
+- `.busted` - Busted test runner config
+- `spec/` - Test specs
+- `mocks/` - Test mocks
 
 **Files INCLUDED in ZIP:**
 - All Lua files (`utils/`, `imports/`, `libs/`, `skinning/`)
@@ -135,31 +139,32 @@ SuaviUI.zip
 ## PowerShell Command Reference
 
 ### Create Release ZIP (Manual)
+
+**IMPORTANT**: Do NOT use `Compress-Archive -Path $files.FullName` — it flattens the
+directory structure, losing the `SuaviUI/` root folder and duplicating files at the
+top level. Use robocopy staging instead:
+
 ```powershell
 cd "e:\Games\World of Warcraft\_retail_\Interface\AddOns"
 
 # Remove old ZIP if exists
 if (Test-Path "SuaviUI-vX.X.X.zip") { Remove-Item "SuaviUI-vX.X.X.zip" }
 
-# Define exclusions
-$exclude = @('docs', '.git', '.github', '.gitignore', '.pkgmeta', '.wowup_ignore', 
-             '.copilot-instructions.md', 'SuaviUI.code-workspace', 'error.log', 
-             '.DS_Store', 'DS_Store', '.previews')
+# Stage a clean copy via robocopy (preserves folder structure)
+$staging = "$env:TEMP\SuaviUI-release"
+if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
 
-# Get files excluding specified paths
-$files = Get-ChildItem -Path "SuaviUI" -Recurse | Where-Object { 
-    $skip = $false
-    foreach ($ex in $exclude) { 
-        if ($_.FullName -like "*\$ex\*" -or $_.Name -eq $ex) { 
-            $skip = $true
-            break 
-        } 
-    }
-    -not $skip 
-}
+# /E = recursive, /XD = exclude dirs, /XF = exclude files
+robocopy "SuaviUI" "$staging\SuaviUI" /E /NFL /NDL /NJH /NJS /NC /NS `
+    /XD docs .git .github .previews .claude spec mocks `
+    /XF .gitignore .pkgmeta .wowup_ignore .copilot-instructions.md `
+        SuaviUI.code-workspace error.log .DS_Store DS_Store .busted
 
-# Create ZIP
-Compress-Archive -Path $files.FullName -DestinationPath "SuaviUI-vX.X.X.zip" -Force
+# Create ZIP from staging (SuaviUI/ is the root folder inside the archive)
+Compress-Archive -Path "$staging\SuaviUI" -DestinationPath "SuaviUI-vX.X.X.zip" -Force
+
+# Cleanup staging
+Remove-Item $staging -Recurse -Force
 
 # Verify
 if (Test-Path "SuaviUI-vX.X.X.zip") { 
