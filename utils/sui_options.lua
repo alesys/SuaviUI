@@ -5250,12 +5250,6 @@ local function CreateCooldownViewersPage(parent)
             end
         end
 
-        local coordinator = (SUI and SUI.CooldownCoordinator) or (_G.SuaviUI and _G.SuaviUI.CooldownCoordinator)
-        if coordinator and coordinator.RequestRefresh then
-            coordinator:RequestRefresh("options", { icons = true, bars = true, essential = true, utility = true }, { delay = 0 })
-            return
-        end
-
         -- Force the viewer frames to refresh their layout immediately
         -- Wrap in pcall to avoid Blizzard EditMode bugs
         local viewers = {

@@ -10,14 +10,6 @@ local ADDON_NAME, ns = ...
 local SUICore = ns.Addon
 local LSM = LibStub("LibSharedMedia-3.0")
 
--- TEMP: Force-disable NCDM to prevent any cooldown icon layout/spacing changes
-local FORCE_DISABLE_NCDM = true
-if FORCE_DISABLE_NCDM then
-    ns.NCDM = ns.NCDM or {}
-    ns.NCDM.disabled = true
-    return
-end
-
 -- Enable CDM immediately when file loads (before any events fire)
 pcall(function() SetCVar("cooldownViewerEnabled", 1) end)
 
@@ -206,29 +198,9 @@ end
 ---------------------------------------------------------------------------
 local function ApplyTexCoord(icon)
     if not icon then return end
-    
-    -- Check if square icons styling OR NCDM zoom is enabled
-    local profile = SUICore and SUICore.db and SUICore.db.profile
-    if not profile then return end
-    
-    -- Only apply TexCoord if square icons enabled OR if there's custom zoom
-    local hasSquareStyle = profile.cooldownManager_squareIcons_Essential or 
-                           profile.cooldownManager_squareIcons_Utility or
-                           profile.cooldownManager_squareIcons_BuffIcons
-    
     local z = icon._ncdmZoom or 0
-    if z == 0 and not hasSquareStyle then
-        -- No styling needed - leave TexCoord at default (0, 1, 0, 1)
-        local tex = icon.Icon or icon.icon
-        if tex and tex.SetTexCoord then
-            tex:SetTexCoord(0, 1, 0, 1)
-        end
-        return
-    end
-    
     local aspectRatio = icon._ncdmAspectRatio or 1.0
-    -- Only apply base crop if styling is enabled
-    local baseCrop = (hasSquareStyle or z > 0) and 0.08 or 0
+    local baseCrop = 0.08
 
     -- Start with base crop + zoom
     local left = baseCrop + z
@@ -259,51 +231,40 @@ local function SetupIconOnce(icon)
     if not icon or icon._ncdmSetup then return end
     icon._ncdmSetup = true
     
-    -- Store original mask textures before stripping (for restoration later)
-    if not icon._originalMasks then
-        icon._originalMasks = {}
-        local textures = { icon.Icon, icon.icon }
-        for _, tex in ipairs(textures) do
-            if tex and tex.GetMaskTexture then
-                for i = 1, 10 do
-                    local mask = tex:GetMaskTexture(i)
-                    if mask then
-                        table.insert(icon._originalMasks, { texture = tex, mask = mask, slot = i })
-                    end
+    -- Remove Blizzard's mask textures
+    local textures = { icon.Icon, icon.icon }
+    for _, tex in ipairs(textures) do
+        if tex and tex.GetMaskTexture and tex.RemoveMaskTexture then
+            for i = 1, 10 do
+                local mask = tex:GetMaskTexture(i)
+                if mask then
+                    tex:RemoveMaskTexture(mask)
                 end
             end
         end
     end
     
-    -- Store original NormalTexture alpha (for restoration later)
-    if not icon._originalNormalAlpha then
-        if icon.NormalTexture then
-            icon._originalNormalAlpha = icon.NormalTexture:GetAlpha()
-        elseif icon.GetNormalTexture then
-            local normalTex = icon:GetNormalTexture()
-            if normalTex then
-                icon._originalNormalAlpha = normalTex:GetAlpha()
-            end
+    -- Strip Blizzard's overlay texture
+    StripBlizzardOverlay(icon)
+    
+    -- Hide NormalTexture border
+    if icon.NormalTexture then
+        icon.NormalTexture:SetAlpha(0)
+    end
+    if icon.GetNormalTexture then
+        local normalTex = icon:GetNormalTexture()
+        if normalTex then
+            normalTex:SetAlpha(0)
         end
     end
-    
-    -- Store original overlay appearance
-    if not icon._overlayProcessed then
-        icon._overlayProcessed = true
-        -- Mark overlay textures so we can restore them later
-        for _, region in next, { icon:GetRegions() } do
-            if region:IsObjectType("Texture") then
-                local atlas = region:GetAtlas()
-                if atlas == "UI-HUD-CoolDownManager-IconOverlay" then
-                    region._originalAlpha = region:GetAlpha()
-                end
-            end
-        end
-    end
-    
-    -- NOTE: Do NOT strip masks/hide borders here!
-    -- Only do this when actually styling icons
-    -- This ensures icons look identical when addon is disabled
+
+    -- Block atlas borders (shifts CPU attribution to Blizzard's SetAtlas)
+    if icon.DebuffBorder then PreventAtlasBorder(icon.DebuffBorder) end
+    if icon.BuffBorder then PreventAtlasBorder(icon.BuffBorder) end
+    if icon.TempEnchantBorder then PreventAtlasBorder(icon.TempEnchantBorder) end
+
+    -- NOTE: Removed SetTexCoord hook to avoid taint during combat
+    -- TexCoord is now applied via the Layout hook instead (v1.34 approach)
 end
 
 ---------------------------------------------------------------------------
@@ -312,9 +273,88 @@ end
 local function SkinIcon(icon, size, aspectRatioCrop, zoom, borderSize, borderColorTable)
     if not icon then return end
 
-    -- [TEMPORARILY DISABLED] CDM styling code causing visual issues
-    -- TODO: Investigate and fix styling application
-    return true
+    -- Store zoom and aspect ratio for the texture coordinate calculation
+    icon._ncdmZoom = zoom or 0
+    icon._ncdmAspectRatio = aspectRatioCrop or 1.0
+
+    -- One-time setup (mask removal, overlay strip, SetTexCoord hook)
+    SetupIconOnce(icon)
+
+    -- Calculate dimensions (higher aspect ratio = flatter icon)
+    local aspectRatio = aspectRatioCrop or 1.0
+    local width = size
+    local height = size / aspectRatio
+
+    -- Set icon frame size
+    icon:SetSize(width, height)
+
+    -- Border (BACKGROUND texture approach)
+    borderSize = borderSize or 0
+    if borderSize > 0 then
+        if not icon._ncdmBorder then
+            icon._ncdmBorder = icon:CreateTexture(nil, "BACKGROUND", nil, -8)
+        end
+        local bc = borderColorTable or {0, 0, 0, 1}
+        icon._ncdmBorder:SetColorTexture(bc[1], bc[2], bc[3], bc[4])
+
+        icon._ncdmBorder:ClearAllPoints()
+        icon._ncdmBorder:SetPoint("TOPLEFT", icon, "TOPLEFT", -borderSize, borderSize)
+        icon._ncdmBorder:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", borderSize, -borderSize)
+        icon._ncdmBorder:Show()
+
+        -- Expand hit area to include border for mouseover detection
+        icon:SetHitRectInsets(-borderSize, -borderSize, -borderSize, -borderSize)
+    else
+        if icon._ncdmBorder then
+            icon._ncdmBorder:Hide()
+        end
+        -- Reset hit area when no border
+        icon:SetHitRectInsets(0, 0, 0, 0)
+    end
+    
+    -- One-time setup for textures and flash
+    if not icon._ncdmPositioned then
+        icon._ncdmPositioned = true
+
+        local textures = { icon.Icon, icon.icon }
+        for _, tex in ipairs(textures) do
+            if tex then
+                tex:ClearAllPoints()
+                tex:SetAllPoints(icon)
+            end
+        end
+
+        -- Hide CooldownFlash entirely to fix the square flash on ability ready
+        if icon.CooldownFlash then
+            icon.CooldownFlash:SetAlpha(0)
+            -- Hook Show to keep it hidden
+            if not icon.CooldownFlash._ncdmHooked then
+                icon.CooldownFlash._ncdmHooked = true
+                hooksecurefunc(icon.CooldownFlash, "Show", function(self)
+                    self:SetAlpha(0)
+                end)
+            end
+        end
+    end
+
+    -- Always re-anchor cooldown frame to match current icon size
+    local cooldown = icon.Cooldown or icon.cooldown
+    if cooldown then
+        cooldown:ClearAllPoints()
+        cooldown:SetAllPoints(icon)
+        -- Use simple stretchable texture so swipe fills entire frame
+        cooldown:SetSwipeTexture("Interface\\Buttons\\WHITE8X8")
+        cooldown:SetSwipeColor(0, 0, 0, 0.8)
+    end
+    
+    -- Always apply TexCoord (this is lightweight)
+    ApplyTexCoord(icon)
+
+    -- Hook for mouseover detection (handles dynamically created icons)
+    icon:EnableMouse(true)  -- Ensure icon receives mouse events
+    HookFrameForMouseover(icon)
+
+    return true  -- Successfully skinned
 end
 
 ---------------------------------------------------------------------------
@@ -546,11 +586,6 @@ local function LayoutViewer(viewerName, trackerKey)
     local viewer = _G[viewerName]
     if not viewer then return end
 
-    -- Avoid fighting CMC during coordinated refresh
-    if _G.SuaviUI_CooldownRefreshInProgress and _G.SuaviUI_CooldownRefreshPhase == "cmc" then
-        return
-    end
-
     -- Skip layout entirely if viewer is being dragged in EditMode
     -- This prevents interference with Blizzard's snap calculations
     if viewer.isDragging or viewer.isEditing then return end
@@ -574,15 +609,7 @@ local function LayoutViewer(viewerName, trackerKey)
     end
 
     -- Check for vertical layout mode
-    -- Respect Edit Mode's isHorizontal setting if available, otherwise use NCDM's layoutDirection
-    local layoutDirection
-    if viewer.isHorizontal ~= nil then
-        -- Edit Mode is controlling orientation - respect it
-        layoutDirection = viewer.isHorizontal and "HORIZONTAL" or "VERTICAL"
-    else
-        -- No Edit Mode setting - use NCDM's own setting
-        layoutDirection = settings.layoutDirection or "HORIZONTAL"
-    end
+    local layoutDirection = settings.layoutDirection or "HORIZONTAL"
     local isVertical = (layoutDirection == "VERTICAL")
 
     -- Store layout direction on viewer for power bar snap detection
@@ -1063,9 +1090,6 @@ local function HookViewer(viewerName, trackerKey)
 
     -- Step 5: OnSizeChanged hook - increment layout counter
     viewer:HookScript("OnSizeChanged", function(self, width, height)
-        if _G.SuaviUI_CooldownRefreshInProgress and _G.SuaviUI_CooldownRefreshPhase == "cmc" then
-            return
-        end
         -- Ignore size changes during our own layout to prevent loops
         if self.__cdmLayoutSuppressed or self.__cdmLayoutRunning then
             return
@@ -1328,16 +1352,7 @@ local function ApplyUtilityAnchor()
     utilViewer.__cdmAnchoredToEssential = true
 end
 
-local function RequestNCDMRefresh()
-    local coordinator = (ns and ns.CooldownCoordinator) or (_G.SuaviUI and _G.SuaviUI.CooldownCoordinator)
-    if coordinator and coordinator.RequestRefresh then
-        coordinator:RequestRefresh("ncdm", { essential = true, utility = true }, { delay = 0 })
-        return
-    end
-    RefreshAll()
-end
-
-_G.SuaviUI_RefreshNCDM = RequestNCDMRefresh
+_G.SuaviUI_RefreshNCDM = RefreshAll
 _G.SuaviUI_IncrementNCDMVersion = IncrementSettingsVersion
 _G.SuaviUI_ApplyUtilityAnchor = ApplyUtilityAnchor
 
@@ -1961,62 +1976,10 @@ _G.SuaviUI_RefreshCDMMouseover = SetupCDMMouseoverDetector
 _G.SuaviUI_RefreshUnitframesMouseover = SetupUnitframesMouseoverDetector
 
 ---------------------------------------------------------------------------
--- RESTORE ICON: Remove NCDM styling and restore Blizzard visuals
----------------------------------------------------------------------------
-local function RestoreIcon(icon)
-    if not icon then return end
-    
-    -- Restore NCDM-stripped masks
-    if icon._originalMasks then
-        local textures = { icon.Icon, icon.icon }
-        for _, tex in ipairs(textures) do
-            if tex and icon._originalMasks[tostring(tex)] then
-                for _, mask in ipairs(icon._originalMasks[tostring(tex)]) do
-                    if tex.AddMaskTexture then
-                        tex:AddMaskTexture(mask)
-                    end
-                end
-            end
-        end
-    end
-    
-    -- Restore NCDM-stripped NormalTexture
-    if icon._originalNormalAlpha then
-        if icon.NormalTexture then
-            icon.NormalTexture:SetAlpha(icon._originalNormalAlpha)
-        end
-        if icon.GetNormalTexture then
-            local normalTex = icon:GetNormalTexture()
-            if normalTex then
-                normalTex:SetAlpha(icon._originalNormalAlpha)
-            end
-        end
-    end
-    
-    -- Restore overlay textures hidden by StripBlizzardOverlay
-    for _, region in next, { icon:GetRegions() } do
-        if region:IsObjectType("Texture") then
-            local atlas = region:GetAtlas()
-            if atlas == "UI-HUD-CoolDownManager-IconOverlay" and region:GetAlpha() == 0 then
-                region:SetAlpha(1)
-            end
-        end
-    end
-    
-    -- Reset NCDM styling flag so it can be applied again if needed
-    icon._ncdmStyled = false
-    icon._ncdmZoom = nil
-    icon._ncdmAspectRatio = nil
-    icon.__cdmSkinned = nil
-    icon.__cdmSkinPending = nil
-end
-
----------------------------------------------------------------------------
 -- EXPOSE MODULE
 ---------------------------------------------------------------------------
 NCDM.Refresh = RefreshAll
 NCDM.LayoutViewer = LayoutViewer
-NCDM.RestoreIcon = RestoreIcon
 ns.NCDM = NCDM
 
 

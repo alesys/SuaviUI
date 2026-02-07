@@ -31,23 +31,6 @@ local function GetSetting(key, default)
     return profile[key]
 end
 
-local function GetCoordinator()
-    return (ns and ns.CooldownCoordinator) or (_G.SuaviUI and _G.SuaviUI.CooldownCoordinator)
-end
-
-local function RequestCoordinatedRefresh(parts, source, opts)
-    local coordinator = GetCoordinator()
-    if coordinator and coordinator.RequestRefresh then
-        coordinator:RequestRefresh(source or "cmc", parts, opts)
-        return true
-    end
-    return false
-end
-
-local function IsCoordinatorInProgress()
-    return _G.SuaviUI_CooldownRefreshInProgress
-end
-
 local function UpdateRuntime()
     if Runtime.isInEditMode or Runtime.hasSettingsOpened then
         Runtime.stop = true
@@ -98,11 +81,6 @@ function Runtime:IsReady(viewerNameOrFrame)
 end
 
 CMC_DEBUG = false
--- CDM layout is controlled by the user-facing "Use Centered Styling" toggle
--- When disabled, all centering/alignment routines early-return.
-local function FORCE_DISABLE_CDM_LAYOUT()
-    return not GetSetting("cooldownManager_useCenteredStyling", false)
-end
 local PrintDebug = function(...)
     if CMC_DEBUG then
         print("[CMC]", ...)
@@ -400,10 +378,6 @@ function ViewerAdapters.UpdateBuffIcons()
     -- Why: Position Buff Icon viewer children based on isHorizontal, iconDirection, and alignment.
     -- When: On aura events, settings changes, or explicit refresh calls when the feature is enabled.
 
-    if FORCE_DISABLE_CDM_LAYOUT() then
-        return
-    end
-
     if not Runtime:IsReady(BuffIconCooldownViewer)
         or GetSetting("cooldownManager_alignBuffIcons_growFromDirection", "START") == "Disable" then
         return
@@ -488,9 +462,6 @@ end
 function ViewerAdapters.UpdateBuffBarsIfNeeded()
     -- Why: Align Buff Bar frames from chosen growth direction when enabled and changes detected.
     -- When: On aura events, settings changes, or explicit refresh calls when the feature is enabled.
-    if FORCE_DISABLE_CDM_LAYOUT() then
-        return
-    end
     if not Runtime:IsReady(BuffBarCooldownViewer)
         or GetSetting("cooldownManager_alignBuffBars_growFromDirection", "BOTTOM") == "Disable" then
         return
@@ -645,9 +616,6 @@ local sizeSavedValues = {
 function ViewerAdapters.CenterAllRows(viewer, fromDirection)
     -- Why: Core centering routine that groups children into rows/columns and applies offsets.
     -- When: `UpdateEssentialIfNeeded` or `UpdateUtilityIfNeeded` determines changes require recompute.
-    if FORCE_DISABLE_CDM_LAYOUT() then
-        return
-    end
     if not Runtime:IsReady(viewer) then
         return
     end
@@ -721,17 +689,11 @@ function ViewerAdapters.CenterAllRows(viewer, fromDirection)
 end
 
 function CooldownManager.UpdateEssentialIfNeeded()
-    if FORCE_DISABLE_CDM_LAYOUT() then
-        return
-    end
     local growKey = "cooldownManager_centerEssential_growFromDirection"
     ViewerAdapters.CenterAllRows(EssentialCooldownViewer, GetSetting(growKey, "TOP"))
 end
 
 function CooldownManager.UpdateUtilityIfNeeded()
-    if FORCE_DISABLE_CDM_LAYOUT() then
-        return
-    end
     local growKey = "cooldownManager_centerUtility_growFromDirection"
     ViewerAdapters.CenterAllRows(UtilityCooldownViewer, GetSetting(growKey, "TOP"))
 end
@@ -745,16 +707,6 @@ end
 
 function CooldownManager.ForceRefresh(parts)
     parts = parts or { icons = true, bars = true, essential = true, utility = true }
-    if FORCE_DISABLE_CDM_LAYOUT() then
-        -- Centering is OFF: tell Blizzard to re-layout so positions reset to default
-        for _, name in ipairs({ "EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer", "BuffBarCooldownViewer" }) do
-            local v = viewers[name]
-            if v and v.RefreshLayout then
-                pcall(v.RefreshLayout, v)
-            end
-        end
-        return
-    end
     if parts.icons then
         StateTracker.MarkBuffIconsDirty()
     end
@@ -799,64 +751,46 @@ EventHandler.frame:SetScript("OnEvent", function(_, event, arg1)
             CooldownManager.HookViewerRefreshLayout()
         end
         C_Timer.After(0, function()
-            if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
-                CooldownManager.ForceRefreshAll()
-            end
+            CooldownManager.ForceRefreshAll()
         end)
         return
     end
     local parts = EventHandler.EventRefreshMap[event]
     if event == "PLAYER_REGEN_DISABLED" then
         C_Timer.After(0, function()
-            if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
-                CooldownManager.ForceRefreshAll()
-            end
+            CooldownManager.ForceRefreshAll()
         end)
         return
     end
     if event == "SPELL_UPDATE_COOLDOWN" and GetSetting("cooldownManager_utility_dimWhenNotOnCD", false) then
         C_Timer.After(0, function()
-            if not RequestCoordinatedRefresh({ utility = true }, "cmc", { delay = 0 }) then
-                CooldownManager.ForceRefresh({ utility = true })
-            end
+            CooldownManager.ForceRefresh({ utility = true })
         end)
         return
     end
     if parts then
-        if not RequestCoordinatedRefresh(parts, "cmc", { delay = 0 }) then
-            CooldownManager.ForceRefresh(parts)
-        end
+        CooldownManager.ForceRefresh(parts)
     else
-        if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
-            CooldownManager.ForceRefreshAll()
-        end
+        CooldownManager.ForceRefreshAll()
     end
 end)
 
 if EventRegistry then
     EventRegistry:RegisterCallback("CooldownViewerSettings.OnDataChanged", function()
         PrintDebug("CooldownViewerSettings.OnDataChanged triggered refresh")
-        if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
-            CooldownManager.ForceRefreshAll("CooldownViewerSettings.OnDataChanged")
-        end
+        CooldownManager.ForceRefreshAll("CooldownViewerSettings.OnDataChanged")
     end)
     EventRegistry:RegisterCallback("CooldownViewerSettings.OnShow", function()
         PrintDebug("CooldownViewerSettings.OnShow triggered refresh")
-        if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
-            CooldownManager.ForceRefreshAll("CooldownViewerSettings.OnShow")
-        end
+        CooldownManager.ForceRefreshAll("CooldownViewerSettings.OnShow")
     end)
     EventRegistry:RegisterCallback("CooldownViewerSettings.OnHide", function()
         PrintDebug("CooldownViewerSettings.OnHide triggered refresh")
-        if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
-            CooldownManager.ForceRefreshAll("CooldownViewerSettings.OnHide")
-        end
+        CooldownManager.ForceRefreshAll("CooldownViewerSettings.OnHide")
     end)
 
     EventRegistry:RegisterCallback("EditMode.Exit", function()
-        if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
-            CooldownManager.ForceRefreshAll()
-        end
+        CooldownManager.ForceRefreshAll()
     end)
 end
 
@@ -872,24 +806,14 @@ function CooldownManager.HookViewerRefreshLayout()
         if v and v.RefreshLayout and not v.__suiCMCRefreshHooked then
             v.__suiCMCRefreshHooked = true
             hooksecurefunc(v, "RefreshLayout", function()
-                if IsCoordinatorInProgress() then
-                    return
-                end
                 -- Wrap in pcall to prevent affecting Blizzard's Edit Mode flow
                 -- which can trigger EncounterWarnings bugs
                 pcall(function()
-                    if not RequestCoordinatedRefresh(viewerReasonPartsMap[n], "cmc", { delay = 0 }) then
-                        CooldownManager.ForceRefresh(viewerReasonPartsMap[n])
-                    end
+                    CooldownManager.ForceRefresh(viewerReasonPartsMap[n])
                 end)
                 C_Timer.After(0, function()
-                    if IsCoordinatorInProgress() then
-                        return
-                    end
                     pcall(function()
-                        if not RequestCoordinatedRefresh(viewerReasonPartsMap[n], "cmc", { delay = 0 }) then
-                            CooldownManager.ForceRefresh(viewerReasonPartsMap[n])
-                        end
+                        CooldownManager.ForceRefresh(viewerReasonPartsMap[n])
                     end)
                 end)
             end)
@@ -900,9 +824,7 @@ end
 function CooldownManager.Initialize()
     RefreshViewerRefs()
     CooldownManager.HookViewerRefreshLayout()
-    if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
-        CooldownManager.ForceRefreshAll()
-    end
+    CooldownManager.ForceRefreshAll()
 end
 
 C_Timer.After(0, function()
