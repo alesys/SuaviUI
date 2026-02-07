@@ -474,8 +474,9 @@ local function BuildUnitFrameSettings(unitKey)
 
             local layoutName = LEM.GetActiveLayoutName() or "Default"
 
-            -- Set current texture as default text
-            dropdown:SetDefaultText(settingObject.get(layoutName))
+            -- Set current texture as default text (with display name)
+            local currentTexture = settingObject.get(layoutName)
+            dropdown:SetDefaultText(TEXTURE_NAMES[currentTexture] or currentTexture)
 
             if not LSM then
                 local fallback = "Blizzard"
@@ -500,7 +501,7 @@ local function BuildUnitFrameSettings(unitKey)
                 local displayName = TEXTURE_NAMES[textureName] or textureName
 
                 local button = rootDescription:CreateButton(displayName, function()
-                    dropdown:SetDefaultText(textureName)
+                    dropdown:SetDefaultText(displayName)
                     settingObject.set(layoutName, textureName)
                 end)
 

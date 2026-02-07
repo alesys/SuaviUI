@@ -1,1 +1,75 @@
-﻿
+﻿This error comes from a Blizzard bug in the new built‑in Cooldown Viewer system, not from your own addons. [us.forums.blizzard](https://us.forums.blizzard.com/en/wow/t/constant-cooldownviewer-lua-error-in-middle-of-screen/2240690)
+
+## What the error is
+
+The message
+
+> `Blizzard_CooldownViewer/CooldownViewer.lua:947: attempt to compare local 'charges' (a secret value)`
+
+is a Lua error thrown inside Blizzard’s own addon `Blizzard_CooldownViewer`, specifically in the function `CacheChargeValues` that handles spell charges.  It typically fires whenever abilities with charges are used (for example BM Hunter abilities like Bestial Wrath or Barbed Shot). [us.forums.blizzard](https://us.forums.blizzard.com/en/wow/t/new-lua-errors-after-the-latest-hotfix/2245552)
+
+On current builds this error often appears together with other CooldownViewer “secret value” errors such as:
+
+- `attempt to compare local 'spellID' (a secret value)` in `CooldownViewer.lua` and `CooldownViewerItemData.lua` [us.forums.blizzard](https://us.forums.blizzard.com/en/wow/t/new-lua-errors-after-the-latest-hotfix/2245552)
+- `attempt to compare field 'maxCharges' (a secret value)` [bbs.nga](https://bbs.nga.cn/read.php?tid=46073340)
+
+These all indicate internal issues in Blizzard’s new cooldown data handling, often when charges or spell IDs are unexpectedly `false` or `<no value>`. [nga.178](https://nga.178.com/read.php?tid=5483616&page=1086)
+
+## Causes and relation to addons/taint
+
+From multiple reports:
+
+- Players with **all addons disabled** still get the CooldownViewer errors, confirming they are not caused by third‑party code. [us.forums.blizzard](https://us.forums.blizzard.com/en/wow/t/constant-cooldownviewer-lua-error-in-middle-of-screen/2240690)
+- The stack traces are entirely within Blizzard’s own files (`Blizzard_CooldownViewer.lua`, `CooldownViewerItemData.lua`, `TableUtil.lua`, `Blizzard_EditMode`), with no third‑party addon functions in the call stack. [us.forums.blizzard](https://us.forums.blizzard.com/en/wow/t/constant-cooldownviewer-lua-error-in-middle-of-screen/2240690)
+
+Because of that:
+
+- This is a **Blizzard UI bug**, introduced with Dragonflight/Midnight 12.0’s new Cooldown Viewer and recent hotfixes. [eu.forums.blizzard](https://eu.forums.blizzard.com/en/wow/t/absolute-disaster/602525)
+- It is not classical “taint” from an addon; it is native code mishandling values (e.g., trying to compare a protected “secret value” that is nil/false). [nga.178](https://nga.178.com/read.php?tid=5483616&page=1086)
+
+BugGrabber, BugSack, or similar tools **do not cause** the problem; they only capture and display the errors. The same errors appear in Blizzard’s own default error popup when all addons are off, so BugGrabber is just the messenger. [us.forums.blizzard](https://us.forums.blizzard.com/en/wow/t/new-lua-errors-after-the-latest-hotfix/2245552)
+
+## Known Blizzard bug status
+
+Recent forum posts describe this as a new problem after a hotfix, with many errors like:
+
+> “New LUA errors after the latest hotfix… `attempt to compare local 'charges' (a secret value)` … `attempt to compare local 'spellID' (a secret value)` … hundreds of errors during combat.” [eu.forums.blizzard](https://eu.forums.blizzard.com/en/wow/t/absolute-disaster/602525)
+
+There is no public hotfix note yet that fully resolves the Cooldown Viewer charge/spellID “secret value” issues, and players are reporting them as ongoing as of late January–early February 2026. [eu.forums.blizzard](https://eu.forums.blizzard.com/en/wow/t/absolute-disaster/602525)
+
+## Workarounds and practical fixes
+
+Until Blizzard ships a code fix, your options are basically to disable or avoid the Cooldown Viewer code paths:
+
+1. **Turn off the Cooldown Viewer UI (if exposed in Edit Mode/options)**  
+   Some builds expose a “Cooldowns”/“Cooldown Viewer” system in Edit Mode; hiding or disabling this system can stop the errors because the offending frame never initializes or updates. Users report stack traces tied to Edit Mode hiding/showing these systems. [us.forums.blizzard](https://us.forums.blizzard.com/en/wow/t/constant-cooldownviewer-lua-error-in-middle-of-screen/2240690)
+
+2. **Use a minimal “fix” addon that safely guards comparisons**  
+   Community posts on Chinese forums describe local fixes where they wrap comparisons of `charges`, `maxCharges`, or `spellID` with nil/boolean checks to avoid comparing “secret values”. [nga.178](https://nga.178.com/read.php?tid=46067233)
+   A simple example pattern (paraphrased) is adding guards like:
+   - Only compare charges if they are numbers, skip if `false` or `nil`. [nga.178](https://nga.178.com/read.php?tid=5483616&page=1086)
+
+   You can look for small “CooldownViewer fix”/“secret value fix” snippets on addon forums that patch line ranges around the failing lines (e.g., near 338, 398, 937, 947 in `CooldownViewer.lua`). [us.forums.blizzard](https://us.forums.blizzard.com/en/wow/t/new-lua-errors-after-the-latest-hotfix/2245552)
+
+3. **Temporarily suppress error popups with BugGrabber**  
+   Since the underlying bug is Blizzard’s, you can at least prevent your screen from being spammed by errors:  
+   - Use BugGrabber+BugSack and configure them to **capture errors without showing the default popup**, so combat is playable even though the error still occurs internally. [us.forums.blizzard](https://us.forums.blizzard.com/en/wow/t/constant-cooldownviewer-lua-error-in-middle-of-screen/2240690)
+
+4. **Revert to a UI profile that doesn’t use the new system**  
+   Some reports suggest that errors spike after using Edit Mode to move/enable the new Cooldown Viewer. Resetting or using a profile made before enabling it may reduce or avoid the issue for some setups. [us.forums.blizzard](https://us.forums.blizzard.com/en/wow/t/new-lua-errors-after-the-latest-hotfix/2245552)
+
+5. **Monitor official forums for a hotfix**  
+   Multiple threads in the official WoW Bug Report and General Discussion forums are reporting this exact error and related ones, so Blizzard is aware and likely to patch it in a client update or hotfix. [eu.forums.blizzard](https://eu.forums.blizzard.com/en/wow/t/absolute-disaster/602525)
+
+## Summary for your specific questions
+
+- **Cause:** Bug in Blizzard’s built‑in `Blizzard_CooldownViewer` module (charge/spellID handling) introduced or worsened by recent hotfixes. [eu.forums.blizzard](https://eu.forums.blizzard.com/en/wow/t/absolute-disaster/602525)
+- **Related addons/taint:** No specific third‑party addon is required to trigger it; it happens on a clean UI and is not standard taint from external code. [us.forums.blizzard](https://us.forums.blizzard.com/en/wow/t/constant-cooldownviewer-lua-error-in-middle-of-screen/2240690)
+- **Blizzard bug:** Yes, confirmed by stack traces and reports with all addons disabled. [us.forums.blizzard](https://us.forums.blizzard.com/en/wow/t/new-lua-errors-after-the-latest-hotfix/2245552)
+- **BugGrabber/other addons:** They surface/capture the error but do not cause it; the same error appears with only Blizzard UI loaded. [us.forums.blizzard](https://us.forums.blizzard.com/en/wow/t/constant-cooldownviewer-lua-error-in-middle-of-screen/2240690)
+- **Workarounds:** Hide/disable the Cooldown Viewer system in Edit Mode if possible, apply a community Lua guard patch around the failing comparisons, or suppress error popups via BugGrabber while waiting for an official fix. [bbs.nga](https://bbs.nga.cn/read.php?tid=46073340)
+
+For direct references with stack traces and discussions, see:  
+- US Bug Report example with your exact message: `CooldownViewer.lua:947: attempt to compare local 'charges' (a secret value)` [us.forums.blizzard](https://us.forums.blizzard.com/en/wow/t/constant-cooldownviewer-lua-error-in-middle-of-screen/2240690)
+- Detailed multi‑error thread after latest hotfix: [https://us.forums.blizzard.com/en/wow/t/new-lua-errors-after-the-latest-hotfix/2245552](https://us.forums.blizzard.com/en/wow/t/new-lua-errors-after-the-latest-hotfix/2245552) [us.forums.blizzard](https://us.forums.blizzard.com/en/wow/t/new-lua-errors-after-the-latest-hotfix/2245552)
+- Player complaint about abilities with charges spamming this error: [https://eu.forums.blizzard.com/en/wow/t/absolute-disaster/602525](https://eu.forums.blizzard.com/en/wow/t/absolute-disaster/602525) [eu.forums.blizzard](https://eu.forums.blizzard.com/en/wow/t/absolute-disaster/602525)

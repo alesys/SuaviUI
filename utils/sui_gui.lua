@@ -2969,6 +2969,15 @@ function GUI:CreateFormDropdownWithTexturePreview(parent, label, dbKey, dbTable,
     local container = CreateFrame("Frame", nil, parent)
     container:SetHeight(L.formRowHeight)
 
+    -- Get texture display names from ResourceBars
+    local RB = _G.SuaviUI and _G.SuaviUI.ResourceBars
+    local TEXTURE_NAMES = RB and RB.TEXTURE_DISPLAY_NAMES or {}
+    
+    -- Helper function to get display name for a texture key
+    local function GetTextureDisplayName(textureName)
+        return TEXTURE_NAMES[textureName] or textureName
+    end
+
     -- Label on left (off-white text)
     local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     SetFont(text, L.font.normal, "", C.text)
@@ -3026,7 +3035,7 @@ function GUI:CreateFormDropdownWithTexturePreview(parent, label, dbKey, dbTable,
     dropdown.selected:SetPoint("LEFT", 8, 0)
     dropdown.selected:SetPoint("RIGHT", chevronZone, "LEFT", -5, 0)
     dropdown.selected:SetJustifyH("LEFT")
-    dropdown.selected:SetText(dbTable[dbKey] or "Select...")
+    dropdown.selected:SetText(GetTextureDisplayName(dbTable[dbKey]) or "Select...")
 
     -- Hover effect
     dropdown:SetScript("OnEnter", function(self)
@@ -3119,14 +3128,14 @@ function GUI:CreateFormDropdownWithTexturePreview(parent, label, dbKey, dbTable,
             -- Text label (on top of texture)
             local btnText = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             SetFont(btnText, 11, "OUTLINE", C.textBright)
-            btnText:SetText(textureName)
+            btnText:SetText(GetTextureDisplayName(textureName))
             btnText:SetPoint("LEFT", 4, 0)
             btnText:SetShadowColor(0, 0, 0, 1)
             btnText:SetShadowOffset(1, -1)
             
             btn:SetScript("OnClick", function()
                 dbTable[dbKey] = textureName
-                dropdown.selected:SetText(textureName)
+                dropdown.selected:SetText(GetTextureDisplayName(textureName))
                 if onChange then onChange() end
                 menuFrame:Hide()
             end)
