@@ -311,7 +311,19 @@ function SUICore:ResetProfileCompletely()
         end
     end
     
-    -- Clear global refresh state (legacy coordinator cleanup)
+    -- Step 5: Clear cooldown coordinator state
+    if _G.SuaviUI and _G.SuaviUI.CooldownCoordinator then
+        local coordinator = _G.SuaviUI.CooldownCoordinator
+        if coordinator._pendingTimer then
+            coordinator._pendingTimer:Cancel()
+            coordinator._pendingTimer = nil
+        end
+        coordinator._pendingSource = nil
+        coordinator._pendingParts = nil
+        coordinator._pendingOpts = nil
+    end
+    
+    -- Clear global refresh state
     _G.SuaviUI_CooldownRefreshInProgress = nil
     _G.SuaviUI_CooldownRefreshPhase = nil
     _G.SuaviUI_CooldownRefreshSource = nil

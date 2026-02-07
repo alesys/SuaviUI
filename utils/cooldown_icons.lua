@@ -9,6 +9,10 @@ local StyledIcons = {}
 ns.StyledIcons = StyledIcons
 SuaviUI.StyledIcons = StyledIcons
 
+-- TEMP: Force-disable CDM icon styling (square icons + size normalization)
+-- Re-enabled to allow square styling from the CDM Options panel.
+local FORCE_DISABLE_CDM_STYLING = false
+
 local isModuleStyledEnabled = false
 local areHooksInitialized = false
 
@@ -42,6 +46,9 @@ local function GetProfile()
 end
 
 local function IsAnyStyledFeatureEnabled()
+    if FORCE_DISABLE_CDM_STYLING then
+        return false
+    end
     local profile = GetProfile()
     if not profile then
         return false
@@ -95,17 +102,18 @@ local function ApplySquareStyle(button, viewerSettingName)
 
     button:SetSize(width, width)
 
-    if button.Icon then
-        button.Icon:ClearAllPoints()
-        button.Icon:SetPoint("TOPLEFT", button, "TOPLEFT", -config.paddingFixup / 2, config.paddingFixup / 2)
-        button.Icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", config.paddingFixup / 2, -config.paddingFixup / 2)
+    local iconTexture = button.Icon or button.icon or button.texture or button.Texture
+    if iconTexture then
+        iconTexture:ClearAllPoints()
+        iconTexture:SetPoint("TOPLEFT", button, "TOPLEFT", -config.paddingFixup / 2, config.paddingFixup / 2)
+        iconTexture:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", config.paddingFixup / 2, -config.paddingFixup / 2)
 
         -- Calculate zoom-based texture coordinates
         local zoomKey = "cooldownManager_squareIconsZoom_" .. viewerSettingName
         local zoom = profile[zoomKey] or 0
         local crop = zoom * 0.5
-        if button.Icon.SetTexCoord then
-            button.Icon:SetTexCoord(crop, 1 - crop, crop, 1 - crop)
+        if iconTexture.SetTexCoord then
+            iconTexture:SetTexCoord(crop, 1 - crop, crop, 1 - crop)
         end
     end
 
@@ -166,6 +174,8 @@ local function ApplySquareStyle(button, viewerSettingName)
 end
 
 local function RestoreOriginalStyle(button, viewerSettingName)
+    -- Only restore if button was previously styled by us
+    -- DO NOT restore Blizzard's default state - that causes unwanted modifications
     if not button.suiSquareStyled then
         return
     end
@@ -173,20 +183,38 @@ local function RestoreOriginalStyle(button, viewerSettingName)
     local width, height = GetViewerIconSize(viewerSettingName)
     button:SetSize(width, height)
 
-    if button.Icon then
-        button.Icon:ClearAllPoints()
-        button.Icon:SetPoint("CENTER", button, "CENTER", 0, 0)
-        button.Icon:SetSize(width, height)
-        -- Reset texture coordinates
-        if button.Icon.SetTexCoord then
-            button.Icon:SetTexCoord(0, 1, 0, 1)
+    local iconTexture = button.Icon or button.icon or button.texture or button.Texture
+    if iconTexture then
+        iconTexture:ClearAllPoints()
+        iconTexture:SetPoint("CENTER", button, "CENTER", 0, 0)
+        iconTexture:SetSize(width, height)
+
+        -- Fully reset texture coordinates to remove zoom
+        if iconTexture.SetTexCoord then
+            iconTexture:SetTexCoord(0, 1, 0, 1)
+        end
+
+        -- Re-attach any existing mask texture if present on the frame
+        local maskTexture = button.IconMask or button.mask or button.Mask or button.iconMask
+        if maskTexture and iconTexture.AddMaskTexture and iconTexture.GetMaskTexture then
+            local hasMask = false
+            for i = 1, 10 do
+                if iconTexture:GetMaskTexture(i) == maskTexture then
+                    hasMask = true
+                    break
+                end
+            end
+            if not hasMask then
+                iconTexture:AddMaskTexture(maskTexture)
+            end
         end
     end
 
+    -- Restore cooldown swipe to default circular texture
     for i = 1, select("#", button:GetChildren()) do
         local child = select(i, button:GetChildren())
         if child and child.SetSwipeTexture then
-            child:SetSwipeTexture(6707800)
+            child:SetSwipeTexture(6707800)  -- Blizzard default
             child:ClearAllPoints()
             child:SetPoint("CENTER", button, "CENTER", 0, 0)
             child:SetSize(width, height)
@@ -194,11 +222,36 @@ local function RestoreOriginalStyle(button, viewerSettingName)
         end
     end
 
+    -- Restore NCDM-stripped masks (if NCDM was applied)
+    if button._originalMasks then
+        local textures = { button.Icon, button.icon }
+        for _, tex in ipairs(textures) do
+            if tex and button._originalMasks[tostring(tex)] then
+                for _, mask in ipairs(button._originalMasks[tostring(tex)]) do
+                    if tex.AddMaskTexture then
+                        tex:AddMaskTexture(mask)
+                    end
+                end
+            end
+        end
+    end
+
+    -- Restore NCDM-stripped NormalTexture
+    if button._originalNormalAlpha and button.NormalTexture then
+        button.NormalTexture:SetAlpha(button._originalNormalAlpha)
+    end
+    if button._originalNormalAlpha and button.GetNormalTexture then
+        local normalTex = button:GetNormalTexture()
+        if normalTex then
+            normalTex:SetAlpha(button._originalNormalAlpha)
+        end
+    end
+
     -- Restore hidden overlay textures
     for _, region in next, { button:GetRegions() } do
         if region:IsObjectType("Texture") then
             local atlas = region:GetAtlas()
-            if region.__sui_set6707800 then
+            if region.__sui_set6707800 or region:GetTexture() == BASE_SQUARE_MASK then
                 region:SetTexture(6707800)
                 region.__sui_set6707800 = nil
             elseif atlas == "UI-HUD-CoolDownManager-IconOverlay" then
@@ -207,11 +260,18 @@ local function RestoreOriginalStyle(button, viewerSettingName)
         end
     end
 
+    -- Hide square border
     if button.suiSquareBorder then
         button.suiSquareBorder:Hide()
+        button.suiSquareBorder:SetBackdrop(nil)  -- Clear backdrop completely
     end
 
     button.suiSquareStyled = false
+    
+    -- Also restore NCDM styling if available (clears NCDM's styling flags)
+    if ns.NCDM and ns.NCDM.RestoreIcon then
+        ns.NCDM.RestoreIcon(button)
+    end
 end
 
 -- Process all children of a viewer
@@ -281,10 +341,21 @@ function StyledIcons.UpdateIconStyle(icon, viewerSettingName)
     if not icon or not viewerSettingName then
         return
     end
-    if IsSquareIconsEnabled(viewerSettingName) then
+    if FORCE_DISABLE_CDM_STYLING then
+        if icon.suiSquareStyled then
+            RestoreOriginalStyle(icon, viewerSettingName)
+        end
+        return
+    end
+    local enabled = IsSquareIconsEnabled(viewerSettingName)
+    
+    if enabled then
         ApplySquareStyle(icon, viewerSettingName)
     else
-        RestoreOriginalStyle(icon, viewerSettingName)
+        -- Only restore if this icon was previously styled by us
+        if icon.suiSquareStyled then
+            RestoreOriginalStyle(icon, viewerSettingName)
+        end
     end
 end
 
@@ -381,6 +452,9 @@ function StyledIcons:Shutdown()
 end
 
 function StyledIcons:Enable()
+    if FORCE_DISABLE_CDM_STYLING then
+        return
+    end
     if isModuleStyledEnabled then
         return
     end
@@ -422,6 +496,9 @@ function StyledIcons:Disable()
 end
 
 function StyledIcons:Initialize()
+    if FORCE_DISABLE_CDM_STYLING then
+        return
+    end
     if not IsAnyStyledFeatureEnabled() then
         return
     end
@@ -429,6 +506,12 @@ function StyledIcons:Initialize()
 end
 
 function StyledIcons:OnSettingChanged()
+    if FORCE_DISABLE_CDM_STYLING then
+        if isModuleStyledEnabled then
+            self:Disable()
+        end
+        return
+    end
     local shouldBeEnabled = IsAnyStyledFeatureEnabled()
 
     if shouldBeEnabled and not isModuleStyledEnabled then
@@ -441,7 +524,10 @@ function StyledIcons:OnSettingChanged()
     end
 
     -- Trigger a refresh of the cooldown manager if available
-    if ns.CooldownManager and ns.CooldownManager.ForceRefreshAll then
+    local coordinator = (ns and ns.CooldownCoordinator) or (_G.SuaviUI and _G.SuaviUI.CooldownCoordinator)
+    if coordinator and coordinator.RequestRefresh then
+        coordinator:RequestRefresh("icons", { icons = true, bars = true, essential = true, utility = true }, { delay = 0 })
+    elseif ns.CooldownManager and ns.CooldownManager.ForceRefreshAll then
         ns.CooldownManager.ForceRefreshAll()
     end
 end
@@ -560,7 +646,10 @@ SlashCmdList.SUISTYLEFORCE = function()
         StyledIcons:Enable()
     end
     StyledIcons:RefreshAll()
-    if ns.CooldownManager and ns.CooldownManager.ForceRefreshAll then
+    local coordinator = (ns and ns.CooldownCoordinator) or (_G.SuaviUI and _G.SuaviUI.CooldownCoordinator)
+    if coordinator and coordinator.RequestRefresh then
+        coordinator:RequestRefresh("icons", { icons = true, bars = true, essential = true, utility = true }, { delay = 0 })
+    elseif ns.CooldownManager and ns.CooldownManager.ForceRefreshAll then
         ns.CooldownManager.ForceRefreshAll()
     end
     print("  Done!")
