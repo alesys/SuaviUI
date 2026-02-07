@@ -175,6 +175,10 @@ do
         for _, v in ipairs(viewers) do RecoverViewer(v) end
     end
 
+    -- TEMP: Disable crash recovery to test impact
+    local DISABLE_CRASH_RECOVERY = true
+    if DISABLE_CRASH_RECOVERY then return end
+
     local ticker
     local f = CreateFrame("Frame")
     f:RegisterEvent("PLAYER_REGEN_DISABLED")
