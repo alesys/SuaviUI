@@ -1212,8 +1212,17 @@ local function SetupMinimapDragging()
     -- Apply saved position (handles both array format from drag and keyed format from defaults)
     local pos = settings.position
     if pos then
+        -- Validate anchor points (check if they're legitimate WoW anchor points, not corrupted layout names)
+        local VALID_ANCHORS = { TOPLEFT = true, TOP = true, TOPRIGHT = true, LEFT = true, CENTER = true, 
+                                RIGHT = true, BOTTOMLEFT = true, BOTTOM = true, BOTTOMRIGHT = true }
+        
         local point = pos[1] or pos.point or "TOPLEFT"
         local relPoint = pos[2] or pos.relPoint or "BOTTOMLEFT"
+        
+        -- Fallback if anchor points are invalid (corrupted data from old bug)
+        if not VALID_ANCHORS[point] then point = "TOPLEFT" end
+        if not VALID_ANCHORS[relPoint] then relPoint = "BOTTOMLEFT" end
+        
         local x = pos[3] or pos.x or 790
         local y = pos[4] or pos.y or 285
         Minimap:ClearAllPoints()
