@@ -57,7 +57,7 @@ local function GetTexturePath(textureName)
 end
 
 local function GetSafeColor(color, fallback)
-    if color and color[1] and color[2] and color[3] then
+    if color and type(color[1]) == "number" and type(color[2]) == "number" and type(color[3]) == "number" then
         return color[1], color[2], color[3], color[4] or 1
     end
     fallback = fallback or {1, 0.7, 0, 1}
@@ -498,7 +498,8 @@ function CastbarMixin:ApplyColors(settings)
     -- Bar color
     if self.statusBar then
         local barColor = settings.color or settings.barColor or {1, 0.7, 0, 1}
-        self.statusBar:SetStatusBarColor(GetSafeColor(barColor))
+        local r, g, b, a = GetSafeColor(barColor)
+        self.statusBar:SetStatusBarColor(r, g, b, a)
     end
     
     -- Background color
@@ -511,7 +512,8 @@ function CastbarMixin:ApplyColors(settings)
     -- Border color
     if self.border then
         local borderColor = settings.borderColor or {0, 0, 0, 1}
-        self.border:SetBackdropBorderColor(GetSafeColor(borderColor))
+        local r, g, b, a = GetSafeColor(borderColor)
+        self.border:SetBackdropBorderColor(r, g, b, a)
     end
 end
 
