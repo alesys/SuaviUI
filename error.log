@@ -73,3 +73,34 @@ For direct references with stack traces and discussions, see:
 - US Bug Report example with your exact message: `CooldownViewer.lua:947: attempt to compare local 'charges' (a secret value)` [us.forums.blizzard](https://us.forums.blizzard.com/en/wow/t/constant-cooldownviewer-lua-error-in-middle-of-screen/2240690)
 - Detailed multi‑error thread after latest hotfix: [https://us.forums.blizzard.com/en/wow/t/new-lua-errors-after-the-latest-hotfix/2245552](https://us.forums.blizzard.com/en/wow/t/new-lua-errors-after-the-latest-hotfix/2245552) [us.forums.blizzard](https://us.forums.blizzard.com/en/wow/t/new-lua-errors-after-the-latest-hotfix/2245552)
 - Player complaint about abilities with charges spamming this error: [https://eu.forums.blizzard.com/en/wow/t/absolute-disaster/602525](https://eu.forums.blizzard.com/en/wow/t/absolute-disaster/602525) [eu.forums.blizzard](https://eu.forums.blizzard.com/en/wow/t/absolute-disaster/602525)
+
+
+
+
+Message: ...s/Blizzard_CooldownViewer/CooldownViewerItemData.lua:200: attempt to compare local 'spellID' (a secret value)
+Time: Sat Feb  7 16:06:18 2026
+Count: 26
+Stack:
+[Interface/AddOns/Blizzard_CooldownViewer/CooldownViewerItemData.lua]:200: in function 'SpellIDMatchesAnyAssociatedSpellIDs'
+[Interface/AddOns/Blizzard_CooldownViewer/CooldownViewerItemData.lua]:349: in function 'GetTargetRelatedAuraInfo'
+[Interface/AddOns/Blizzard_CooldownViewer/CooldownViewerItemData.lua]:370: in function 'GetAuraData'
+[Interface/AddOns/Blizzard_CooldownViewer/CooldownViewer.lua]:241: in function 'RefreshAuraInstance'
+[Interface/AddOns/Blizzard_CooldownViewer/CooldownViewer.lua]:1228: in function 'RefreshData'
+[Interface/AddOns/Blizzard_CooldownViewer/CooldownViewer.lua]:1576: in function 'RefreshActiveFramesForTargetChange'
+[Interface/AddOns/Blizzard_CooldownViewer/CooldownViewer.lua]:1563: in function 'OnUnitAura'
+[Interface/AddOns/Blizzard_CooldownViewer/CooldownViewer.lua]:1513: in function 'OnEvent'
+[Interface/AddOns/Blizzard_CooldownViewer/CooldownViewer.lua]:1930: in function 'OnEvent'
+[Interface/AddOns/Blizzard_CooldownViewer/CooldownViewer.lua]:1953: in function <...ce/AddOns/Blizzard_CooldownViewer/CooldownViewer.lua:1952>
+
+
+
+197x ...ceBlizzard_CooldownViewer/CooldownViewer.lua:947: attempt to compare local 'charges' (a secret value)
+[Blizzard_CooldownViewer/CooldownViewer.lua]:947: in function 'CacheChargeValues'
+[Blizzard_CooldownViewer/CooldownViewer.lua]:1011: in function 'RefreshSpellChargeInfo'
+[Blizzard_CooldownViewer/CooldownViewer.lua]:1068: in function 'RefreshData'
+[Blizzard_CooldownViewer/CooldownViewer.lua]:176: in function 'OnSpellUpdateCooldownEvent'
+[Blizzard_CooldownViewer/CooldownViewer.lua]:1509: in function 'OnEvent'
+[Blizzard_CooldownViewer/CooldownViewer.lua]:1842: in function 'OnEvent'
+[Blizzard_CooldownViewer/CooldownViewer.lua]:1891: in function <...ceBlizzard_CooldownViewer/CooldownViewer.lua:1890>
+
+Locals:

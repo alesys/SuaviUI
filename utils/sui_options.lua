@@ -119,9 +119,11 @@ local LSM = LibStub("LibSharedMedia-3.0", true)
 
 local function GetTextureList()
     local textures = {}
+    local TEXTURE_NAMES = (ns.ResourceBars and ns.ResourceBars.TEXTURE_DISPLAY_NAMES) or {}
     if LSM then
         for _, name in ipairs(LSM:List("statusbar")) do
-            table.insert(textures, {value = name, text = name})
+            local displayName = TEXTURE_NAMES[name] or name
+            table.insert(textures, {value = name, text = displayName})
         end
         table.sort(textures, function(a, b) return a.text < b.text end)
     else
@@ -8287,7 +8289,7 @@ local function CreateUnitFramesPage(parent)
         local ufdb = GetUFDB()
 
         -- Set search context for auto-registration
-        GUI:SetSearchContext({tabIndex = 2, tabName = "Single Frames & Castbars", subTabIndex = 1, subTabName = "General"})
+        GUI:SetSearchContext({tabIndex = 2, tabName = "Unit Frames", subTabIndex = 1, subTabName = "General"})
 
         if not ufdb then
             local info = GUI:CreateLabel(tabContent, "Unit frame settings not available - database not loaded", 12, C.textMuted)
@@ -8592,7 +8594,7 @@ local function CreateUnitFramesPage(parent)
             boss = {index = 7, name = "Boss"},
         }
         local subTabInfo = unitSubTabs[unitKey] or {index = 2, name = unitKey}
-        GUI:SetSearchContext({tabIndex = 2, tabName = "Single Frames & Castbars", subTabIndex = subTabInfo.index, subTabName = subTabInfo.name})
+        GUI:SetSearchContext({tabIndex = 2, tabName = "Unit Frames", subTabIndex = subTabInfo.index, subTabName = subTabInfo.name})
 
         if not ufdb or not ufdb[unitKey] then
             local info = GUI:CreateLabel(tabContent, "Unit frame settings not available for " .. unitKey, 12, C.textMuted)
@@ -8705,6 +8707,7 @@ local function CreateUnitFramesPage(parent)
 
         local infoText = GUI:CreateLabel(tabContent, 
             "Frame positioning, size, colors, texture, and bar appearance settings are now managed through the Edit Mode sidepanel.\n\n" ..
+            "Castbar settings are in the Edit Mode castbar sidepanel — click a Castbar in Edit Mode.\n\n" ..
             "Use the 'Edit Mode' button in the General tab or type /sui editmode to access these settings.",
             11, C.textMuted)
         infoText:SetPoint("TOPLEFT", PAD, y)
@@ -8728,20 +8731,15 @@ local function CreateUnitFramesPage(parent)
             }
         end
 
-        local absorbCheck = GUI:CreateFormCheckbox(tabContent, "Show Absorb Shields", "enabled", unitDB.absorbs, RefreshUnit)
-        absorbCheck:SetPoint("TOPLEFT", PAD, y)
-        absorbCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local absorbOpacity = GUI:CreateFormSlider(tabContent, "Opacity", 0, 1, 0.05, "opacity", unitDB.absorbs, RefreshUnit)
-        absorbOpacity:SetPoint("TOPLEFT", PAD, y)
-        absorbOpacity:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local absorbColor = GUI:CreateFormColorPicker(tabContent, "Absorb Color", "color", unitDB.absorbs, RefreshUnit)
-        absorbColor:SetPoint("TOPLEFT", PAD, y)
-        absorbColor:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
+        local absorbInfo = GUI:CreateLabel(tabContent,
+            "Show/Opacity/Color settings are in the Edit Mode sidepanel. Absorb texture is set here.",
+            11, C.textMuted)
+        absorbInfo:SetPoint("TOPLEFT", PAD, y)
+        absorbInfo:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        absorbInfo:SetJustifyH("LEFT")
+        absorbInfo:SetWordWrap(true)
+        absorbInfo:SetHeight(20)
+        y = y - 24
 
         local absorbTexture = GUI:CreateFormDropdown(tabContent, "Absorb Texture", GetTextureList(), "texture", unitDB.absorbs, RefreshUnit)
         absorbTexture:SetPoint("TOPLEFT", PAD, y)
@@ -8809,30 +8807,22 @@ local function CreateUnitFramesPage(parent)
             y = y - FORM_ROW
         end
 
-        -- HEALTH TEXT section
-        -- Helper to copy castbar settings from one unit to another
-        local function CopyCastbarSettings(sourceDB, targetDB)
-            if not sourceDB or not targetDB then return end
-            local keys = {"width", "height", "offsetX", "offsetY", "fontSize", "borderSize", "maxLength", "texture", "showIcon", "enabled"}
-            for _, key in ipairs(keys) do
-                if sourceDB[key] ~= nil then
-                    targetDB[key] = sourceDB[key]
-                end
-            end
-            if sourceDB.color then
-                targetDB.color = {sourceDB.color[1], sourceDB.color[2], sourceDB.color[3], sourceDB.color[4]}
-            end
-            if sourceDB.bgColor then
-                targetDB.bgColor = {sourceDB.bgColor[1], sourceDB.bgColor[2], sourceDB.bgColor[3], sourceDB.bgColor[4]}
-            end
-        end
-
-        -- CASTBAR section (for player, target, targettarget, focus, pet, boss)
+        -- CASTBAR section (removed — all castbar settings are now in the Edit Mode castbar sidepanel)
         if unitKey == "player" or unitKey == "target" or unitKey == "targettarget" or unitKey == "focus" or unitKey == "pet" or unitKey == "boss" then
-            -- Use dedicated castbar options module (it creates its own header)
-            if ns.SUI_CastbarOptions and ns.SUI_CastbarOptions.BuildCastbarOptions then
-                y = ns.SUI_CastbarOptions.BuildCastbarOptions(tabContent, unitKey, y, PAD, FORM_ROW, RefreshUnit, GetTextureList, NINE_POINT_ANCHOR_OPTIONS, GetUFDB, GetDB)
-            end
+            local castbarHeader = GUI:CreateSectionHeader(tabContent, "Castbar")
+            castbarHeader:SetPoint("TOPLEFT", PAD, y)
+            y = y - castbarHeader.gap
+
+            local castbarInfo = GUI:CreateLabel(tabContent,
+                "Castbar settings (appearance, positioning, text, empowered, etc.) are now managed exclusively through the Edit Mode sidepanel.\n\n" ..
+                "Click on a Castbar in Edit Mode to access all settings.",
+                11, C.textMuted)
+            castbarInfo:SetPoint("TOPLEFT", PAD, y)
+            castbarInfo:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+            castbarInfo:SetJustifyH("LEFT")
+            castbarInfo:SetWordWrap(true)
+            castbarInfo:SetHeight(56)
+            y = y - 66
         end
 
         -- Aura settings (all single unit frames)
@@ -8887,22 +8877,15 @@ local function CreateUnitFramesPage(parent)
             debuffHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - debuffHeader.gap
 
-            local showDebuffsCheck = GUI:CreateFormCheckbox(tabContent, "Show Debuffs", "showDebuffs", auraDB, RefreshAuras)
-            showDebuffsCheck:SetPoint("TOPLEFT", PAD, y)
-            showDebuffsCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local debuffHideSwipe = GUI:CreateFormCheckbox(tabContent, "Hide Duration Swipe", "debuffHideSwipe", auraDB, RefreshAuras)
-            debuffHideSwipe:SetPoint("TOPLEFT", PAD, y)
-            debuffHideSwipe:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            if unitKey ~= "player" then
-                local onlyMyDebuffsCheck = GUI:CreateFormCheckbox(tabContent, "Only My Debuffs", "onlyMyDebuffs", auraDB, RefreshAuras)
-                onlyMyDebuffsCheck:SetPoint("TOPLEFT", PAD, y)
-                onlyMyDebuffsCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-            end
+            local debuffInfo = GUI:CreateLabel(tabContent,
+                "Show/Hide, Anchor, Size, Grow, Offset, and Spacing settings are in the Edit Mode sidepanel.",
+                11, C.textMuted)
+            debuffInfo:SetPoint("TOPLEFT", PAD, y)
+            debuffInfo:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+            debuffInfo:SetJustifyH("LEFT")
+            debuffInfo:SetWordWrap(true)
+            debuffInfo:SetHeight(20)
+            y = y - 24
 
             -- Debuff Preview toggle (pill-shaped, matches Castbar Preview style)
             local debuffPreviewContainer = CreateFrame("Frame", nil, tabContent)
@@ -8958,36 +8941,6 @@ local function CreateUnitFramesPage(parent)
             end)
             y = y - FORM_ROW
 
-            local auraIconSize = GUI:CreateFormSlider(tabContent, "Icon Size", 12, 50, 1, "iconSize", auraDB, RefreshAuras)
-            auraIconSize:SetPoint("TOPLEFT", PAD, y)
-            auraIconSize:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local debuffAnchorDrop = GUI:CreateFormDropdown(tabContent, "Anchor", auraAnchorOptions, "debuffAnchor", auraDB, RefreshAuras)
-            debuffAnchorDrop:SetPoint("TOPLEFT", PAD, y)
-            debuffAnchorDrop:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local debuffGrowDrop = GUI:CreateFormDropdown(tabContent, "Grow Direction", growOptions, "debuffGrow", auraDB, RefreshAuras)
-            debuffGrowDrop:SetPoint("TOPLEFT", PAD, y)
-            debuffGrowDrop:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local debuffMaxSlider = GUI:CreateFormSlider(tabContent, "Max Icons", 1, 32, 1, "debuffMaxIcons", auraDB, RefreshAuras)
-            debuffMaxSlider:SetPoint("TOPLEFT", PAD, y)
-            debuffMaxSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local debuffXSlider = GUI:CreateFormSlider(tabContent, "X Offset", -100, 100, 1, "debuffOffsetX", auraDB, RefreshAuras)
-            debuffXSlider:SetPoint("TOPLEFT", PAD, y)
-            debuffXSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local debuffYSlider = GUI:CreateFormSlider(tabContent, "Y Offset", -100, 100, 1, "debuffOffsetY", auraDB, RefreshAuras)
-            debuffYSlider:SetPoint("TOPLEFT", PAD, y)
-            debuffYSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
             -- Debuff-specific text customization (stack and duration)
             if unitKey == "target" or unitKey == "player" or unitKey == "focus" or unitKey == "targettarget" or unitKey == "boss" then
                 -- Initialize debuff-specific defaults
@@ -9005,11 +8958,6 @@ local function CreateUnitFramesPage(parent)
                 if auraDB.debuffDurationOffsetX == nil then auraDB.debuffDurationOffsetX = 0 end
                 if auraDB.debuffDurationOffsetY == nil then auraDB.debuffDurationOffsetY = 0 end
                 if auraDB.debuffDurationColor == nil then auraDB.debuffDurationColor = {1, 1, 1, 1} end
-
-                local debuffSpacingSlider = GUI:CreateFormSlider(tabContent, "Spacing", 0, 10, 1, "debuffSpacing", auraDB, RefreshAuras)
-                debuffSpacingSlider:SetPoint("TOPLEFT", PAD, y)
-                debuffSpacingSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
 
                 local debuffShowStackCheck = GUI:CreateFormCheckbox(tabContent, "Stack Show", "debuffShowStack", auraDB, RefreshAuras)
                 debuffShowStackCheck:SetPoint("TOPLEFT", PAD, y)
@@ -9078,15 +9026,15 @@ local function CreateUnitFramesPage(parent)
             buffHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - buffHeader.gap
 
-            local showBuffsCheck = GUI:CreateFormCheckbox(tabContent, "Show Buffs", "showBuffs", auraDB, RefreshAuras)
-            showBuffsCheck:SetPoint("TOPLEFT", PAD, y)
-            showBuffsCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local buffHideSwipe = GUI:CreateFormCheckbox(tabContent, "Hide Duration Swipe", "buffHideSwipe", auraDB, RefreshAuras)
-            buffHideSwipe:SetPoint("TOPLEFT", PAD, y)
-            buffHideSwipe:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
+            local buffInfo = GUI:CreateLabel(tabContent,
+                "Show/Hide, Anchor, Size, Grow, Offset, and Spacing settings are in the Edit Mode sidepanel.",
+                11, C.textMuted)
+            buffInfo:SetPoint("TOPLEFT", PAD, y)
+            buffInfo:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+            buffInfo:SetJustifyH("LEFT")
+            buffInfo:SetWordWrap(true)
+            buffInfo:SetHeight(20)
+            y = y - 24
 
             -- Buff Preview toggle (pill-shaped, matches Castbar Preview style)
             local buffPreviewContainer = CreateFrame("Frame", nil, tabContent)
@@ -9142,36 +9090,6 @@ local function CreateUnitFramesPage(parent)
             end)
             y = y - FORM_ROW
 
-            local buffIconSize = GUI:CreateFormSlider(tabContent, "Icon Size", 12, 50, 1, "buffIconSize", auraDB, RefreshAuras)
-            buffIconSize:SetPoint("TOPLEFT", PAD, y)
-            buffIconSize:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local buffAnchorDrop = GUI:CreateFormDropdown(tabContent, "Anchor", auraAnchorOptions, "buffAnchor", auraDB, RefreshAuras)
-            buffAnchorDrop:SetPoint("TOPLEFT", PAD, y)
-            buffAnchorDrop:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local buffGrowDrop = GUI:CreateFormDropdown(tabContent, "Grow Direction", growOptions, "buffGrow", auraDB, RefreshAuras)
-            buffGrowDrop:SetPoint("TOPLEFT", PAD, y)
-            buffGrowDrop:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local buffMaxSlider = GUI:CreateFormSlider(tabContent, "Max Icons", 1, 32, 1, "buffMaxIcons", auraDB, RefreshAuras)
-            buffMaxSlider:SetPoint("TOPLEFT", PAD, y)
-            buffMaxSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local buffXSlider = GUI:CreateFormSlider(tabContent, "X Offset", -100, 100, 1, "buffOffsetX", auraDB, RefreshAuras)
-            buffXSlider:SetPoint("TOPLEFT", PAD, y)
-            buffXSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local buffYSlider = GUI:CreateFormSlider(tabContent, "Y Offset", -100, 100, 1, "buffOffsetY", auraDB, RefreshAuras)
-            buffYSlider:SetPoint("TOPLEFT", PAD, y)
-            buffYSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
             -- Buff-specific text customization (stack and duration)
             if unitKey == "target" or unitKey == "player" or unitKey == "focus" or unitKey == "targettarget" or unitKey == "boss" then
                 -- Initialize buff-specific defaults
@@ -9189,11 +9107,6 @@ local function CreateUnitFramesPage(parent)
                 if auraDB.buffDurationOffsetX == nil then auraDB.buffDurationOffsetX = 0 end
                 if auraDB.buffDurationOffsetY == nil then auraDB.buffDurationOffsetY = 0 end
                 if auraDB.buffDurationColor == nil then auraDB.buffDurationColor = {1, 1, 1, 1} end
-
-                local buffSpacingSlider = GUI:CreateFormSlider(tabContent, "Spacing", 0, 10, 1, "buffSpacing", auraDB, RefreshAuras)
-                buffSpacingSlider:SetPoint("TOPLEFT", PAD, y)
-                buffSpacingSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
 
                 local buffShowStackCheck = GUI:CreateFormCheckbox(tabContent, "Stack Show", "buffShowStack", auraDB, RefreshAuras)
                 buffShowStackCheck:SetPoint("TOPLEFT", PAD, y)
@@ -9622,18 +9535,8 @@ local function CreateUnitFramesPage(parent)
 end
 
 ---------------------------------------------------------------------------
--- PAGE: Castbars
+-- PAGE: Castbars (removed — all settings in Edit Mode sidepanel)
 ---------------------------------------------------------------------------
-local function CreateCastbarsPage(parent)
-    local scroll, content = CreateScrollableContent(parent)
-    local y = -15
-    
-    local info = GUI:CreateLabel(content, "Castbar customization - use Edit Mode for positioning", 12, C.textMuted)
-    info:SetPoint("TOPLEFT", PADDING, y)
-    y = y - ROW_GAP
-    
-    content:SetHeight(100)
-end
 
 ---------------------------------------------------------------------------
 -- PAGE: Action Bars

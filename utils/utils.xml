@@ -39,7 +39,7 @@
     <Script file="sui_inspect.lua"/>
     <Script file="sui_gui.lua"/>
     <Script file="sui_welcome.lua"/>
-    <Script file="sui_castbar_options.lua"/>
+    <!-- sui_castbar_options.lua is deprecated - castbar settings are now exclusively in the Edit Mode sidepanel -->
     <Script file="sui_options.lua"/>
     <Script file="sui_blizzard_options.lua"/>
     <Script file="sui_ncdm.lua"/>

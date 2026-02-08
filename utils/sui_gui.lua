@@ -2970,8 +2970,7 @@ function GUI:CreateFormDropdownWithTexturePreview(parent, label, dbKey, dbTable,
     container:SetHeight(L.formRowHeight)
 
     -- Get texture display names from ResourceBars
-    local RB = _G.SuaviUI and _G.SuaviUI.ResourceBars
-    local TEXTURE_NAMES = RB and RB.TEXTURE_DISPLAY_NAMES or {}
+    local TEXTURE_NAMES = (ns.ResourceBars and ns.ResourceBars.TEXTURE_DISPLAY_NAMES) or {}
     
     -- Helper function to get display name for a texture key
     local function GetTextureDisplayName(textureName)

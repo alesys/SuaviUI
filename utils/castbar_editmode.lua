@@ -90,9 +90,11 @@ end
 ---------------------------------------------------------------------------
 local function GetTextureList()
     local textures = {}
+    local TEXTURE_NAMES = (ns.ResourceBars and ns.ResourceBars.TEXTURE_DISPLAY_NAMES) or {}
     if LSM then
         for name in pairs(LSM:HashTable("statusbar")) do
-            table.insert(textures, {value = name, text = name})
+            local displayName = TEXTURE_NAMES[name] or name
+            table.insert(textures, {value = name, text = displayName})
         end
         table.sort(textures, function(a, b) return a.text < b.text end)
     end
@@ -457,9 +459,7 @@ local function BuildCastbarSettings(unitKey)
             dropdown.texturePool = {}
 
             -- Get texture display names from ResourceBars
-            local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
-            local RB = SUICore and SUICore.ResourceBars
-            local TEXTURE_NAMES = RB and RB.TEXTURE_DISPLAY_NAMES or {}
+            local TEXTURE_NAMES = (ns.ResourceBars and ns.ResourceBars.TEXTURE_DISPLAY_NAMES) or {}
 
             -- Hook cleanup on menu close
             if not dropdown._CB_Texture_Dropdown_OnMenuClosed_hooked then

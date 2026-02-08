@@ -454,7 +454,8 @@ local function BuildLemSettings(bar, defaults)
                     dropdown._SUI_Foreground_Dropdown_OnMenuClosed_hooked = true
                 end
 
-                dropdown:SetDefaultText(settingObject.get(layoutName))
+                local currentFgTexture = settingObject.get(layoutName)
+                dropdown:SetDefaultText(RB.TEXTURE_DISPLAY_NAMES[currentFgTexture] or currentFgTexture)
 
                 local textures = LSM:HashTable(LSM.MediaType.STATUSBAR)
                 local sortedTextures = {}
@@ -468,7 +469,7 @@ local function BuildLemSettings(bar, defaults)
                     local displayName = RB.TEXTURE_DISPLAY_NAMES[textureName] or textureName
 
                     local button = rootDescription:CreateButton(displayName, function()
-                        dropdown:SetDefaultText(textureName)
+                        dropdown:SetDefaultText(displayName)
                         settingObject.set(layoutName, textureName)
                     end)
 
@@ -530,7 +531,8 @@ local function BuildLemSettings(bar, defaults)
                     dropdown._SUI_Background_Dropdown_OnMenuClosed_hooked = true
                 end
 
-                dropdown:SetDefaultText(settingObject.get(layoutName))
+                local currentBgTexture = settingObject.get(layoutName)
+                dropdown:SetDefaultText(RB.TEXTURE_DISPLAY_NAMES[currentBgTexture] or currentBgTexture)
 
                 local textures = LSM:HashTable(LSM.MediaType.BACKGROUND)
                 local sortedTextures = CopyTable(RB.availableBackgroundStyles)
@@ -544,7 +546,7 @@ local function BuildLemSettings(bar, defaults)
                     local displayName = RB.TEXTURE_DISPLAY_NAMES[textureName] or textureName
 
                     local button = rootDescription:CreateButton(displayName, function()
-                        dropdown:SetDefaultText(textureName)
+                        dropdown:SetDefaultText(displayName)
                         settingObject.set(layoutName, textureName)
                     end)
 
