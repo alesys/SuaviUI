@@ -20,7 +20,8 @@ $outputZip = "$parentDir\${addonName}_${Version}.zip"
 Write-Host "Building package: $outputZip" -ForegroundColor Green
 
 # Create temp directory
-$tempDir = New-TemporaryDirectory
+$tempDir = [System.IO.Path]::GetTempPath() + [System.Guid]::NewGuid()
+New-Item -ItemType Directory -Path $tempDir | Out-Null
 $packageDir = Join-Path $tempDir $addonName
 
 # Copy addon files (excluding things in .pkgmeta ignore list)
@@ -47,13 +48,10 @@ if (Test-Path $outputZip) {
 }
 
 Compress-Archive -Path $packageDir -DestinationPath $outputZip
-Write-Host "✓ Package created: $outputZip" -ForegroundColor Green
+Write-Host "Created: $outputZip" -ForegroundColor Green
 
 # Cleanup
 Remove-Item $tempDir -Recurse -Force
 
 Write-Host ""
-Write-Host "Next steps:" -ForegroundColor Cyan
-Write-Host "1. Upload to CurseForge: https://www.curseforge.com/wow/addons/suaviui"
-Write-Host "2. Select file: $outputZip"
-Write-Host "3. Mark as release version"
+Write-Host "Package ready for upload to GitHub and CurseForge"
