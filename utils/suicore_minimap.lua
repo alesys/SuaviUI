@@ -1381,6 +1381,9 @@ function Minimap_Module:Initialize()
     SetupMinimapDragging()
     UpdateMinimapSize()
     
+    -- Ensure minimap is visible after positioning
+    Minimap:Show()
+    
     CreateClock()
     UpdateClock()
     UpdateClockTime()
@@ -1521,10 +1524,23 @@ function Minimap_Module:Refresh()
         Minimap:SetMovable(false)
         -- Restore saved position from profile (validate position data exists)
         if settings.position and settings.position[1] and settings.position[2] then
+            local VALID_ANCHORS = { TOPLEFT = true, TOP = true, TOPRIGHT = true, LEFT = true, CENTER = true, 
+                                    RIGHT = true, BOTTOMLEFT = true, BOTTOM = true, BOTTOMRIGHT = true }
+            
+            local point = settings.position[1]
+            local relPoint = settings.position[2]
+            
+            -- Fallback if anchor points are invalid (corrupted data)
+            if not VALID_ANCHORS[point] then point = "TOPLEFT" end
+            if not VALID_ANCHORS[relPoint] then relPoint = "BOTTOMLEFT" end
+            
             Minimap:ClearAllPoints()
-            Minimap:SetPoint(settings.position[1], UIParent, settings.position[2], settings.position[3] or 0, settings.position[4] or 0)
+            Minimap:SetPoint(point, UIParent, relPoint, settings.position[3] or 0, settings.position[4] or 0)
         end
     end
+    
+    -- Ensure minimap is visible
+    Minimap:Show()
 end
 
 -- Expose datatext refresh for config panel
