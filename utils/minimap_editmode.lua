@@ -68,7 +68,7 @@ local function OnPositionChanged(frame, point, x, y)
 
     if not mm.position then mm.position = {} end
     mm.position[1] = point or "TOPLEFT"
-    mm.position[2] = point or "BOTTOMLEFT"
+    mm.position[2] = "BOTTOMLEFT"
     mm.position[3] = tonumber(x) or 0
     mm.position[4] = tonumber(y) or 0
 
