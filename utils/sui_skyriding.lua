@@ -805,6 +805,14 @@ local function UpdateVisibility()
     local settings = GetSettings()
     if not settings or not skyridingFrame then return end
 
+    -- Never hide during Edit Mode preview
+    if _G.SuaviUI_SkyridingEditMode_IsPreviewActive
+       and _G.SuaviUI_SkyridingEditMode_IsPreviewActive() then
+        skyridingFrame:Show()
+        skyridingFrame:SetAlpha(1)
+        return
+    end
+
     if not settings.enabled then
         skyridingFrame:Hide()
         return
@@ -904,7 +912,7 @@ local function ApplySettings()
     skyridingFrame:EnableMouse(not locked)
 
     -- Bar texture
-    local textureName = settings.barTexture or "Solid"
+    local textureName = settings.barTexture or "Suavisolid"
     local texturePath = LSM:Fetch("statusbar", textureName) or "Interface\\Buttons\\WHITE8x8"
     vigorBar:SetStatusBarTexture(texturePath)
     if secondWindMiniBar then
@@ -1078,6 +1086,10 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
             -- Start OnUpdate for animations
             if skyridingFrame then
                 skyridingFrame:SetScript("OnUpdate", OnUpdate)
+                -- Register with Edit Mode if available
+                if _G.SuaviUI_SkyridingEditMode_Register then
+                    _G.SuaviUI_SkyridingEditMode_Register(skyridingFrame)
+                end
             end
         end)
     elseif event == "PLAYER_CAN_GLIDE_CHANGED" then
@@ -1118,6 +1130,13 @@ SUI.Skyriding = {
     Create = CreateSkyridingFrame,
     UpdateVisibility = UpdateVisibility,
 }
+
+-- Export vigor bar frame for Edit Mode registration
+-- Returns the actual skyridingFrame directly (Edit Mode overlay is expanded
+-- by skyriding_editmode.lua to cover the full widget including second wind + icon)
+_G.SUI_VigorBarHolder = function()
+    return skyridingFrame
+end
 
 
 

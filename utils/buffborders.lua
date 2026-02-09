@@ -14,6 +14,8 @@ local function GetSettings()
         SUICore.db.profile.buffBorders = {
             enableBuffs = true,
             enableDebuffs = true,
+            enableDeadlyDebuffs = true,
+            enableExternalDefensives = true,
             hideBuffFrame = false,
             hideDebuffFrame = false,
             borderSize = 2,
@@ -24,15 +26,20 @@ local function GetSettings()
     return SUICore.db.profile.buffBorders
 end
 
--- Border colors
-local BORDER_COLOR_BUFF = {0, 0, 0, 1}        -- Black for buffs
-local BORDER_COLOR_DEBUFF = {0.5, 0, 0, 1}    -- Dark red for debuffs
+-- Border colors by aura type
+local BORDER_COLORS = {
+    buff     = {0, 0, 0, 1},       -- Black for buffs
+    debuff   = {0.5, 0, 0, 1},     -- Dark red for debuffs
+    deadly   = {0.8, 0, 0, 1},     -- Bright red for deadly debuffs
+    external = {0, 0.4, 0, 1},     -- Dark green for external defensives
+}
 
 -- Track which buttons we've already bordered
 local borderedButtons = {}
 
--- Add border to a single buff/debuff button
-local function AddBorderToButton(button, isBuff)
+-- Add border to a single aura button
+-- auraType: "buff", "debuff", "deadly", "external"
+local function AddBorderToButton(button, auraType)
     if not button or borderedButtons[button] then
         return
     end
@@ -40,10 +47,13 @@ local function AddBorderToButton(button, isBuff)
     -- Check if borders are enabled for this type
     local settings = GetSettings()
     if not settings then return end
-    if isBuff and not settings.enableBuffs then
-        return
-    end
-    if not isBuff and not settings.enableDebuffs then
+    local enableMap = {
+        buff = settings.enableBuffs,
+        debuff = settings.enableDebuffs,
+        deadly = settings.enableDeadlyDebuffs ~= false,
+        external = settings.enableExternalDefensives ~= false,
+    }
+    if enableMap[auraType] == false then
         return
     end
     
@@ -61,8 +71,8 @@ local function AddBorderToButton(button, isBuff)
     
     local borderSize = settings.borderSize or 2
     
-    -- Choose border color based on buff/debuff
-    local borderColor = isBuff and BORDER_COLOR_BUFF or BORDER_COLOR_DEBUFF
+    -- Choose border color based on aura type
+    local borderColor = BORDER_COLORS[auraType] or BORDER_COLORS.buff
     
     -- Create 4 separate edge textures for clean borders around the ICON only
     if not button.suaviBorderTop then
@@ -145,7 +155,8 @@ local function ApplyFontSettings(button)
 end
 
 -- Process all aura buttons in a container
-local function ProcessAuraContainer(container, isBuff)
+-- auraType: "buff", "debuff", "deadly", "external"
+local function ProcessAuraContainer(container, auraType)
     if not container then return end
     
     -- Get all child frames
@@ -153,7 +164,7 @@ local function ProcessAuraContainer(container, isBuff)
     for _, frame in ipairs(frames) do
         -- Check if this looks like an aura button
         if frame.Icon or frame.icon then
-            AddBorderToButton(frame, isBuff)
+            AddBorderToButton(frame, auraType)
             ApplyFontSettings(frame)
         end
     end
@@ -205,23 +216,42 @@ end
 
 -- Main function to process all buff/debuff frames
 local function ApplyBuffBorders()
+    -- Wipe cache each cycle to prevent stale references from aura button pool recycling.
+    -- Textures already exist on the buttons so re-processing is cheap (just color/size updates).
+    wipe(borderedButtons)
+
     -- Apply frame hiding first
     ApplyFrameHiding()
+
     -- Process BuffFrame containers (top right buffs)
     if BuffFrame and BuffFrame.AuraContainer then
-        ProcessAuraContainer(BuffFrame.AuraContainer, true) -- true = buff
+        ProcessAuraContainer(BuffFrame.AuraContainer, "buff")
     end
     
     -- Process DebuffFrame if it exists separately
     if DebuffFrame and DebuffFrame.AuraContainer then
-        ProcessAuraContainer(DebuffFrame.AuraContainer, false) -- false = debuff
+        ProcessAuraContainer(DebuffFrame.AuraContainer, "debuff")
     end
     
+    -- Process DeadlyDebuffFrame (boss deadly mechanics, shown at 1.25x scale)
+    if DeadlyDebuffFrame then
+        local debuff = DeadlyDebuffFrame.Debuff
+        if debuff and (debuff.Icon or debuff.icon) then
+            AddBorderToButton(debuff, "deadly")
+            ApplyFontSettings(debuff)
+        end
+    end
+
+    -- Process ExternalDefensivesFrame (Pain Suppression, Ironbark, etc.)
+    if ExternalDefensivesFrame and ExternalDefensivesFrame.AuraContainer then
+        ProcessAuraContainer(ExternalDefensivesFrame.AuraContainer, "external")
+    end
+
     -- Process temporary enchant frames (treat as buffs)
     if TemporaryEnchantFrame then
         local frames = {TemporaryEnchantFrame:GetChildren()}
         for _, frame in ipairs(frames) do
-            AddBorderToButton(frame, true) -- true = buff
+            AddBorderToButton(frame, "buff")
             ApplyFontSettings(frame)
         end
     end
@@ -263,6 +293,21 @@ local function HookAuraUpdates()
         hooksecurefunc(DebuffFrame.AuraContainer, "Update", ScheduleBuffBorders)
     end
 
+    -- Hook DeadlyDebuffFrame updates (boss deadly mechanics)
+    if DeadlyDebuffFrame and DeadlyDebuffFrame.Update then
+        hooksecurefunc(DeadlyDebuffFrame, "Update", ScheduleBuffBorders)
+    end
+
+    -- Hook ExternalDefensivesFrame updates (external defensives like Pain Suppression)
+    if ExternalDefensivesFrame then
+        if ExternalDefensivesFrame.Update then
+            hooksecurefunc(ExternalDefensivesFrame, "Update", ScheduleBuffBorders)
+        end
+        if ExternalDefensivesFrame.AuraContainer and ExternalDefensivesFrame.AuraContainer.Update then
+            hooksecurefunc(ExternalDefensivesFrame.AuraContainer, "Update", ScheduleBuffBorders)
+        end
+    end
+
     -- Hook the global aura update function if available
     if type(AuraButton_Update) == "function" then
         hooksecurefunc("AuraButton_Update", ScheduleBuffBorders)
@@ -294,8 +339,7 @@ SUI.BuffBorders = {
 
 -- Global function for config panel to call
 _G.SuaviUI_RefreshBuffBorders = function()
-    borderedButtons = {}  -- Clear cache to force re-border
-    ApplyBuffBorders()
+    ApplyBuffBorders()  -- Cache is wiped inside ApplyBuffBorders
 end
 
 

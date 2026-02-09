@@ -5896,24 +5896,19 @@ local function CreateCooldownViewersPage(parent)
     if not db.ncdm.trackedBar then db.ncdm.trackedBar = {} end
     local trackedData = db.ncdm.trackedBar
     if trackedData.enabled == nil then trackedData.enabled = true end
-    if trackedData.hideIcon == nil then trackedData.hideIcon = false end
     if trackedData.barHeight == nil then trackedData.barHeight = 24 end
-    if trackedData.barWidth == nil then trackedData.barWidth = 200 end
     if trackedData.texture == nil then trackedData.texture = "Suavitex v3" end
     if trackedData.useClassColor == nil then trackedData.useClassColor = true end
     if trackedData.barColor == nil then trackedData.barColor = {0.204, 0.827, 0.6, 1} end
-    if trackedData.barOpacity == nil then trackedData.barOpacity = 1.0 end
     if trackedData.borderSize == nil then trackedData.borderSize = 1 end
     if trackedData.bgColor == nil then trackedData.bgColor = {0, 0, 0, 1} end
     if trackedData.bgOpacity == nil then trackedData.bgOpacity = 0.7 end
     if trackedData.textSize == nil then trackedData.textSize = 12 end
     if trackedData.spacing == nil then trackedData.spacing = 4 end
     if trackedData.growUp == nil then trackedData.growUp = true end
-    if trackedData.hideText == nil then trackedData.hideText = false end
     if trackedData.orientation == nil then trackedData.orientation = "horizontal" end
     if trackedData.fillDirection == nil then trackedData.fillDirection = "up" end
     if trackedData.iconPosition == nil then trackedData.iconPosition = "top" end
-    if trackedData.showTextOnVertical == nil then trackedData.showTextOnVertical = false end
 
     -- Enable toggle
     local trackedEnable = GUI:CreateFormCheckbox(content, "Enable Tracked Bar Styling", "enabled", trackedData, RefreshTrackedBars)
@@ -5921,22 +5916,10 @@ local function CreateCooldownViewersPage(parent)
     trackedEnable:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - FORM_ROW
 
-    -- Hide Icon toggle
-    local hideIconCheck = GUI:CreateFormCheckbox(content, "Hide Icon", "hideIcon", trackedData, RefreshTrackedBars)
-    hideIconCheck:SetPoint("TOPLEFT", PADDING, y)
-    hideIconCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
-
     -- Bar Height
     local trackedHeightSlider = GUI:CreateFormSlider(content, "Bar Height", 2, 48, 1, "barHeight", trackedData, RefreshTrackedBars)
     trackedHeightSlider:SetPoint("TOPLEFT", PADDING, y)
     trackedHeightSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - SLIDER_HEIGHT
-
-    -- Bar Width
-    local trackedWidthSlider = GUI:CreateFormSlider(content, "Bar Width", 100, 400, 1, "barWidth", trackedData, RefreshTrackedBars)
-    trackedWidthSlider:SetPoint("TOPLEFT", PADDING, y)
-    trackedWidthSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - SLIDER_HEIGHT
 
     -- Bar Texture (with texture preview)
@@ -5993,19 +5976,12 @@ local function CreateCooldownViewersPage(parent)
     iconPosDropdown:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - FORM_ROW
 
-    -- Show Text (Vertical only)
-    local showTextVerticalCheck = GUI:CreateFormCheckbox(content, "Show Text (Vertical)", "showTextOnVertical", trackedData, RefreshTrackedBars)
-    showTextVerticalCheck:SetPoint("TOPLEFT", PADDING, y)
-    showTextVerticalCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
-
     -- UX: Dim vertical-only options when horizontal
     updateVerticalStates = function()
         local isVertical = trackedData.orientation == "vertical"
         local alpha = isVertical and 1.0 or 0.4
         fillDropdown:SetAlpha(alpha)
         iconPosDropdown:SetAlpha(alpha)
-        showTextVerticalCheck:SetAlpha(alpha)
     end
     updateVerticalStates()  -- Initial state
 
@@ -6020,12 +5996,6 @@ local function CreateCooldownViewersPage(parent)
     trackedBarColorPicker:SetPoint("TOPLEFT", PADDING, y)
     trackedBarColorPicker:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - FORM_ROW
-
-    -- Bar Opacity
-    local trackedBarOpacitySlider = GUI:CreateFormSlider(content, "Bar Opacity", 0, 1, 0.05, "barOpacity", trackedData, RefreshTrackedBars)
-    trackedBarOpacitySlider:SetPoint("TOPLEFT", PADDING, y)
-    trackedBarOpacitySlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - SLIDER_HEIGHT
 
     -- Border Size
     local trackedBorderSlider = GUI:CreateFormSlider(content, "Border Size", 0, 4, 1, "borderSize", trackedData, RefreshTrackedBars)
@@ -6050,12 +6020,6 @@ local function CreateCooldownViewersPage(parent)
     trackedTextSlider:SetPoint("TOPLEFT", PADDING, y)
     trackedTextSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - SLIDER_HEIGHT
-
-    -- Hide Text
-    local hideTextCheck = GUI:CreateFormCheckbox(content, "Hide Text", "hideText", trackedData, RefreshTrackedBars)
-    hideTextCheck:SetPoint("TOPLEFT", PADDING, y)
-    hideTextCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
 
     -- Bar Spacing
     local trackedSpacingSlider = GUI:CreateFormSlider(content, "Bar Spacing", 0, 20, 1, "spacing", trackedData, RefreshTrackedBars)

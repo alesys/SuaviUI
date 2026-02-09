@@ -440,7 +440,7 @@ function AB_EditMode:Initialize()
                     local frame = self.registeredFrames[buttonType]
                     if frame then
                         frame:Show()
-                        frame:SetFrameStrata("DIALOG")  -- Match Edit Mode panel strata
+                        frame:SetFrameStrata("MEDIUM")  -- Match resource powerbar strata
                         if frame._editModeOverlay then
                             frame._editModeOverlay:Show()
                         end

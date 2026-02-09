@@ -93,6 +93,12 @@ do
         return ok
     end
 
+    -- Check if a value is safely comparable (not a secret value)
+    local function IsSafeBool(val)
+        local ok = pcall(function() return val == true end)
+        return ok
+    end
+
     local function SanitizeFrame(frame)
         if not IsSafeNumber(frame.cooldownChargesCount) then frame.cooldownChargesCount = 0 end
         if not IsSafeNumber(frame.previousCooldownChargesCount) then frame.previousCooldownChargesCount = 0 end
@@ -100,12 +106,12 @@ do
         if not IsSafeNumber(frame.cooldownDuration) then frame.cooldownDuration = 0 end
         if not IsSafeNumber(frame.cooldownModRate) then frame.cooldownModRate = 1 end
         if not IsSafeNumber(frame.availableAlertTriggerTime) then frame.availableAlertTriggerTime = nil end
-        local ca = frame.cooldownIsActive
-        if ca ~= nil and ca ~= true and ca ~= false then frame.cooldownIsActive = false end
-        local oa = frame.isOnActualCooldown
-        if oa ~= nil and oa ~= true and oa ~= false then frame.isOnActualCooldown = false end
-        local ao = frame.allowOnCooldownAlert
-        if ao ~= nil and ao ~= true and ao ~= false then frame.allowOnCooldownAlert = false end
+        if not IsSafeBool(frame.cooldownIsActive) then frame.cooldownIsActive = false end
+        if not IsSafeBool(frame.isOnActualCooldown) then frame.isOnActualCooldown = false end
+        if not IsSafeBool(frame.allowOnCooldownAlert) then frame.allowOnCooldownAlert = false end
+        if not IsSafeBool(frame.isActive) then frame.isActive = false end
+        if not IsSafeBool(frame.cooldownEnabled) then frame.cooldownEnabled = false end
+        if not IsSafeBool(frame.cooldownChargesShown) then frame.cooldownChargesShown = false end
     end
 
     local function RecoverViewer(viewer)
@@ -175,9 +181,113 @@ do
         for _, v in ipairs(viewers) do RecoverViewer(v) end
     end
 
-    -- TEMP: Disable crash recovery to test impact
-    local DISABLE_CRASH_RECOVERY = true
+    -- Proactive sanitization: PRE-hook RefreshData to sanitize BEFORE Blizzard's code runs
+    -- hooksecurefunc runs AFTER the original function, which is too late.
+    -- We replace the method with a wrapper that sanitizes first.
+    local function HookViewerRefreshData(viewer)
+        if not viewer or not viewer.RefreshData then return end
+        if viewer._SUI_RefreshDataHooked then return end
+        
+        local originalRefreshData = viewer.RefreshData
+        viewer.RefreshData = function(self, ...)
+            -- Sanitize all active frames BEFORE Blizzard's code compares secret values
+            if self.itemFramePool then
+                for frame in self.itemFramePool:EnumerateActive() do
+                    SanitizeFrame(frame)
+                end
+            end
+            return originalRefreshData(self, ...)
+        end
+        
+        viewer._SUI_RefreshDataHooked = true
+    end
+
+    -- Hook individual item OnEvent/OnUpdate to sanitize before Blizzard code runs
+    -- CooldownViewer items share a mixin; their OnEvent calls RefreshData → crashes
+    local function HookViewerItemEvents(viewer)
+        if not viewer or viewer._SUI_ItemEventsHooked then return end
+        if not viewer.itemFramePool then return end
+        
+        -- Hook the OnEvent callback on the viewer to sanitize items beforehand
+        -- The viewer's OnEvent dispatches SPELL_UPDATE_COOLDOWN to each item's RefreshData
+        if viewer.OnEvent and not viewer._SUI_OnEventHooked then
+            local origOnEvent = viewer.OnEvent
+            viewer.OnEvent = function(self, event, ...)
+                -- Sanitize before any event processing
+                if self.itemFramePool then
+                    for frame in self.itemFramePool:EnumerateActive() do
+                        SanitizeFrame(frame)
+                    end
+                end
+                return origOnEvent(self, event, ...)
+            end
+            viewer._SUI_OnEventHooked = true
+        end
+        
+        viewer._SUI_ItemEventsHooked = true
+    end
+
+    -- Hook viewer OnUpdate to sanitize isActive before Blizzard's per-item loop
+    -- CooldownViewerBuffBarItemMixin:OnUpdate does `if self:IsActive()` — crashes
+    -- when isActive is a secret value. We only check isActive here (not full
+    -- SanitizeFrame) because the OnUpdate path only gates on that one field.
+    local function HookViewerOnUpdate(viewer)
+        if not viewer or not viewer.OnUpdate then return end
+        if viewer._SUI_OnUpdateHooked then return end
+
+        local originalOnUpdate = viewer.OnUpdate
+        viewer.OnUpdate = function(self, elapsed, ...)
+            if self.itemFramePool then
+                for frame in self.itemFramePool:EnumerateActive() do
+                    if not IsSafeBool(frame.isActive) then
+                        frame.isActive = false
+                    end
+                end
+            end
+            return originalOnUpdate(self, elapsed, ...)
+        end
+
+        viewer._SUI_OnUpdateHooked = true
+    end
+
+    -- Hook all CDM viewers on load
+    local function HookAllViewers()
+        local viewers = {
+            _G.EssentialCooldownViewer, _G.UtilityCooldownViewer,
+            _G.BuffIconCooldownViewer,  _G.BuffBarCooldownViewer,
+        }
+        for _, v in ipairs(viewers) do
+            if v then
+                HookViewerRefreshData(v)
+                HookViewerItemEvents(v)
+                HookViewerOnUpdate(v)
+            end
+        end
+        
+        -- Also sanitize all currently active item frames
+        for _, viewer in ipairs(viewers) do
+            if viewer and viewer.itemFramePool then
+                for frame in viewer.itemFramePool:EnumerateActive() do
+                    SanitizeFrame(frame)
+                end
+            end
+        end
+    end
+
+    -- Re-enable crash recovery (handles secret value crashes during combat)
+    local DISABLE_CRASH_RECOVERY = false
     if DISABLE_CRASH_RECOVERY then return end
+
+    -- Install proactive hooks immediately
+    HookAllViewers()
+    -- Re-hook after ADDON_LOADED in case viewers reload
+    local hookFrame = CreateFrame("Frame")
+    hookFrame:RegisterEvent("ADDON_LOADED")
+    hookFrame:SetScript("OnEvent", function(_, _, addon)
+        if addon == "Blizzard_CooldownViewer" then
+            C_Timer.After(0.5, HookAllViewers)
+        end
+    end)
 
     local ticker
     local f = CreateFrame("Frame")
@@ -231,8 +341,13 @@ SLASH_SUAVIUI_EM1 = "/em"
 SLASH_SUAVIUI_EM2 = "/ed"
 SlashCmdList["SUAVIUI_EM"] = function()
     if EditModeManagerFrame then
-        -- Use the Blizzard slash command to avoid tainting EditMode
-        RunSlashCmd("/editmode")
+        -- Toggle Edit Mode visibility directly
+        if EditModeManagerFrame:IsShown() then
+            EditModeManagerFrame:Hide()
+        else
+            EditModeManagerFrame:Show()
+            EditModeManagerFrame:OnEditModeEnter()
+        end
     else
         print("|cff34D399SuaviUI:|r Edit Mode not available.")
     end

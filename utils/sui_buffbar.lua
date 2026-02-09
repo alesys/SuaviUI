@@ -2,12 +2,8 @@
 local SUICore = ns.Addon
 local LSM = LibStub("LibSharedMedia-3.0")
 
--- TEMP: Force-disable CDM buff icon/bar layout adjustments
-local FORCE_DISABLE_CDM_BUFFBAR = true
-
-if _G.SuaviUI and _G.SuaviUI.CooldownManagerCentered then
-    return
-end
+-- CDM buff bar layout adjustments (enabled)
+local FORCE_DISABLE_CDM_BUFFBAR = false
 
 ---------------------------------------------------------------------------
 -- SUI Buff Bar Manager
@@ -104,23 +100,19 @@ local function GetTrackedBarSettings()
     return {
         enabled = true,
         barHeight = 24,
-        barWidth = 200,
         texture = "Suavitex v3",
         useClassColor = true,
         barColor = {0.204, 0.827, 0.6, 1},
-        barOpacity = 1.0,
         borderSize = 1,
         bgColor = {0, 0, 0, 1},
         bgOpacity = 0.7,
         textSize = 12,
         spacing = 4,
         growUp = true,
-        hideText = false,
         -- Vertical bar settings
         orientation = "horizontal",
         fillDirection = "up",
         iconPosition = "top",
-        showTextOnVertical = false,
     }
 end
 
@@ -582,34 +574,32 @@ local function ApplyBarStyle(frame, settings)
     if frame.IsForbidden and frame:IsForbidden() then return end
 
     local barHeight = settings.barHeight or 24
-    local barWidth = settings.barWidth or 200
     local texture = settings.texture or "Suavitex v3"
     local useClassColor = settings.useClassColor
     local barColor = settings.barColor or {0.204, 0.827, 0.6, 1}
-    local barOpacity = settings.barOpacity or 1.0
     local borderSize = settings.borderSize or 1
     local bgColor = settings.bgColor or {0, 0, 0, 1}
     local bgOpacity = settings.bgOpacity or 0.7
     local textSize = settings.textSize or 12
-    local hideIcon = settings.hideIcon
-    local hideText = settings.hideText
+
+    -- Note: Icon visibility, bar width, bar opacity, and text visibility
+    -- are controlled by CDM's Edit Mode panel (Display Mode, Bar Width %, Opacity)
 
     -- Vertical bar settings
     local orientation = settings.orientation or "horizontal"
     local isVertical = (orientation == "vertical")
     local fillDirection = settings.fillDirection or "up"
     local iconPosition = settings.iconPosition or "top"
-    local showTextOnVertical = settings.showTextOnVertical or false
 
-    -- For vertical bars: swap width/height conceptually
-    -- "Bar Height" setting becomes bar width, "Bar Width" becomes bar height
+    -- Use CDM's current frame width, SUI only controls bar height
+    local currentWidth = frame:GetWidth() or 200
     local frameWidth, frameHeight
     if isVertical then
-        frameWidth = barHeight   -- Height setting becomes width
-        frameHeight = barWidth   -- Width setting becomes height
+        frameWidth = barHeight      -- Height setting becomes width
+        frameHeight = currentWidth   -- CDM-controlled width becomes height
     else
-        frameWidth = barWidth
-        frameHeight = barHeight
+        frameWidth = currentWidth    -- CDM controls width
+        frameHeight = barHeight      -- SUI controls height
     end
 
     -- Get the StatusBar child (usually frame.Bar)
@@ -624,6 +614,10 @@ local function ApplyBarStyle(frame, settings)
                 end
             end
         end
+    end
+    
+    if not statusBar then
+        return
     end
 
     -- 1. STRIP Blizzard's decorative textures from the statusBar (keep only the fill texture)
@@ -662,20 +656,11 @@ local function ApplyBarStyle(frame, settings)
         end
     end)
 
-    -- 3. Handle icon visibility and styling
+    -- 3. Style icon if visible (CDM Display Mode controls icon visibility)
     local iconContainer = frame.Icon
-    if iconContainer then
-        if hideIcon then
-            -- Hide icon completely when user wants no icon
+    if iconContainer and iconContainer:IsShown() then
+            -- Style icon with full texture stripping for clean rendering
             pcall(function()
-                iconContainer:Hide()
-                iconContainer:SetAlpha(0)
-            end)
-        else
-            -- Show and style icon with full texture stripping for clean rendering
-            pcall(function()
-                iconContainer:Show()
-                iconContainer:SetAlpha(1)
 
                 -- Disable atlas borders on iconContainer (prevents thick border reappearance)
                 DisableAtlasBorder(iconContainer.DebuffBorder)
@@ -770,17 +755,17 @@ local function ApplyBarStyle(frame, settings)
                 end)
             end
         end)
-        end  -- end else (not hideIcon)
     end
 
     -- 3b. Reposition statusBar and icon based on orientation and visibility
+    local iconVisible = iconContainer and iconContainer:IsShown()
     if statusBar then
         pcall(function()
             statusBar:ClearAllPoints()
 
             if isVertical then
                 -- VERTICAL: Icon at top or bottom, bar fills remaining space
-                if hideIcon or not iconContainer then
+                if not iconVisible then
                     -- No icon: bar fills entire frame
                     statusBar:SetAllPoints(frame)
                 else
@@ -802,7 +787,7 @@ local function ApplyBarStyle(frame, settings)
                 end
             else
                 -- HORIZONTAL: Original behavior
-                if hideIcon or not iconContainer then
+                if not iconVisible then
                     statusBar:SetPoint("LEFT", frame, "LEFT", 0, 0)
                 else
                     statusBar:SetPoint("LEFT", iconContainer, "RIGHT", 0, 0)
@@ -822,18 +807,18 @@ local function ApplyBarStyle(frame, settings)
         end
     end
 
-    -- 5. Apply bar color (class or custom) with opacity
+    -- 5. Apply bar color (class or custom) — CDM controls overall opacity
     if statusBar and statusBar.SetStatusBarColor then
         pcall(function()
             if useClassColor then
                 local _, class = UnitClass("player")
                 local color = RAID_CLASS_COLORS[class]
                 if color then
-                    statusBar:SetStatusBarColor(color.r, color.g, color.b, barOpacity)
+                    statusBar:SetStatusBarColor(color.r, color.g, color.b, 1)
                 end
             else
                 local c = barColor
-                statusBar:SetStatusBarColor(c[1] or 0.2, c[2] or 0.8, c[3] or 0.6, barOpacity)
+                statusBar:SetStatusBarColor(c[1] or 0.2, c[2] or 0.8, c[3] or 0.6, 1)
             end
         end)
     end
@@ -910,21 +895,15 @@ local function ApplyBarStyle(frame, settings)
         end
     end
 
-    -- 8. Apply text size to duration/name text (hide if hideText enabled or vertical without showTextOnVertical)
+    -- 8. Apply text size — CDM Display Mode controls text visibility
     local generalFont = GetGeneralFont()
     local generalOutline = GetGeneralFontOutline()
-    local showText = not hideText and (not isVertical or showTextOnVertical)
 
     if frame.GetRegions then
         for _, region in ipairs({frame:GetRegions()}) do
             if region and region:GetObjectType() == "FontString" then
                 pcall(function()
-                    if showText then
-                        region:SetFont(generalFont, textSize, generalOutline)
-                        region:SetAlpha(1)
-                    else
-                        region:SetAlpha(0)
-                    end
+                    region:SetFont(generalFont, textSize, generalOutline)
                 end)
             end
         end
@@ -934,12 +913,7 @@ local function ApplyBarStyle(frame, settings)
         for _, region in ipairs({statusBar:GetRegions()}) do
             if region and region:GetObjectType() == "FontString" then
                 pcall(function()
-                    if showText then
-                        region:SetFont(generalFont, textSize, generalOutline)
-                        region:SetAlpha(1)
-                    else
-                        region:SetAlpha(0)
-                    end
+                    region:SetFont(generalFont, textSize, generalOutline)
                 end)
             end
         end
@@ -1321,14 +1295,22 @@ LayoutBuffBars = function()
     -- Update container dimensions to prevent Blizzard's Layout() from resizing and causing drift
     -- Both vertical and horizontal set ONE dimension fixed, letting bars overflow the other dimension
     -- This prevents CENTER-anchor drift because container size never changes with bar count
+    -- In Edit Mode, size the container to encompass ALL bars so the selection
+    -- overlay covers the full widget. Outside Edit Mode, use single-bar size
+    -- so bars overflow without causing drift.
+    local isEditMode = EditModeManagerFrame and EditModeManagerFrame.editModeActive
+
     if isVertical then
         SuppressLayout()
 
-        -- Only set HEIGHT, leave width alone so bars overflow horizontally
         local currentWidth = BuffBarCooldownViewer:GetWidth()
-        BuffBarCooldownViewer:SetSize(currentWidth, roundPixel(effectiveBarHeight))
+        if isEditMode and count > 1 then
+            -- Expand width to cover all bars during Edit Mode
+            BuffBarCooldownViewer:SetSize(roundPixel(totalSize), roundPixel(effectiveBarHeight))
+        else
+            BuffBarCooldownViewer:SetSize(currentWidth, roundPixel(effectiveBarHeight))
+        end
 
-        -- Ensure isHorizontal flag stays correct for subsequent Layout() calls
         BuffBarCooldownViewer.isHorizontal = false
 
         UnsuppressLayout()
@@ -1338,10 +1320,13 @@ LayoutBuffBars = function()
         -- bars anchor to BOTTOM/TOP edges - if HEIGHT changes, those edges move
         SuppressLayout()
 
-        -- Set both dimensions to single bar size - bars overflow, edges stay fixed
-        BuffBarCooldownViewer:SetSize(roundPixel(effectiveBarWidth), roundPixel(effectiveBarHeight))
+        if isEditMode and count > 1 then
+            -- Expand height to cover all bars during Edit Mode
+            BuffBarCooldownViewer:SetSize(roundPixel(effectiveBarWidth), roundPixel(totalSize))
+        else
+            BuffBarCooldownViewer:SetSize(roundPixel(effectiveBarWidth), roundPixel(effectiveBarHeight))
+        end
 
-        -- Ensure Blizzard's Layout() uses correct flags
         BuffBarCooldownViewer.isHorizontal = true
         BuffBarCooldownViewer.layoutFramesGoingUp = growFromBottom
 

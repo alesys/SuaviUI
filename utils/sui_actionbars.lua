@@ -425,7 +425,7 @@ local function CreateExtraButtonHolder(buttonType, displayName)
     mover:EnableMouse(true)
     mover:SetMovable(true)
     mover:RegisterForDrag("LeftButton")
-    mover:SetFrameStrata("DIALOG")  -- Match Edit Mode panel strata
+    mover:SetFrameStrata("MEDIUM")  -- Match resource powerbar strata
     mover:Hide()
 
     -- Label text

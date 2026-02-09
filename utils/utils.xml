@@ -54,6 +54,7 @@
     <Script file="sui_quicksalvage.lua"/>
     <Script file="sui_crosshair.lua"/>
     <Script file="sui_skyriding.lua"/>
+    <Script file="skyriding_editmode.lua"/>
     <Script file="sui_chat.lua"/>
     <Script file="sui_tooltips.lua"/>
     <Script file="sui_mplus_timer.lua"/>

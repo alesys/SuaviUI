@@ -196,24 +196,22 @@ function SUICore:ApplyDefaultProfileOnFirstInstall()
         return  -- Already applied, don't re-apply
     end
     
-    -- Check if this is truly a fresh install by seeing if the profile matches defaults exactly
-    -- We check a few key settings that would be different in the custom profile
+    -- Check if this is truly a fresh install by seeing if the profile has any data at all
     local profile = self.db.profile
-    
-    -- If user has customized anything, don't overwrite
     local hasCustomizations = false
     
-    -- Check some distinctive settings from the default profile
-    if profile.ncdm and profile.ncdm.essential and profile.ncdm.essential.row1 then
-        -- Check if row1 settings match the hard-coded defaults (which differ from our custom profile)
-        if profile.ncdm.essential.row1.iconSize ~= 39 or
-           profile.ncdm.essential.row1.iconCount ~= 8 then
-            hasCustomizations = true
-        end
+    -- Any existing ncdm data means this is NOT a fresh install
+    if profile.ncdm then
+        hasCustomizations = true
+    end
+    
+    -- Any existing general settings means this is NOT a fresh install
+    if profile.general then
+        hasCustomizations = true
     end
     
     if hasCustomizations then
-        -- User has made changes, mark as applied but don't overwrite
+        -- Existing profile data found, mark as applied and don't overwrite
         profile.defaultProfileApplied = true
         return
     end
@@ -221,9 +219,10 @@ function SUICore:ApplyDefaultProfileOnFirstInstall()
     -- This is a fresh install - apply the default profile
     local success, errorMsg = self:ImportProfileFromString(DEFAULT_PROFILE_STRING)
     
+    -- Always mark as applied to prevent retrying on failure
+    self.db.profile.defaultProfileApplied = true
+    
     if success then
-        -- Mark that we've applied the default profile
-        self.db.profile.defaultProfileApplied = true
         print("|cff34D399SuaviUI:|r Default profile loaded successfully!")
     else
         print("|cffFF5757SuaviUI:|r Failed to load default profile: " .. tostring(errorMsg))
