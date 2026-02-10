@@ -86,11 +86,20 @@ function Runtime:IsReady(viewerNameOrFrame)
     elseif type(viewerNameOrFrame) == "table" then
         viewer = viewerNameOrFrame
     end
-    if not viewer or not viewer.IsInitialized or not EditModeManagerFrame then
+    if not viewer or not EditModeManagerFrame then
         return false
     end
 
-    if EditModeManagerFrame.layoutApplyInProgress or not viewer:IsInitialized() then
+    -- 12.0.5: CooldownViewer mixin properties are forbidden; pcall-protect access
+    local hasInit = false
+    pcall(function() hasInit = viewer.IsInitialized end)
+    if not hasInit then
+        return false
+    end
+
+    local initialized = false
+    pcall(function() initialized = viewer:IsInitialized() end)
+    if EditModeManagerFrame.layoutApplyInProgress or not initialized then
         return false
     end
 
@@ -372,7 +381,9 @@ function ViewerAdapters.GetBuffBarFrames()
         return {}
     end
     local frames = {}
-    if BuffBarCooldownViewer.GetItemFrames then
+    local hasGetItemFrames = false
+    pcall(function() hasGetItemFrames = BuffBarCooldownViewer.GetItemFrames ~= nil end)
+    if hasGetItemFrames then
         local ok, items = pcall(BuffBarCooldownViewer.GetItemFrames, BuffBarCooldownViewer)
         if ok and items then
             frames = items
@@ -435,11 +446,16 @@ function ViewerAdapters.UpdateBuffIcons()
         return
     end
 
-    local isHorizontal = BuffIconCooldownViewer.isHorizontal ~= false
-    local iconDirection = BuffIconCooldownViewer.iconDirection == 1 and "NORMAL" or "REVERSED"
+    local isHorizontal = true
+    local iconDirection = "NORMAL"
+    local padding = 0
+    pcall(function()
+        isHorizontal = BuffIconCooldownViewer.isHorizontal ~= false
+        iconDirection = BuffIconCooldownViewer.iconDirection == 1 and "NORMAL" or "REVERSED"
+        padding = isHorizontal and BuffIconCooldownViewer.childXPadding or BuffIconCooldownViewer.childYPadding
+    end)
     local iconDirectionModifier = iconDirection == "NORMAL" and 1 or -1
     local alignment = GetSetting("cooldownManager_alignBuffIcons_growFromDirection", "CENTER")
-    local padding = isHorizontal and BuffIconCooldownViewer.childXPadding or BuffIconCooldownViewer.childYPadding
     local settingMap = viewerSettingsMap["BuffIconCooldownViewer"]
 
     if isHorizontal then
@@ -521,7 +537,8 @@ function ViewerAdapters.UpdateBuffBarsIfNeeded()
 
     local refBar = bars[1]
     local barHeight = refBar and refBar:GetHeight()
-    local spacing = BuffBarCooldownViewer.childYPadding or 0
+    local spacing = 0
+    pcall(function() spacing = BuffBarCooldownViewer.childYPadding or 0 end)
     if not barHeight or barHeight == 0 then
         return
     end
@@ -686,10 +703,17 @@ function ViewerAdapters.CenterAllRows(viewer, fromDirection)
             viewerType = "Utility"
         end
 
-        local isHorizontal = viewer.isHorizontal ~= false
-        local iconDirection = viewer.iconDirection == 1 and "NORMAL" or "REVERSED"
-        local iconLimit = viewer.iconLimit or 0
-        if iconLimit <= 0 then
+        local isHorizontal, iconDirection, iconLimit, iconScale
+        local propsOk = pcall(function()
+            isHorizontal = viewer.isHorizontal ~= false
+            iconDirection = viewer.iconDirection == 1 and "NORMAL" or "REVERSED"
+            iconLimit = viewer.iconLimit or 0
+            iconScale = viewer.iconScale or 1
+        end)
+        if not propsOk then
+            return
+        end
+        if not iconLimit or iconLimit <= 0 then
             return
         end
 
@@ -707,14 +731,15 @@ function ViewerAdapters.CenterAllRows(viewer, fromDirection)
             return
         end
 
-        local padding = isHorizontal and viewer.childXPadding or viewer.childYPadding
+        local padding = 0
+        pcall(function() padding = isHorizontal and viewer.childXPadding or viewer.childYPadding end)
         if viewerName == "UtilityCooldownViewer" and GetSetting("cooldownManager_limitUtilitySizeToEssential", false) then
             local essentialViewer = viewers["EssentialCooldownViewer"]
             if essentialViewer then
                 local eWidth = essentialViewer:GetWidth()
                 if eWidth and eWidth > 0 then
-                    local iconActualWidth = (w + padding) * viewer.iconScale
-                    local maxIcons = floor((eWidth + (padding * viewer.iconScale)) / iconActualWidth)
+                    local iconActualWidth = (w + padding) * (iconScale or 1)
+                    local maxIcons = floor((eWidth + (padding * (iconScale or 1))) / iconActualWidth)
                     if maxIcons > 0 then
                         iconLimit = math.max(math.min(iconLimit, maxIcons), math.min(iconLimit, 5))
                     end
