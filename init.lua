@@ -306,7 +306,7 @@ do
     -- is also a taint source. BuffBar/BuffIcon have custom containers;
     -- Essential/Utility will need monitoring for issues without this recovery.
     local DISABLE_CRASH_RECOVERY = true
-    if DISABLE_CRASH_RECOVERY then return end
+    if not DISABLE_CRASH_RECOVERY then
 
     -- Install proactive hooks immediately
     HookAllViewers()
@@ -340,6 +340,7 @@ do
             C_Timer.After(1.0, RecoverAll)
         end
     end)
+    end -- if not DISABLE_CRASH_RECOVERY
 end
 
 -- Quick Keybind Mode shortcut (/kb)
