@@ -79,67 +79,21 @@ do
     end
 end
 
--- CompactUnitFrame global-function guards: REMOVED
--- Previously we replaced CompactUnitFrame_UpdateHealPrediction and
--- CompactUnitFrame_GetRangeAlpha with insecure Lua wrappers to catch
--- secret-value crashes during Edit Mode transitions. However, replacing
--- secure globals with insecure functions taints the global table, and
--- because nameplates inherit from CompactUnitFrame, the taint propagates
--- into nameplate setup — causing SetNamePlateHitTestFrame to reject its
--- own HitTestFrame argument (9+ errors per session).
+-- Taint prevention notes (WoW 12.x)
+-- =====================================
+-- 1. Global-function guards (HealPrediction, RangeAlpha, NamePlate): REMOVED.
+--    Replacing secure globals with insecure functions taints the entire global
+--    table, causing cascading failures (5793+ nameplate crashes).
 --
--- The root taint source (hooksecurefunc on CompactRaidFrameManager) has
--- been fixed with RegisterStateDriver in uihider.lua, and the outOfRange
--- field is pre-cleared by ClearTaintedOutOfRange below. These guards are
--- no longer needed.
-
--- CompactPartyFrame / CompactArenaFrame outOfRange pre-clear (WoW 12.x)
--- The outOfRange field on party AND arena frame members can become a secret value
--- when taint propagates through the frame update chain. secureexecuterange in
--- EditModeManager bypasses our global function replacement, so we must ensure
--- the field has a safe boolean value BEFORE Blizzard's secure code reads it.
--- This runs on EnterEditMode and on key events that trigger frame refresh.
-do
-    local framePrefixes = {
-        "CompactPartyFrameMember",
-        "CompactArenaFrameMember",
-    }
-
-    local function ClearTaintedOutOfRange()
-        for _, prefix in ipairs(framePrefixes) do
-            for i = 1, 5 do
-                local frame = _G[prefix .. i]
-                if frame then
-                    -- Only clear if the value is actually tainted/secret
-                    local isSafe = true
-                    if type(issecretvalue) == "function" then
-                        isSafe = not issecretvalue(frame.outOfRange)
-                    else
-                        local ok = pcall(function() return frame.outOfRange == true end)
-                        isSafe = ok
-                    end
-                    if not isSafe then
-                        frame.outOfRange = false
-                    end
-                end
-            end
-        end
-    end
-
-    -- Pre-clear before Edit Mode enters (prevents secureexecuterange crash)
-    if EditModeManagerFrame then
-        hooksecurefunc(EditModeManagerFrame, "EnterEditMode", ClearTaintedOutOfRange)
-    end
-
-    -- Pre-clear on events that trigger frame refresh
-    local clearFrame = CreateFrame("Frame")
-    clearFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
-    clearFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-    clearFrame:RegisterEvent("ARENA_OPPONENT_UPDATE")
-    clearFrame:SetScript("OnEvent", function()
-        ClearTaintedOutOfRange()
-    end)
-end
+-- 2. ClearTaintedOutOfRange: REMOVED.
+--    Writing frame.outOfRange = false from addon (insecure) context *directly*
+--    taints the field, even when the intent is to "clear" a tainted value.
+--    Any write from addon code is addon-tainted. The root taint source
+--    (hooksecurefunc on CompactRaidFrameManager) was fixed with
+--    RegisterStateDriver in uihider.lua, so the field should no longer
+--    become tainted in the first place.
+--
+-- 3. The ONLY safe way to hide secure frames is RegisterStateDriver.
 
 -- CooldownViewer secret-value crash recovery (WoW 12.x)
 -- Blizzard's RefreshLayout does: ReleaseAll() → Acquire → RefreshData() → Layout().
@@ -236,9 +190,10 @@ do
     end
 
     local function RecoverAll()
+        -- Only recover Essential and Utility viewers.
+        -- BuffIcon and BuffBar use custom containers (Option C Phase 1+2).
         local viewers = {
             _G.EssentialCooldownViewer, _G.UtilityCooldownViewer,
-            _G.BuffIconCooldownViewer,  _G.BuffBarCooldownViewer,
         }
         for _, v in ipairs(viewers) do RecoverViewer(v) end
     end
@@ -314,9 +269,12 @@ do
 
     -- Hook all CDM viewers on load
     local function HookAllViewers()
+        -- Only hook Essential and Utility viewers.
+        -- BuffIcon and BuffBar viewers use custom containers (Option C Phase 1+2)
+        -- and no longer need crash recovery. Wrapping their methods would
+        -- unnecessarily taint their method tables.
         local viewers = {
             _G.EssentialCooldownViewer, _G.UtilityCooldownViewer,
-            _G.BuffIconCooldownViewer,  _G.BuffBarCooldownViewer,
         }
         for _, v in ipairs(viewers) do
             if v then
