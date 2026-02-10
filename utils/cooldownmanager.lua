@@ -165,18 +165,20 @@ if SLASH_SUI_SQUARETEST1 == nil then
     end
 end
 
-local viewers = {
-    EssentialCooldownViewer = _G["EssentialCooldownViewer"],
-    UtilityCooldownViewer = _G["UtilityCooldownViewer"],
-    BuffIconCooldownViewer = _G["BuffIconCooldownViewer"],
-    BuffBarCooldownViewer = _G["BuffBarCooldownViewer"],
-}
+local viewers = {}
+-- Populated by RefreshViewerRefs() (pcall-safe for WoW 12.0.5 forbidden tables)
 
 local function RefreshViewerRefs()
-    viewers.EssentialCooldownViewer = _G["EssentialCooldownViewer"]
-    viewers.UtilityCooldownViewer = _G["UtilityCooldownViewer"]
-    viewers.BuffIconCooldownViewer = _G["BuffIconCooldownViewer"]
-    viewers.BuffBarCooldownViewer = _G["BuffBarCooldownViewer"]
+    -- WoW 12.0.5: viewer globals may be forbidden. pcall each access.
+    local ok, v
+    ok, v = pcall(function() return _G["EssentialCooldownViewer"] end)
+    viewers.EssentialCooldownViewer = ok and v or nil
+    ok, v = pcall(function() return _G["UtilityCooldownViewer"] end)
+    viewers.UtilityCooldownViewer = ok and v or nil
+    ok, v = pcall(function() return _G["BuffIconCooldownViewer"] end)
+    viewers.BuffIconCooldownViewer = ok and v or nil
+    ok, v = pcall(function() return _G["BuffBarCooldownViewer"] end)
+    viewers.BuffBarCooldownViewer = ok and v or nil
 end
 
 -- Defaults
@@ -541,35 +543,41 @@ end
 function ViewerAdapters.CollectViewerChildren(viewer)
     -- Why: Standardized filtered list of visible icon-like children sorted by layoutIndex.
     -- When: Building rows/columns for Essential/Utility centered layouts.
+    -- WoW 12.0.5: viewer children may be forbidden. All access is pcall-wrapped.
     local all = {}
-    local viewerName = viewer:GetName()
+    local ok, viewerName = pcall(function() return viewer:GetName() end)
+    if not ok then return all end
     local toDim = viewerName == "UtilityCooldownViewer" and GetSetting("cooldownManager_utility_dimWhenNotOnCD", false)
     local toDimOpacity = GetSetting("cooldownManager_utility_dimOpacity", 0.3)
-    for _, child in ipairs({ viewer:GetChildren() }) do
-        if child and child:IsShown() and child.Icon then
-            all[#all + 1] = child
+    local okc, children = pcall(function() return { viewer:GetChildren() } end)
+    if not okc or not children then return all end
+    for _, child in ipairs(children) do
+        pcall(function()
+            if child and child:IsShown() and child.Icon then
+                all[#all + 1] = child
 
-            if child.cooldownID and toDim and ns.CooldownTracker then
-                local info = C_CooldownViewer.GetCooldownViewerCooldownInfo(child.cooldownID)
-                if not C_Spell.GetSpellCooldown(info.spellID).isOnGCD then
-                    local cd = nil
-                    if not issecretvalue(child.cooldownChargesShown) and child.cooldownChargesShown then
-                        cd = ns.CooldownTracker:getChargeCD(info.spellID)
-                    else
-                        cd = ns.CooldownTracker:getSpellCD(info.spellID)
+                if child.cooldownID and toDim and ns.CooldownTracker then
+                    local info = C_CooldownViewer.GetCooldownViewerCooldownInfo(child.cooldownID)
+                    if not C_Spell.GetSpellCooldown(info.spellID).isOnGCD then
+                        local cd = nil
+                        if not issecretvalue(child.cooldownChargesShown) and child.cooldownChargesShown then
+                            cd = ns.CooldownTracker:getChargeCD(info.spellID)
+                        else
+                            cd = ns.CooldownTracker:getSpellCD(info.spellID)
+                        end
+
+                        local curve = C_CurveUtil.CreateCurve()
+                        curve:AddPoint(0.0, toDimOpacity)
+                        curve:AddPoint(0.1, 1)
+                        local EvaluateDuration = cd.EvaluateRemainingDuration and cd:EvaluateRemainingDuration(curve)
+
+                        child:SetAlpha(EvaluateDuration)
                     end
-
-                    local curve = C_CurveUtil.CreateCurve()
-                    curve:AddPoint(0.0, toDimOpacity)
-                    curve:AddPoint(0.1, 1)
-                    local EvaluateDuration = cd.EvaluateRemainingDuration and cd:EvaluateRemainingDuration(curve)
-
-                    child:SetAlpha(EvaluateDuration)
+                else
+                    child:SetAlpha(1)
                 end
-            else
-                child:SetAlpha(1)
             end
-        end
+        end)
     end
     table.sort(all, function(a, b)
         return (a.layoutIndex or 0) < (b.layoutIndex or 0)
@@ -660,79 +668,83 @@ local sizeSavedValues = {
 function ViewerAdapters.CenterAllRows(viewer, fromDirection)
     -- Why: Core centering routine that groups children into rows/columns and applies offsets.
     -- When: `UpdateEssentialIfNeeded` or `UpdateUtilityIfNeeded` determines changes require recompute.
+    -- WoW 12.0.5: viewer may be forbidden. All access wrapped in pcall.
     if FORCE_DISABLE_CDM_LAYOUT() then
         return
     end
-    if not Runtime:IsReady(viewer) then
-        return
-    end
+    if not viewer then return end
+    local ok = pcall(function()
+        if not Runtime:IsReady(viewer) then
+            return
+        end
 
-    local viewerName = viewer:GetName()
-    local viewerType = nil
-    if viewerName == "EssentialCooldownViewer" then
-        viewerType = "Essential"
-    elseif viewerName == "UtilityCooldownViewer" then
-        viewerType = "Utility"
-    end
+        local viewerName = viewer:GetName()
+        local viewerType = nil
+        if viewerName == "EssentialCooldownViewer" then
+            viewerType = "Essential"
+        elseif viewerName == "UtilityCooldownViewer" then
+            viewerType = "Utility"
+        end
 
-    local isHorizontal = viewer.isHorizontal ~= false
-    local iconDirection = viewer.iconDirection == 1 and "NORMAL" or "REVERSED"
-    local iconLimit = viewer.iconLimit or 0
-    if iconLimit <= 0 then
-        return
-    end
+        local isHorizontal = viewer.isHorizontal ~= false
+        local iconDirection = viewer.iconDirection == 1 and "NORMAL" or "REVERSED"
+        local iconLimit = viewer.iconLimit or 0
+        if iconLimit <= 0 then
+            return
+        end
 
-    local children = ViewerAdapters.CollectViewerChildren(viewer)
-    if fromDirection == "Disable" or #children == 0 then
-        return
-    end
+        local children = ViewerAdapters.CollectViewerChildren(viewer)
+        if fromDirection == "Disable" or #children == 0 then
+            return
+        end
 
-    local first = children[1]
-    if not first then
-        return
-    end
-    local w, h = first:GetWidth(), first:GetHeight()
-    if not w or w == 0 or not h or h == 0 then
-        return
-    end
+        local first = children[1]
+        if not first then
+            return
+        end
+        local w, h = first:GetWidth(), first:GetHeight()
+        if not w or w == 0 or not h or h == 0 then
+            return
+        end
 
-    local padding = isHorizontal and viewer.childXPadding or viewer.childYPadding
-    if viewerName == "UtilityCooldownViewer" and GetSetting("cooldownManager_limitUtilitySizeToEssential", false) then
-        local essentialViewer = viewers["EssentialCooldownViewer"]
-        if essentialViewer then
-            local eWidth = essentialViewer:GetWidth()
-            if eWidth and eWidth > 0 then
-                local iconActualWidth = (w + padding) * viewer.iconScale
-                local maxIcons = floor((eWidth + (padding * viewer.iconScale)) / iconActualWidth)
-                if maxIcons > 0 then
-                    iconLimit = math.max(math.min(iconLimit, maxIcons), math.min(iconLimit, 5))
+        local padding = isHorizontal and viewer.childXPadding or viewer.childYPadding
+        if viewerName == "UtilityCooldownViewer" and GetSetting("cooldownManager_limitUtilitySizeToEssential", false) then
+            local essentialViewer = viewers["EssentialCooldownViewer"]
+            if essentialViewer then
+                local eWidth = essentialViewer:GetWidth()
+                if eWidth and eWidth > 0 then
+                    local iconActualWidth = (w + padding) * viewer.iconScale
+                    local maxIcons = floor((eWidth + (padding * viewer.iconScale)) / iconActualWidth)
+                    if maxIcons > 0 then
+                        iconLimit = math.max(math.min(iconLimit, maxIcons), math.min(iconLimit, 5))
+                    end
                 end
             end
         end
-    end
 
-    local rows = LayoutEngine.BuildRows(iconLimit, children)
-    if #rows == 0 then
-        return
-    end
+        local rows = LayoutEngine.BuildRows(iconLimit, children)
+        if #rows == 0 then
+            return
+        end
 
-    if isHorizontal then
-        local rowOffsetModifier = fromDirection == "BOTTOM" and 1 or -1
-        local iconDirectionModifier = iconDirection == "NORMAL" and 1 or -1
-        local rowAnchor = (fromDirection == "BOTTOM") and "BOTTOM" or "TOP"
-        for iRow, row in ipairs(rows) do
-            local yOffset = (iRow - 1) * (h + padding) * rowOffsetModifier
-            PositionRowHorizontal(viewer, row, yOffset, w, padding, iconDirectionModifier, rowAnchor, viewerType)
+        if isHorizontal then
+            local rowOffsetModifier = fromDirection == "BOTTOM" and 1 or -1
+            local iconDirectionModifier = iconDirection == "NORMAL" and 1 or -1
+            local rowAnchor = (fromDirection == "BOTTOM") and "BOTTOM" or "TOP"
+            for iRow, row in ipairs(rows) do
+                local yOffset = (iRow - 1) * (h + padding) * rowOffsetModifier
+                PositionRowHorizontal(viewer, row, yOffset, w, padding, iconDirectionModifier, rowAnchor, viewerType)
+            end
+        else
+            local rowOffsetModifier = fromDirection == "BOTTOM" and -1 or 1
+            local iconDirectionModifier = iconDirection == "NORMAL" and -1 or 1
+            local colAnchor = (fromDirection == "BOTTOM") and "RIGHT" or "LEFT"
+            for iRow, row in ipairs(rows) do
+                local xOffset = (iRow - 1) * (w + padding) * rowOffsetModifier
+                PositionRowVertical(viewer, row, xOffset, h, padding, iconDirectionModifier, colAnchor, viewerType)
+            end
         end
-    else
-        local rowOffsetModifier = fromDirection == "BOTTOM" and -1 or 1
-        local iconDirectionModifier = iconDirection == "NORMAL" and -1 or 1
-        local colAnchor = (fromDirection == "BOTTOM") and "RIGHT" or "LEFT"
-        for iRow, row in ipairs(rows) do
-            local xOffset = (iRow - 1) * (w + padding) * rowOffsetModifier
-            PositionRowVertical(viewer, row, xOffset, h, padding, iconDirectionModifier, colAnchor, viewerType)
-        end
-    end
+    end)
 end
 
 function CooldownManager.UpdateEssentialIfNeeded()
@@ -740,7 +752,10 @@ function CooldownManager.UpdateEssentialIfNeeded()
         return
     end
     local growKey = "cooldownManager_centerEssential_growFromDirection"
-    ViewerAdapters.CenterAllRows(EssentialCooldownViewer, GetSetting(growKey, "TOP"))
+    local viewer = viewers["EssentialCooldownViewer"]
+    if viewer then
+        ViewerAdapters.CenterAllRows(viewer, GetSetting(growKey, "TOP"))
+    end
 end
 
 function CooldownManager.UpdateUtilityIfNeeded()
@@ -748,7 +763,10 @@ function CooldownManager.UpdateUtilityIfNeeded()
         return
     end
     local growKey = "cooldownManager_centerUtility_growFromDirection"
-    ViewerAdapters.CenterAllRows(UtilityCooldownViewer, GetSetting(growKey, "TOP"))
+    local viewer = viewers["UtilityCooldownViewer"]
+    if viewer then
+        ViewerAdapters.CenterAllRows(viewer, GetSetting(growKey, "TOP"))
+    end
 end
 
 local function ShouldDebugRefreshLog()
@@ -764,8 +782,12 @@ function CooldownManager.ForceRefresh(parts)
         -- Centering is OFF: tell Blizzard to re-layout so positions reset to default
         for _, name in ipairs({ "EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer", "BuffBarCooldownViewer" }) do
             local v = viewers[name]
-            if v and v.RefreshLayout then
-                pcall(v.RefreshLayout, v)
+            if v then
+                pcall(function()
+                    if v.RefreshLayout then
+                        v:RefreshLayout()
+                    end
+                end)
             end
         end
         return
@@ -884,14 +906,17 @@ local viewerReasonPartsMap = {
 
 function CooldownManager.HookViewerRefreshLayout()
     for n, v in pairs(viewers) do
-        if v and v.RefreshLayout and not v.__suiCMCRefreshHooked then
-            v.__suiCMCRefreshHooked = true
-            hooksecurefunc(v, "RefreshLayout", function()
+        -- WoW 12.0.5: viewer internals may be forbidden to addon access.
+        -- Wrap every property read in pcall to avoid "attempted to index a forbidden table".
+        local ok, hasRL, isHooked = pcall(function()
+            return v and v.RefreshLayout, v and v.__suiCMCRefreshHooked
+        end)
+        if ok and hasRL and not isHooked then
+            pcall(function() v.__suiCMCRefreshHooked = true end)
+            local hookOk = pcall(hooksecurefunc, v, "RefreshLayout", function()
                 if IsCoordinatorInProgress() then
                     return
                 end
-                -- Wrap in pcall to prevent affecting Blizzard's Edit Mode flow
-                -- which can trigger EncounterWarnings bugs
                 pcall(function()
                     if not RequestCoordinatedRefresh(viewerReasonPartsMap[n], "cmc", { delay = 0 }) then
                         CooldownManager.ForceRefresh(viewerReasonPartsMap[n])

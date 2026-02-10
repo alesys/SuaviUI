@@ -1757,8 +1757,6 @@ function GUI:CreateDropdown(parent, label, options, dbKey, dbTable, onChange)
     
     -- Dropdown menu frame (created once, reused)
     local menuFrame = CreateFrame("Frame", nil, dropdown, "BackdropTemplate")
-    menuFrame:SetPoint("TOPLEFT", dropdown, "BOTTOMLEFT", 0, -2)
-    menuFrame:SetPoint("TOPRIGHT", dropdown, "BOTTOMRIGHT", 0, -2)
     menuFrame:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -2006,8 +2004,6 @@ function GUI:CreateDropdownFullWidth(parent, label, options, dbKey, dbTable, onC
     
     -- Dropdown menu
     local menuFrame = CreateFrame("Frame", nil, dropdown, "BackdropTemplate")
-    menuFrame:SetPoint("TOPLEFT", dropdown, "BOTTOMLEFT", 0, -2)
-    menuFrame:SetPoint("TOPRIGHT", dropdown, "BOTTOMRIGHT", 0, -2)
     menuFrame:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -2895,11 +2891,43 @@ function GUI:CreateFormDropdown(parent, label, options, dbKey, dbTable, onChange
         menuFrame:SetHeight(math.min(totalHeight, maxHeight))
     end
 
+    local function PositionMenu()
+        local left = dropdown:GetLeft()
+        local right = dropdown:GetRight()
+        local top = dropdown:GetTop()
+        local bottom = dropdown:GetBottom()
+        if not left or not right or not top or not bottom then return end
+
+        local scale = dropdown:GetEffectiveScale()
+        local uiScale = UIParent:GetEffectiveScale()
+        local leftScaled = left * scale / uiScale
+        local rightScaled = right * scale / uiScale
+        local topScaled = top * scale / uiScale
+        local bottomScaled = bottom * scale / uiScale
+        local menuHeight = menuFrame:GetHeight()
+        local gap = 2
+
+        menuFrame:SetParent(UIParent)
+        menuFrame:SetFrameStrata("TOOLTIP")
+        menuFrame:SetFrameLevel(1000)
+        menuFrame:SetWidth(dropdown:GetWidth())
+        menuFrame:ClearAllPoints()
+
+        if (bottomScaled - menuHeight - gap) < 0 then
+            menuFrame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", leftScaled, topScaled + gap)
+            menuFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMLEFT", rightScaled, topScaled + gap)
+        else
+            menuFrame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", leftScaled, bottomScaled - gap)
+            menuFrame:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT", rightScaled, bottomScaled - gap)
+        end
+    end
+
     dropdown:SetScript("OnClick", function()
         if menuFrame:IsShown() then
             menuFrame:Hide()
         else
             BuildMenu()
+            PositionMenu()
             menuFrame:Show()
         end
     end)
@@ -3156,11 +3184,43 @@ function GUI:CreateFormDropdownWithTexturePreview(parent, label, dbKey, dbTable,
         menuFrame:SetHeight(math.min(totalHeight, maxHeight))
     end
 
+    local function PositionMenu()
+        local left = dropdown:GetLeft()
+        local right = dropdown:GetRight()
+        local top = dropdown:GetTop()
+        local bottom = dropdown:GetBottom()
+        if not left or not right or not top or not bottom then return end
+
+        local scale = dropdown:GetEffectiveScale()
+        local uiScale = UIParent:GetEffectiveScale()
+        local leftScaled = left * scale / uiScale
+        local rightScaled = right * scale / uiScale
+        local topScaled = top * scale / uiScale
+        local bottomScaled = bottom * scale / uiScale
+        local menuHeight = menuFrame:GetHeight()
+        local gap = 2
+
+        menuFrame:SetParent(UIParent)
+        menuFrame:SetFrameStrata("TOOLTIP")
+        menuFrame:SetFrameLevel(1000)
+        menuFrame:SetWidth(dropdown:GetWidth())
+        menuFrame:ClearAllPoints()
+
+        if (bottomScaled - menuHeight - gap) < 0 then
+            menuFrame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", leftScaled, topScaled + gap)
+            menuFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMLEFT", rightScaled, topScaled + gap)
+        else
+            menuFrame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", leftScaled, bottomScaled - gap)
+            menuFrame:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT", rightScaled, bottomScaled - gap)
+        end
+    end
+
     dropdown:SetScript("OnClick", function()
         if menuFrame:IsShown() then
             menuFrame:Hide()
         else
             BuildMenu()
+            PositionMenu()
             menuFrame:Show()
         end
     end)

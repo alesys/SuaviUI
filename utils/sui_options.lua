@@ -11056,6 +11056,9 @@ local function BuildProfileManagementTab(tabContent)
 
     -- Forward declare profileDropdown so refresh function can reference it
     local profileDropdown
+    local copyDropdown
+    local deleteDropdown
+    local specDropdowns = {}
 
     -- Current profile display (form style row)
     local activeContainer = CreateFrame("Frame", nil, tabContent)
@@ -11166,6 +11169,23 @@ local function BuildProfileManagementTab(tabContent)
             end
         end
         return profiles
+    end
+
+    local function RefreshProfileDropdowns()
+        local options = GetProfileList()
+
+        if copyDropdown and copyDropdown.SetOptions then
+            copyDropdown:SetOptions(options)
+        end
+        if deleteDropdown and deleteDropdown.SetOptions then
+            deleteDropdown:SetOptions(options)
+        end
+
+        for _, dropdown in ipairs(specDropdowns) do
+            if dropdown and dropdown.SetOptions then
+                dropdown:SetOptions(options)
+            end
+        end
     end
     
     -- Profile dropdown - custom styled (matches our form dropdowns)
@@ -11316,11 +11336,43 @@ local function BuildProfileManagementTab(tabContent)
         end
     end
 
+    local function PositionProfileMenu()
+        local left = profileDropdown:GetLeft()
+        local right = profileDropdown:GetRight()
+        local top = profileDropdown:GetTop()
+        local bottom = profileDropdown:GetBottom()
+        if not left or not right or not top or not bottom then return end
+
+        local scale = profileDropdown:GetEffectiveScale()
+        local uiScale = UIParent:GetEffectiveScale()
+        local leftScaled = left * scale / uiScale
+        local rightScaled = right * scale / uiScale
+        local topScaled = top * scale / uiScale
+        local bottomScaled = bottom * scale / uiScale
+        local menuHeight = profileMenu:GetHeight()
+        local gap = 2
+
+        profileMenu:SetParent(UIParent)
+        profileMenu:SetFrameStrata("TOOLTIP")
+        profileMenu:SetFrameLevel(1000)
+        profileMenu:SetWidth(profileDropdown:GetWidth())
+        profileMenu:ClearAllPoints()
+
+        if (bottomScaled - menuHeight - gap) < 0 then
+            profileMenu:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", leftScaled, topScaled + gap)
+            profileMenu:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMLEFT", rightScaled, topScaled + gap)
+        else
+            profileMenu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", leftScaled, bottomScaled - gap)
+            profileMenu:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT", rightScaled, bottomScaled - gap)
+        end
+    end
+
     profileDropdown:SetScript("OnClick", function()
         if profileMenu:IsShown() then
             profileMenu:Hide()
         else
             BuildProfileMenu()
+            PositionProfileMenu()
             profileMenu:Show()
         end
     end)
@@ -11422,6 +11474,8 @@ local function BuildProfileManagementTab(tabContent)
             profileDropdownText:SetText(newName)
             newProfileBox:SetText("")
             print("|cff34D399SuaviUI:|r Created new profile: " .. newName)
+            RefreshProfileDisplay()
+            RefreshProfileDropdowns()
         end
     end)
     y = y - FORM_ROW - 10
@@ -11441,7 +11495,7 @@ local function BuildProfileManagementTab(tabContent)
 
     -- Copy from dropdown (form style)
     local copyWrapper = { selected = "" }
-    local copyDropdown = GUI:CreateFormDropdown(tabContent, "Copy From", GetProfileList(), "selected", copyWrapper, function(value)
+    copyDropdown = GUI:CreateFormDropdown(tabContent, "Copy From", GetProfileList(), "selected", copyWrapper, function(value)
         if db and value and value ~= "" then
             db:CopyProfile(value)
             print("|cff34D399SuaviUI:|r Copied settings from: " .. value)
@@ -11467,7 +11521,7 @@ local function BuildProfileManagementTab(tabContent)
 
     -- Delete dropdown (form style)
     local deleteWrapper = { selected = "" }
-    local deleteDropdown = GUI:CreateFormDropdown(tabContent, "Delete Profile", GetProfileList(), "selected", deleteWrapper, function(value)
+    deleteDropdown = GUI:CreateFormDropdown(tabContent, "Delete Profile", GetProfileList(), "selected", deleteWrapper, function(value)
         if db and value and value ~= "" then
             local current = db:GetCurrentProfile()
             if value == current then
@@ -11487,6 +11541,8 @@ local function BuildProfileManagementTab(tabContent)
                         db:DeleteProfile(profileToDelete, true)
                         print("|cff34D399SuaviUI:|r Deleted profile: " .. profileToDelete)
                         deleteWrapper.selected = ""
+                        RefreshProfileDropdowns()
+                        RefreshProfileDisplay()
                     end,
                 })
             end
@@ -11548,6 +11604,7 @@ local function BuildProfileManagementTab(tabContent)
                 end)
                 specDropdown:SetPoint("TOPLEFT", PAD, y)
                 specDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+                table.insert(specDropdowns, specDropdown)
                 
                 y = y - FORM_ROW
             end

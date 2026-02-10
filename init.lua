@@ -55,10 +55,14 @@ do
     local function PatchFrames()
         local allDone = true
         for _, name in ipairs(names) do
-            local frame = _G[name]
-            if frame and frame.SetIsEditing then
-                frame.SetIsEditing = function() end
-            elseif not frame then
+            -- WoW 12.0.5: frames may be forbidden. pcall each access.
+            local ok, frame = pcall(function() return _G[name] end)
+            if ok and frame then
+                local hasMethod = pcall(function() return frame.SetIsEditing end)
+                if hasMethod then
+                    pcall(function() frame.SetIsEditing = function() end end)
+                end
+            elseif not ok or not frame then
                 allDone = false
             end
         end

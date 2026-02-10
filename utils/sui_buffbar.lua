@@ -15,6 +15,38 @@ local SUI_BuffBar = {}
 ns.BuffBar = SUI_BuffBar
 
 ---------------------------------------------------------------------------
+-- SAFE VIEWER ACCESS (WoW 12.0.5: viewer internals may be forbidden)
+---------------------------------------------------------------------------
+local function SafeGetViewer(name)
+    local ok, viewer = pcall(function() return _G[name] end)
+    return ok and viewer or nil
+end
+
+local function SafeViewerCall(viewer, method, ...)
+    if not viewer then return end
+    local args = {...}
+    local ok, result = pcall(function()
+        if type(method) == "string" then
+            return viewer[method](viewer, unpack(args))
+        else
+            return method(viewer, unpack(args))
+        end
+    end)
+    return ok and result or nil
+end
+
+local function SafeViewerProp(viewer, prop)
+    if not viewer then return nil end
+    local ok, val = pcall(function() return viewer[prop] end)
+    return ok and val or nil
+end
+
+local function SafeViewerSet(viewer, prop, val)
+    if not viewer then return end
+    pcall(function() viewer[prop] = val end)
+end
+
+---------------------------------------------------------------------------
 -- HELPER: Get font from general settings
 ---------------------------------------------------------------------------
 local function GetGeneralFont()
@@ -180,13 +212,13 @@ local customBarNameCounter = 0
 -- Lazily create the container (parented to UIParent, anchored to viewer)
 local function GetOrCreateContainer()
     if customContainer then return customContainer end
-    if not BuffBarCooldownViewer then return nil end
+    local viewer = SafeGetViewer("BuffBarCooldownViewer")
+    if not viewer then return nil end
 
     customContainer = CreateFrame("Frame", "SuaviBuffBarContainer", UIParent)
-    -- Match viewer position but independent alpha/strata
-    customContainer:SetPoint("CENTER", BuffBarCooldownViewer, "CENTER", 0, 0)
-    customContainer:SetSize(BuffBarCooldownViewer:GetWidth() or 200,
-                            BuffBarCooldownViewer:GetHeight() or 24)
+    customContainer:SetPoint("CENTER", viewer, "CENTER", 0, 0)
+    customContainer:SetSize(SafeViewerCall(viewer, "GetWidth") or 200,
+                            SafeViewerCall(viewer, "GetHeight") or 24)
     customContainer:Show()
     return customContainer
 end
@@ -275,7 +307,7 @@ end
 
 -- Read cooldownIDs from hidden Blizzard viewer safely (no frame-state dependency)
 local function GetViewerCooldownIDs()
-    local viewer = BuffBarCooldownViewer
+    local viewer = SafeGetViewer("BuffBarCooldownViewer")
     if not viewer then return {} end
 
     local ok, ids = pcall(function() return viewer:GetCooldownIDs() end)
@@ -392,13 +424,14 @@ end
 
 -- Hide Blizzard's viewer children, show it during Edit Mode for positioning
 local function SetViewerHidden(hide)
-    if not BuffBarCooldownViewer then return end
+    local viewer = SafeGetViewer("BuffBarCooldownViewer")
+    if not viewer then return end
     if hide then
-        BuffBarCooldownViewer:SetAlpha(0)
-        BuffBarCooldownViewer:EnableMouse(false)
+        pcall(function() viewer:SetAlpha(0) end)
+        pcall(function() viewer:EnableMouse(false) end)
     else
-        BuffBarCooldownViewer:SetAlpha(1)
-        BuffBarCooldownViewer:EnableMouse(true)
+        pcall(function() viewer:SetAlpha(1) end)
+        pcall(function() viewer:EnableMouse(true) end)
     end
 end
 
@@ -417,12 +450,13 @@ local customIconNameCounter = 0
 
 local function GetOrCreateIconContainer()
     if customIconContainer then return customIconContainer end
-    if not BuffIconCooldownViewer then return nil end
+    local viewer = SafeGetViewer("BuffIconCooldownViewer")
+    if not viewer then return nil end
 
     customIconContainer = CreateFrame("Frame", "SuaviBuffIconContainer", UIParent)
-    customIconContainer:SetPoint("CENTER", BuffIconCooldownViewer, "CENTER", 0, 0)
-    customIconContainer:SetSize(BuffIconCooldownViewer:GetWidth() or 42,
-                                BuffIconCooldownViewer:GetHeight() or 42)
+    customIconContainer:SetPoint("CENTER", viewer, "CENTER", 0, 0)
+    customIconContainer:SetSize(SafeViewerCall(viewer, "GetWidth") or 42,
+                                SafeViewerCall(viewer, "GetHeight") or 42)
     customIconContainer:Show()
     return customIconContainer
 end
@@ -491,7 +525,7 @@ end
 
 -- Read cooldownIDs from BuffIconCooldownViewer safely
 local function GetIconViewerCooldownIDs()
-    local viewer = BuffIconCooldownViewer
+    local viewer = SafeGetViewer("BuffIconCooldownViewer")
     if not viewer then return {} end
 
     local ok, ids = pcall(function() return viewer:GetCooldownIDs() end)
@@ -603,13 +637,14 @@ end
 
 -- Hide/show Blizzard's BuffIcon viewer
 local function SetIconViewerHidden(hide)
-    if not BuffIconCooldownViewer then return end
+    local viewer = SafeGetViewer("BuffIconCooldownViewer")
+    if not viewer then return end
     if hide then
-        BuffIconCooldownViewer:SetAlpha(0)
-        BuffIconCooldownViewer:EnableMouse(false)
+        pcall(function() viewer:SetAlpha(0) end)
+        pcall(function() viewer:EnableMouse(false) end)
     else
-        BuffIconCooldownViewer:SetAlpha(1)
-        BuffIconCooldownViewer:EnableMouse(true)
+        pcall(function() viewer:SetAlpha(1) end)
+        pcall(function() viewer:EnableMouse(true) end)
     end
 end
 
@@ -629,21 +664,23 @@ local function GetBuffIconFrames()
 
     local all = {}
 
-    for _, child in ipairs({ BuffIconCooldownViewer:GetChildren() }) do
-        if child then
-            -- Skip Selection frame (Edit Mode)
-            if child == BuffIconCooldownViewer.Selection then
-                -- Skip
-            else
-                local hasIcon = child.icon or child.Icon
-                local hasCooldown = child.cooldown or child.Cooldown
+    pcall(function()
+        for _, child in ipairs({ BuffIconCooldownViewer:GetChildren() }) do
+            if child then
+                -- Skip Selection frame (Edit Mode)
+                if child == BuffIconCooldownViewer.Selection then
+                    -- Skip
+                else
+                    local hasIcon = child.icon or child.Icon
+                    local hasCooldown = child.cooldown or child.Cooldown
 
-                if hasIcon or hasCooldown then
-                    table.insert(all, child)
+                    if hasIcon or hasCooldown then
+                        table.insert(all, child)
+                    end
                 end
             end
         end
-    end
+    end)
 
     table.sort(all, function(a, b)
         return (a.layoutIndex or 0) < (b.layoutIndex or 0)
@@ -678,12 +715,14 @@ local function GetBuffBarFrames()
     local frames = {}
 
     -- First, try CooldownViewer API if present
-    if BuffBarCooldownViewer.GetItemFrames then
-        local ok, items = pcall(BuffBarCooldownViewer.GetItemFrames, BuffBarCooldownViewer)
-        if ok and items then
-            frames = items
+    pcall(function()
+        if BuffBarCooldownViewer.GetItemFrames then
+            local ok, items = pcall(BuffBarCooldownViewer.GetItemFrames, BuffBarCooldownViewer)
+            if ok and items then
+                frames = items
+            end
         end
-    end
+    end)
 
     -- Fallback to raw children scan
     if #frames == 0 then
@@ -692,9 +731,11 @@ local function GetBuffBarFrames()
             for _, child in ipairs({ children }) do
                 if child and child:IsObjectType("Frame") then
                     -- Skip Selection frame
-                    if child ~= BuffBarCooldownViewer.Selection then
-                        table.insert(frames, child)
-                    end
+                    pcall(function()
+                        if child ~= BuffBarCooldownViewer.Selection then
+                            table.insert(frames, child)
+                        end
+                    end)
                 end
             end
         end
@@ -1487,7 +1528,8 @@ LayoutBuffIcons = function()
             startY = 0
         end
 
-        -- Position each custom icon
+        -- Position each custom icon (anchor to container, not viewer — viewer may be forbidden)
+        local anchorFrame = customIconContainer or SafeGetViewer("BuffIconCooldownViewer")
         for i, icon in ipairs(icons) do
             ApplyIconStyle(icon, settings)
             icon:ClearAllPoints()
@@ -1499,10 +1541,10 @@ LayoutBuffIcons = function()
                 else
                     y = startY - (i - 1) * (iconHeight + padding)
                 end
-                icon:SetPoint("CENTER", BuffIconCooldownViewer, "CENTER", 0, roundPixel(y))
+                icon:SetPoint("CENTER", anchorFrame, "CENTER", 0, roundPixel(y))
             else
                 local x = startX + (i - 1) * (iconWidth + padding)
-                icon:SetPoint("CENTER", BuffIconCooldownViewer, "CENTER", roundPixel(x), 0)
+                icon:SetPoint("CENTER", anchorFrame, "CENTER", roundPixel(x), 0)
             end
 
             icon:SetFrameStrata("MEDIUM")
@@ -1512,15 +1554,19 @@ LayoutBuffIcons = function()
         -- Update viewer size for Edit Mode selection overlay
         if not InCombatLockdown() then
             SuppressLayout()
-            BuffIconCooldownViewer:SetSize(roundPixel(totalWidth), roundPixel(totalHeight))
+            pcall(function()
+                BuffIconCooldownViewer:SetSize(roundPixel(totalWidth), roundPixel(totalHeight))
+            end)
             UnsuppressLayout()
 
-            if BuffIconCooldownViewer.Selection then
-                BuffIconCooldownViewer.Selection:ClearAllPoints()
-                BuffIconCooldownViewer.Selection:SetPoint("TOPLEFT", BuffIconCooldownViewer, "TOPLEFT", 0, 0)
-                BuffIconCooldownViewer.Selection:SetPoint("BOTTOMRIGHT", BuffIconCooldownViewer, "BOTTOMRIGHT", 0, 0)
-                BuffIconCooldownViewer.Selection:SetFrameLevel(BuffIconCooldownViewer:GetFrameLevel())
-            end
+            pcall(function()
+                if BuffIconCooldownViewer.Selection then
+                    BuffIconCooldownViewer.Selection:ClearAllPoints()
+                    BuffIconCooldownViewer.Selection:SetPoint("TOPLEFT", BuffIconCooldownViewer, "TOPLEFT", 0, 0)
+                    BuffIconCooldownViewer.Selection:SetPoint("BOTTOMRIGHT", BuffIconCooldownViewer, "BOTTOMRIGHT", 0, 0)
+                    BuffIconCooldownViewer.Selection:SetFrameLevel(BuffIconCooldownViewer:GetFrameLevel())
+                end
+            end)
         end
 
         isIconLayoutRunning = false
@@ -1529,7 +1575,9 @@ LayoutBuffIcons = function()
 
     ---------------------------------------------------------------------------
     -- LEGACY PATH: Original Blizzard viewer layout (USE_CUSTOM_ICONS = false)
+    -- Entire body wrapped in pcall — viewer internals may be forbidden (12.0.5)
     ---------------------------------------------------------------------------
+    pcall(function()
 
     local settings = GetBuffSettings()
     if not settings.enabled then
@@ -1684,6 +1732,8 @@ LayoutBuffIcons = function()
         end
     end
 
+    end) -- end pcall wrapping legacy icon path
+
     isIconLayoutRunning = false
 end
 
@@ -1739,7 +1789,7 @@ LayoutBuffBars = function()
         -- Settings
         local settings = GetTrackedBarSettings()
         local stylingEnabled = settings.enabled
-        local barWidth = BuffBarCooldownViewer:GetWidth() or 200
+        local barWidth = SafeViewerCall(BuffBarCooldownViewer, "GetWidth") or 200
         local barHeight = stylingEnabled and settings.barHeight or 24
         local spacing = stylingEnabled and settings.spacing or 4
         local growFromBottom = (not stylingEnabled) or (settings.growUp ~= false)
@@ -1775,18 +1825,18 @@ LayoutBuffBars = function()
             if isVertical then
                 if growFromBottom then
                     local x = roundPixel(offsetIndex * (effectiveBarWidth + spacing))
-                    bar:SetPoint("LEFT", BuffBarCooldownViewer, "LEFT", x, 0)
+                    bar:SetPoint("LEFT", container, "LEFT", x, 0)
                 else
                     local x = roundPixel(-offsetIndex * (effectiveBarWidth + spacing))
-                    bar:SetPoint("RIGHT", BuffBarCooldownViewer, "RIGHT", x, 0)
+                    bar:SetPoint("RIGHT", container, "RIGHT", x, 0)
                 end
             else
                 if growFromBottom then
                     local y = roundPixel(offsetIndex * (effectiveBarHeight + spacing))
-                    bar:SetPoint("BOTTOM", BuffBarCooldownViewer, "BOTTOM", 0, y)
+                    bar:SetPoint("BOTTOM", container, "BOTTOM", 0, y)
                 else
                     local y = roundPixel(-offsetIndex * (effectiveBarHeight + spacing))
-                    bar:SetPoint("TOP", BuffBarCooldownViewer, "TOP", 0, y)
+                    bar:SetPoint("TOP", container, "TOP", 0, y)
                 end
             end
 
@@ -1819,41 +1869,46 @@ LayoutBuffBars = function()
 
         -- Keep viewer at single-bar size (prevents Blizzard Layout drift)
         SuppressLayout()
-        BuffBarCooldownViewer:SetSize(roundPixel(effectiveBarWidth), roundPixel(effectiveBarHeight))
+        pcall(function() BuffBarCooldownViewer:SetSize(roundPixel(effectiveBarWidth), roundPixel(effectiveBarHeight)) end)
         UnsuppressLayout()
 
-        -- Expand Edit Mode selection overlay to cover full stack
-        if BuffBarCooldownViewer.Selection then
-            local selection = BuffBarCooldownViewer.Selection
-            local isEditMode = EditModeManagerFrame and EditModeManagerFrame.editModeActive
-            selection:ClearAllPoints()
+        -- Also set container size so bars can anchor against it
+        container:SetSize(roundPixel(effectiveBarWidth), roundPixel(effectiveBarHeight))
 
-            if isEditMode and count > 1 then
-                if isVertical then
-                    local extra = math.max(0, totalSize - effectiveBarWidth)
-                    if growFromBottom then
-                        selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", 0, 0)
-                        selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", extra, 0)
+        -- Expand Edit Mode selection overlay to cover full stack
+        pcall(function()
+            if BuffBarCooldownViewer.Selection then
+                local selection = BuffBarCooldownViewer.Selection
+                local isEditMode = EditModeManagerFrame and EditModeManagerFrame.editModeActive
+                selection:ClearAllPoints()
+
+                if isEditMode and count > 1 then
+                    if isVertical then
+                        local extra = math.max(0, totalSize - effectiveBarWidth)
+                        if growFromBottom then
+                            selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", 0, 0)
+                            selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", extra, 0)
+                        else
+                            selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", -extra, 0)
+                            selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", 0, 0)
+                        end
                     else
-                        selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", -extra, 0)
-                        selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", 0, 0)
+                        local extra = math.max(0, totalSize - effectiveBarHeight)
+                        if growFromBottom then
+                            selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", 0, extra)
+                            selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", 0, 0)
+                        else
+                            selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", 0, 0)
+                            selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", 0, -extra)
+                        end
                     end
                 else
-                    local extra = math.max(0, totalSize - effectiveBarHeight)
-                    if growFromBottom then
-                        selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", 0, extra)
-                        selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", 0, 0)
-                    else
-                        selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", 0, 0)
-                        selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", 0, -extra)
-                    end
+                    selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", 0, 0)
+                    selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", 0, 0)
                 end
-            else
-                selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", 0, 0)
-                selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", 0, 0)
+                selection:SetFrameLevel(BuffBarCooldownViewer:GetFrameLevel())
             end
-            selection:SetFrameLevel(BuffBarCooldownViewer:GetFrameLevel())
-        end
+        end)
 
         isBarLayoutRunning = false
         return  -- Custom path complete; skip legacy code below
@@ -1861,7 +1916,9 @@ LayoutBuffBars = function()
 
     ---------------------------------------------------------------------------
     -- LEGACY PATH: Original Blizzard viewer layout (USE_CUSTOM_BARS = false)
+    -- Entire body wrapped in pcall — viewer internals may be forbidden (12.0.5)
     ---------------------------------------------------------------------------
+    pcall(function()
 
     -- Apply HUD layer priority (strata + level)
     local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
@@ -2096,6 +2153,8 @@ LayoutBuffBars = function()
         selection:SetFrameLevel(BuffBarCooldownViewer:GetFrameLevel())
     end
 
+    end) -- end pcall wrapping legacy bar path
+
     isBarLayoutRunning = false
 end
 
@@ -2132,15 +2191,17 @@ local function CheckIconChanges()
         return
     end
 
-    -- Legacy: Count visible icons
+    -- Legacy: Count visible icons (wrapped in pcall - viewer may be forbidden)
     local visibleCount = 0
-    for _, child in ipairs({ BuffIconCooldownViewer:GetChildren() }) do
-        if child and child ~= BuffIconCooldownViewer.Selection then
-            if (child.icon or child.Icon) and child:IsShown() then
-                visibleCount = visibleCount + 1
+    pcall(function()
+        for _, child in ipairs({ BuffIconCooldownViewer:GetChildren() }) do
+            if child and child ~= BuffIconCooldownViewer.Selection then
+                if (child.icon or child.Icon) and child:IsShown() then
+                    visibleCount = visibleCount + 1
+                end
             end
         end
-    end
+    end)
 
     -- Build hash including count AND settings
     local settings = GetBuffSettings()
@@ -2189,29 +2250,28 @@ local function ForcePopulateBuffIcons()
 
     forcePopulateDone = true
 
-    -- Method 1: Call Layout() which triggers Blizzard to populate icons
-    if viewer.Layout and type(viewer.Layout) == "function" then
-        pcall(function()
+    -- Wrap all viewer access in pcall (viewer internals may be forbidden in 12.0.5)
+    pcall(function()
+        -- Method 1: Call Layout() which triggers Blizzard to populate icons
+        if viewer.Layout and type(viewer.Layout) == "function" then
             viewer:Layout()
-        end)
-    end
+        end
 
-    -- Method 2: If the viewer has systemInfo with spells, it should auto-populate
-    -- Just triggering a size change can help force refresh
-    if not InCombatLockdown() then
-        local w, h = viewer:GetSize()
-        if w and h and w > 0 and h > 0 then
-            -- Briefly nudge size to trigger internal refresh
-            pcall(function()
+        -- Method 2: If the viewer has systemInfo with spells, it should auto-populate
+        -- Just triggering a size change can help force refresh
+        if not InCombatLockdown() then
+            local w, h = viewer:GetSize()
+            if w and h and w > 0 and h > 0 then
+                -- Briefly nudge size to trigger internal refresh
                 viewer:SetSize(w + 0.1, h)
                 C_Timer.After(0.05, function()
                     if viewer and not InCombatLockdown() then
                         pcall(function() viewer:SetSize(w, h) end)
                     end
                 end)
-            end)
+            end
         end
-    end
+    end)
 
     -- Method 3: Force a rescan via SUICore if available
     if _G.SuaviUI and _G.SuaviUI.SUICore then
@@ -2359,20 +2419,22 @@ local function Initialize()
     ---------------------------------------------------------------------------
     if not USE_CUSTOM_BARS then
         -- Set isHorizontal IMMEDIATELY at login, before combat can start
-        if BuffBarCooldownViewer and not InCombatLockdown() then
-            local settings = GetTrackedBarSettings()
-            local isVertical = (settings.orientation == "vertical")
-            local growFromBottom = (settings.growUp ~= false)
+        pcall(function()
+            if BuffBarCooldownViewer and not InCombatLockdown() then
+                local settings = GetTrackedBarSettings()
+                local isVertical = (settings.orientation == "vertical")
+                local growFromBottom = (settings.growUp ~= false)
 
-            BuffBarCooldownViewer.isHorizontal = not isVertical
-            if isVertical then
-                BuffBarCooldownViewer.layoutFramesGoingRight = growFromBottom
-                BuffBarCooldownViewer.layoutFramesGoingUp = false
-            else
-                BuffBarCooldownViewer.layoutFramesGoingRight = true
-                BuffBarCooldownViewer.layoutFramesGoingUp = growFromBottom
+                BuffBarCooldownViewer.isHorizontal = not isVertical
+                if isVertical then
+                    BuffBarCooldownViewer.layoutFramesGoingRight = growFromBottom
+                    BuffBarCooldownViewer.layoutFramesGoingUp = false
+                else
+                    BuffBarCooldownViewer.layoutFramesGoingRight = true
+                    BuffBarCooldownViewer.layoutFramesGoingUp = growFromBottom
+                end
             end
-        end
+        end)
     end
 
     -- Force populate buff icons first (teaches the viewer what spells to show)
@@ -2380,91 +2442,99 @@ local function Initialize()
 
     -- Legacy icon OnUpdate polling (only when not using custom icons)
     if not USE_CUSTOM_ICONS then
-        if BuffIconCooldownViewer and not BuffIconCooldownViewer.__quiOnUpdateHooked then
-            BuffIconCooldownViewer.__quiOnUpdateHooked = true
-            BuffIconCooldownViewer.__quiElapsed = 0
-            BuffIconCooldownViewer:HookScript("OnUpdate", function(self, elapsed)
-                self.__quiElapsed = (self.__quiElapsed or 0) + elapsed
-                if self.__quiElapsed > 0.05 then  -- 20 FPS polling - hash prevents over-layout
-                    self.__quiElapsed = 0
-                    if self:IsShown() then
-                        CheckIconChanges()
+        pcall(function()
+            if BuffIconCooldownViewer and not BuffIconCooldownViewer.__quiOnUpdateHooked then
+                BuffIconCooldownViewer.__quiOnUpdateHooked = true
+                BuffIconCooldownViewer.__quiElapsed = 0
+                BuffIconCooldownViewer:HookScript("OnUpdate", function(self, elapsed)
+                    self.__quiElapsed = (self.__quiElapsed or 0) + elapsed
+                    if self.__quiElapsed > 0.05 then
+                        self.__quiElapsed = 0
+                        if self:IsShown() then
+                            CheckIconChanges()
+                        end
                     end
-                end
-            end)
-        end
+                end)
+            end
+        end)
     end
 
     -- Legacy bar OnUpdate hook (only when not using custom bars)
     if not USE_CUSTOM_BARS then
-        if BuffBarCooldownViewer and not BuffBarCooldownViewer.__quiOnUpdateHooked then
-            BuffBarCooldownViewer.__quiOnUpdateHooked = true
-            BuffBarCooldownViewer.__quiElapsed = 0
-            BuffBarCooldownViewer:HookScript("OnUpdate", function(self, elapsed)
-                self.__quiElapsed = (self.__quiElapsed or 0) + elapsed
-                if self.__quiElapsed > 0.05 then  -- 20 FPS for bars
-                    self.__quiElapsed = 0
-                    if self:IsShown() then
-                        CheckBarChanges()
+        pcall(function()
+            if BuffBarCooldownViewer and not BuffBarCooldownViewer.__quiOnUpdateHooked then
+                BuffBarCooldownViewer.__quiOnUpdateHooked = true
+                BuffBarCooldownViewer.__quiElapsed = 0
+                BuffBarCooldownViewer:HookScript("OnUpdate", function(self, elapsed)
+                    self.__quiElapsed = (self.__quiElapsed or 0) + elapsed
+                    if self.__quiElapsed > 0.05 then
+                        self.__quiElapsed = 0
+                        if self:IsShown() then
+                            CheckBarChanges()
+                        end
                     end
-                end
-            end)
-        end
+                end)
+            end
+        end)
     end
 
     -- Legacy icon viewer hooks (only when not using custom icons)
     if not USE_CUSTOM_ICONS then
-        -- CRITICAL: OnSizeChanged hook - immediate response when Blizzard resizes viewer
-        if BuffIconCooldownViewer then
-            BuffIconCooldownViewer:HookScript("OnSizeChanged", function(self)
-                if IsLayoutSuppressed() then return end
-                if isIconLayoutRunning then return end
-                LayoutBuffIcons()
-            end)
-        end
+        pcall(function()
+            -- CRITICAL: OnSizeChanged hook - immediate response when Blizzard resizes viewer
+            if BuffIconCooldownViewer then
+                BuffIconCooldownViewer:HookScript("OnSizeChanged", function(self)
+                    if IsLayoutSuppressed() then return end
+                    if isIconLayoutRunning then return end
+                    LayoutBuffIcons()
+                end)
+            end
 
-        -- OnShow hook - refresh when viewer becomes visible
-        if BuffIconCooldownViewer then
-            BuffIconCooldownViewer:HookScript("OnShow", function(self)
-                if IsLayoutSuppressed() then return end
-                if isIconLayoutRunning then return end
-                LayoutBuffIcons()
-            end)
-        end
+            -- OnShow hook - refresh when viewer becomes visible
+            if BuffIconCooldownViewer then
+                BuffIconCooldownViewer:HookScript("OnShow", function(self)
+                    if IsLayoutSuppressed() then return end
+                    if isIconLayoutRunning then return end
+                    LayoutBuffIcons()
+                end)
+            end
 
-        -- Hook Layout - immediate call after Blizzard's layout completes
-        if BuffIconCooldownViewer and BuffIconCooldownViewer.Layout then
-            hooksecurefunc(BuffIconCooldownViewer, "Layout", function()
-                if IsLayoutSuppressed() then return end
-                if isIconLayoutRunning then return end
-                LayoutBuffIcons()
-            end)
-        end
+            -- Hook Layout - immediate call after Blizzard's layout completes
+            if BuffIconCooldownViewer and BuffIconCooldownViewer.Layout then
+                hooksecurefunc(BuffIconCooldownViewer, "Layout", function()
+                    if IsLayoutSuppressed() then return end
+                    if isIconLayoutRunning then return end
+                    LayoutBuffIcons()
+                end)
+            end
+        end)
     end
 
     -- Legacy bar Layout hooks (only when not using custom bars)
     if not USE_CUSTOM_BARS then
-        if BuffBarCooldownViewer and BuffBarCooldownViewer.Layout then
-            hooksecurefunc(BuffBarCooldownViewer, "Layout", function()
-                if IsLayoutSuppressed() then return end
-                if isBarLayoutRunning then return end
-                LayoutBuffBars()
-            end)
-        end
-
-        -- FEAT-007: Hook RefreshLayout to correct isHorizontal after Blizzard sets it
-        if BuffBarCooldownViewer and BuffBarCooldownViewer.RefreshLayout then
-            hooksecurefunc(BuffBarCooldownViewer, "RefreshLayout", function(self)
-                pcall(function()
-                    local settings = GetTrackedBarSettings()
-                    if settings.enabled and settings.orientation == "vertical" then
-                        self.isHorizontal = false
-                        self.layoutFramesGoingRight = settings.growUp ~= false
-                        self.layoutFramesGoingUp = false
-                    end
+        pcall(function()
+            if BuffBarCooldownViewer and BuffBarCooldownViewer.Layout then
+                hooksecurefunc(BuffBarCooldownViewer, "Layout", function()
+                    if IsLayoutSuppressed() then return end
+                    if isBarLayoutRunning then return end
+                    LayoutBuffBars()
                 end)
-            end)
-        end
+            end
+
+            -- FEAT-007: Hook RefreshLayout to correct isHorizontal after Blizzard sets it
+            if BuffBarCooldownViewer and BuffBarCooldownViewer.RefreshLayout then
+                hooksecurefunc(BuffBarCooldownViewer, "RefreshLayout", function(self)
+                    pcall(function()
+                        local settings = GetTrackedBarSettings()
+                        if settings.enabled and settings.orientation == "vertical" then
+                            self.isHorizontal = false
+                            self.layoutFramesGoingRight = settings.growUp ~= false
+                            self.layoutFramesGoingUp = false
+                        end
+                    end)
+                end)
+            end
+        end)
     end
 
     ---------------------------------------------------------------------------
@@ -2474,26 +2544,28 @@ local function Initialize()
 
     -- Legacy icon UNIT_AURA hook (only when not using custom icons)
     if not USE_CUSTOM_ICONS then
-        if BuffIconCooldownViewer and not BuffIconCooldownViewer.__quiAuraHook then
-            BuffIconCooldownViewer.__quiAuraHook = CreateFrame("Frame")
-            BuffIconCooldownViewer.__quiAuraHook:RegisterEvent("UNIT_AURA")
-            BuffIconCooldownViewer.__quiAuraHook:SetScript("OnEvent", function(_, event, unit)
-                if unit == "player" and BuffIconCooldownViewer:IsShown() then
-                    if not BuffIconCooldownViewer.__quiRescanPending then
-                        BuffIconCooldownViewer.__quiRescanPending = true
-                        C_Timer.After(0.1, function()
-                            BuffIconCooldownViewer.__quiRescanPending = nil
-                            if BuffIconCooldownViewer:IsShown() then
-                                if isIconLayoutRunning then return end
-                                if IsLayoutSuppressed() then return end
-                                lastIconHash = ""
-                                CheckIconChanges()
-                            end
-                        end)
+        pcall(function()
+            if BuffIconCooldownViewer and not BuffIconCooldownViewer.__quiAuraHook then
+                BuffIconCooldownViewer.__quiAuraHook = CreateFrame("Frame")
+                BuffIconCooldownViewer.__quiAuraHook:RegisterEvent("UNIT_AURA")
+                BuffIconCooldownViewer.__quiAuraHook:SetScript("OnEvent", function(_, event, unit)
+                    if unit == "player" and BuffIconCooldownViewer:IsShown() then
+                        if not BuffIconCooldownViewer.__quiRescanPending then
+                            BuffIconCooldownViewer.__quiRescanPending = true
+                            C_Timer.After(0.1, function()
+                                BuffIconCooldownViewer.__quiRescanPending = nil
+                                if BuffIconCooldownViewer:IsShown() then
+                                    if isIconLayoutRunning then return end
+                                    if IsLayoutSuppressed() then return end
+                                    lastIconHash = ""
+                                    CheckIconChanges()
+                                end
+                            end)
+                        end
                     end
-                end
-            end)
-        end
+                end)
+            end
+        end)
     end
 
     -- Initial layouts (after force populate)
@@ -2570,21 +2642,23 @@ function SUI_BuffBar.Refresh()
         -- Custom bars: refetch data and relayout (no viewer property changes)
         UpdateCustomBarData()
     else
-        -- Legacy: Update isHorizontal when settings change
-        if BuffBarCooldownViewer and not InCombatLockdown() then
-            local settings = GetTrackedBarSettings()
-            local isVertical = (settings.orientation == "vertical")
-            local growFromBottom = (settings.growUp ~= false)
+        -- Legacy: Update isHorizontal when settings change (pcall: viewer may be forbidden)
+        pcall(function()
+            if BuffBarCooldownViewer and not InCombatLockdown() then
+                local settings = GetTrackedBarSettings()
+                local isVertical = (settings.orientation == "vertical")
+                local growFromBottom = (settings.growUp ~= false)
 
-            BuffBarCooldownViewer.isHorizontal = not isVertical
-            if isVertical then
-                BuffBarCooldownViewer.layoutFramesGoingRight = growFromBottom
-                BuffBarCooldownViewer.layoutFramesGoingUp = false
-            else
-                BuffBarCooldownViewer.layoutFramesGoingRight = true
-                BuffBarCooldownViewer.layoutFramesGoingUp = growFromBottom
+                BuffBarCooldownViewer.isHorizontal = not isVertical
+                if isVertical then
+                    BuffBarCooldownViewer.layoutFramesGoingRight = growFromBottom
+                    BuffBarCooldownViewer.layoutFramesGoingUp = false
+                else
+                    BuffBarCooldownViewer.layoutFramesGoingRight = true
+                    BuffBarCooldownViewer.layoutFramesGoingUp = growFromBottom
+                end
             end
-        end
+        end)
     end
 
     LayoutBuffIcons()
