@@ -294,8 +294,14 @@ do
         end
     end
 
-    -- Re-enable crash recovery (handles secret value crashes during combat)
-    local DISABLE_CRASH_RECOVERY = false
+    -- CDM crash recovery: DISABLED (WoW 12.0.5 patch)
+    -- Blizzard made CooldownViewer frame internals forbidden to addon access.
+    -- Indexing viewer.itemFramePool or frame fields causes
+    -- "attempted to index a forbidden table" errors (24x per session).
+    -- The method-replacement approach (RefreshData/OnEvent/OnUpdate wrappers)
+    -- is also a taint source. BuffBar/BuffIcon have custom containers;
+    -- Essential/Utility will need monitoring for issues without this recovery.
+    local DISABLE_CRASH_RECOVERY = true
     if DISABLE_CRASH_RECOVERY then return end
 
     -- Install proactive hooks immediately
