@@ -331,6 +331,10 @@ end
 function ViewerAdapters.GetBuffIconFrames()
     -- Why: Collect visible Buff Icon viewer children, hook change events, and apply stack visuals.
     -- When: Before positioning buff icons and whenever aura events trigger layout updates.
+    -- Custom icons: managed entirely by sui_buffbar.lua — skip Blizzard frame collection
+    if ns.BuffBar and ns.BuffBar.USE_CUSTOM_ICONS then
+        return {}
+    end
     if not BuffIconCooldownViewer then
         return {}
     end
@@ -358,6 +362,10 @@ end
 function ViewerAdapters.GetBuffBarFrames()
     -- Why: Collect active Buff Bar frames with resilience to API differences, and hook changes.
     -- When: Before aligning bars vertically and whenever aura events trigger layout updates.
+    -- Custom bars: managed entirely by sui_buffbar.lua — skip Blizzard frame collection
+    if ns.BuffBar and ns.BuffBar.USE_CUSTOM_BARS then
+        return {}
+    end
     if not BuffBarCooldownViewer then
         return {}
     end
@@ -399,7 +407,10 @@ end
 function ViewerAdapters.UpdateBuffIcons()
     -- Why: Position Buff Icon viewer children based on isHorizontal, iconDirection, and alignment.
     -- When: On aura events, settings changes, or explicit refresh calls when the feature is enabled.
-
+    -- Custom icons: layout handled by sui_buffbar.lua — skip CMC icon positioning
+    if ns.BuffBar and ns.BuffBar.USE_CUSTOM_ICONS then
+        return
+    end
     if FORCE_DISABLE_CDM_LAYOUT() then
         return
     end
@@ -488,6 +499,10 @@ end
 function ViewerAdapters.UpdateBuffBarsIfNeeded()
     -- Why: Align Buff Bar frames from chosen growth direction when enabled and changes detected.
     -- When: On aura events, settings changes, or explicit refresh calls when the feature is enabled.
+    -- Custom bars: layout handled by sui_buffbar.lua — skip CMC bar positioning
+    if ns.BuffBar and ns.BuffBar.USE_CUSTOM_BARS then
+        return
+    end
     if FORCE_DISABLE_CDM_LAYOUT() then
         return
     end

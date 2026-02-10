@@ -244,45 +244,19 @@ local function ApplyHideSettings()
     end
 
     -- Compact Raid Frame Manager
+    -- Uses RegisterStateDriver for taint-free secure hiding.
+    -- Previous approach (hooksecurefunc + Hide) propagated taint to CompactUnitFrame
+    -- subsystem, causing outOfRange secret-value crashes during party frame refresh.
     if CompactRaidFrameManager then
         if InCombatLockdown() then
             -- Skip protected operations during combat
         elseif settings.hideRaidFrameManager then
-            CompactRaidFrameManager:Hide()
-            CompactRaidFrameManager:EnableMouse(false)  -- Prevent hidden frame from blocking clicks
-            -- Hook Show() to prevent it from reappearing when joining groups, etc.
-            -- BUG-008: Wrap in C_Timer.After(0) to break taint chain from secure Blizzard code
-            if not CompactRaidFrameManager._SUI_ShowHooked then
-                CompactRaidFrameManager._SUI_ShowHooked = true
-                hooksecurefunc(CompactRaidFrameManager, "Show", function(self)
-                    C_Timer.After(0, function()
-                        if InCombatLockdown() then return end
-                        local s = GetSettings()
-                        if s and s.hideRaidFrameManager then
-                            self:Hide()
-                            self:EnableMouse(false)
-                        end
-                    end)
-                end)
-            end
-            -- Hook SetShown() to catch permission-change visibility updates
-            -- BUG-008: Wrap in C_Timer.After(0) to break taint chain from secure Blizzard code
-            if not CompactRaidFrameManager._SUI_SetShownHooked then
-                CompactRaidFrameManager._SUI_SetShownHooked = true
-                hooksecurefunc(CompactRaidFrameManager, "SetShown", function(self, shown)
-                    C_Timer.After(0, function()
-                        if InCombatLockdown() then return end
-                        local s = GetSettings()
-                        if s and s.hideRaidFrameManager and shown then
-                            self:Hide()
-                            self:EnableMouse(false)
-                        end
-                    end)
-                end)
-            end
+            RegisterStateDriver(CompactRaidFrameManager, "visibility", "hide")
+            CompactRaidFrameManager:EnableMouse(false)
         else
+            UnregisterStateDriver(CompactRaidFrameManager, "visibility")
             CompactRaidFrameManager:Show()
-            CompactRaidFrameManager:EnableMouse(true)  -- Restore mouse when shown
+            CompactRaidFrameManager:EnableMouse(true)
         end
     end
     
@@ -590,16 +564,12 @@ eventFrame:SetScript("OnEvent", function(self, event, addon)
         return
     end
 
-    -- Handle raid permission/role changes - re-hide CompactRaidFrameManager
-    -- BUG-008: Wrap in C_Timer.After(0) to break taint chain from secure event context
+    -- Handle raid permission/role changes
+    -- RegisterStateDriver is persistent, so no re-hide is needed.
+    -- Just refresh all settings to ensure consistency.
     if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ROLES_ASSIGNED" then
-        if settings and settings.hideRaidFrameManager and CompactRaidFrameManager then
-            C_Timer.After(0, function()
-                if not InCombatLockdown() then
-                    CompactRaidFrameManager:Hide()
-                    CompactRaidFrameManager:EnableMouse(false)
-                end
-            end)
+        if settings then
+            ApplyHideSettings()
         end
         return
     end

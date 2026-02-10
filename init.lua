@@ -79,6 +79,68 @@ do
     end
 end
 
+-- CompactUnitFrame global-function guards: REMOVED
+-- Previously we replaced CompactUnitFrame_UpdateHealPrediction and
+-- CompactUnitFrame_GetRangeAlpha with insecure Lua wrappers to catch
+-- secret-value crashes during Edit Mode transitions. However, replacing
+-- secure globals with insecure functions taints the global table, and
+-- because nameplates inherit from CompactUnitFrame, the taint propagates
+-- into nameplate setup — causing SetNamePlateHitTestFrame to reject its
+-- own HitTestFrame argument (9+ errors per session).
+--
+-- The root taint source (hooksecurefunc on CompactRaidFrameManager) has
+-- been fixed with RegisterStateDriver in uihider.lua, and the outOfRange
+-- field is pre-cleared by ClearTaintedOutOfRange below. These guards are
+-- no longer needed.
+
+-- CompactPartyFrame / CompactArenaFrame outOfRange pre-clear (WoW 12.x)
+-- The outOfRange field on party AND arena frame members can become a secret value
+-- when taint propagates through the frame update chain. secureexecuterange in
+-- EditModeManager bypasses our global function replacement, so we must ensure
+-- the field has a safe boolean value BEFORE Blizzard's secure code reads it.
+-- This runs on EnterEditMode and on key events that trigger frame refresh.
+do
+    local framePrefixes = {
+        "CompactPartyFrameMember",
+        "CompactArenaFrameMember",
+    }
+
+    local function ClearTaintedOutOfRange()
+        for _, prefix in ipairs(framePrefixes) do
+            for i = 1, 5 do
+                local frame = _G[prefix .. i]
+                if frame then
+                    -- Only clear if the value is actually tainted/secret
+                    local isSafe = true
+                    if type(issecretvalue) == "function" then
+                        isSafe = not issecretvalue(frame.outOfRange)
+                    else
+                        local ok = pcall(function() return frame.outOfRange == true end)
+                        isSafe = ok
+                    end
+                    if not isSafe then
+                        frame.outOfRange = false
+                    end
+                end
+            end
+        end
+    end
+
+    -- Pre-clear before Edit Mode enters (prevents secureexecuterange crash)
+    if EditModeManagerFrame then
+        hooksecurefunc(EditModeManagerFrame, "EnterEditMode", ClearTaintedOutOfRange)
+    end
+
+    -- Pre-clear on events that trigger frame refresh
+    local clearFrame = CreateFrame("Frame")
+    clearFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+    clearFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    clearFrame:RegisterEvent("ARENA_OPPONENT_UPDATE")
+    clearFrame:SetScript("OnEvent", function()
+        ClearTaintedOutOfRange()
+    end)
+end
+
 -- CooldownViewer secret-value crash recovery (WoW 12.x)
 -- Blizzard's RefreshLayout does: ReleaseAll() → Acquire → RefreshData() → Layout().
 -- When RefreshData hits a restricted spell (hero talent 442726 / cooldownID 33527),
