@@ -525,7 +525,9 @@ local function UpdateInspectILvlDisplay()
     if not displayFrame.text then return end
 
     local shared = GetShared()
-    local unit = InspectFrame.unit or "target"
+    local unit
+    pcall(function() unit = InspectFrame.unit end)
+    unit = unit or "target"
 
     -- Validate that unit matches our stored GUID (handles target changes mid-inspect)
     if currentInspectGUID and UnitGUID(unit) ~= currentInspectGUID then
@@ -1047,7 +1049,9 @@ local function HookInspectFrame()
         InitializeInspectOverlays()
 
         C_Timer.After(0.1, function()
-            local unit = InspectFrame.unit or "target"
+            local unit
+            pcall(function() unit = InspectFrame.unit end)
+            unit = unit or "target"
             -- Use pcall to protect against edge cases (unit out of range mid-check)
             local ok, canInspect = pcall(function() return UnitExists(unit) and CanInspect(unit) end)
             if ok and canInspect then

@@ -2587,7 +2587,7 @@ Datatexts:Register("currencies", {
         -- Hook BackpackTokenFrame.Update to catch when user changes tracked currencies
         -- Only hook once; uses module-level activeCurrenciesFrame to avoid closure leak
         if BackpackTokenFrame and BackpackTokenFrame.Update and not currenciesHookApplied then
-            hooksecurefunc(BackpackTokenFrame, "Update", function()
+            pcall(hooksecurefunc, BackpackTokenFrame, "Update", function()
                 if activeCurrenciesFrame and activeCurrenciesFrame.Update then
                     activeCurrenciesFrame.Update()
                 end

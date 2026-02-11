@@ -341,7 +341,7 @@ local function SetupOverrideBarHooks()
     -- after SUI's initial skinning. This hook ensures MicroMenu stays in normal position.
     -- Use C_Timer.After(0) to break taint chain from secure Blizzard code
     if bar.UpdateMicroButtons then
-        hooksecurefunc(bar, "UpdateMicroButtons", function()
+        pcall(hooksecurefunc, bar, "UpdateMicroButtons", function()
             if bar.quiSkinned and MicroMenu and MicroMenu.ResetMicroMenuPosition then
                 C_Timer.After(0, function()
                     if not InCombatLockdown() then

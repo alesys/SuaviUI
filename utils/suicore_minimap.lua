@@ -843,7 +843,7 @@ hiddenButtonParent.Layout = function() end  -- Prevent nil errors when Blizzard 
 -- Hook Show() on zoom buttons to prevent Blizzard from re-showing them
 if Minimap.ZoomIn and not Minimap.ZoomIn._SUI_ShowHooked then
     Minimap.ZoomIn._SUI_ShowHooked = true
-    hooksecurefunc(Minimap.ZoomIn, "Show", function(self)
+    pcall(hooksecurefunc, Minimap.ZoomIn, "Show", function(self)
         local s = GetSettings()
         if s and not s.showZoomButtons then
             self:Hide()
@@ -853,7 +853,7 @@ end
 
 if Minimap.ZoomOut and not Minimap.ZoomOut._SUI_ShowHooked then
     Minimap.ZoomOut._SUI_ShowHooked = true
-    hooksecurefunc(Minimap.ZoomOut, "Show", function(self)
+    pcall(hooksecurefunc, Minimap.ZoomOut, "Show", function(self)
         local s = GetSettings()
         if s and not s.showZoomButtons then
             self:Hide()
@@ -1098,7 +1098,7 @@ local function SetupDungeonEyeHook()
 
     -- Hook UpdatePosition to re-apply our positioning after Blizzard resets it
     if QueueStatusButton.UpdatePosition then
-        hooksecurefunc(QueueStatusButton, "UpdatePosition", function()
+        pcall(hooksecurefunc, QueueStatusButton, "UpdatePosition", function()
             local settings = GetSettings()
             if settings and settings.dungeonEye and settings.dungeonEye.enabled then
                 -- Use C_Timer.After to avoid infinite hook recursion

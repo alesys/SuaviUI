@@ -101,7 +101,7 @@ initFrame:RegisterEvent("ADDON_LOADED")
 initFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == "Blizzard_ChallengesUI" then
         if not hooked and ChallengesFrame then
-            hooksecurefunc(ChallengesFrame, "Update", OnChallengesFrameUpdate)
+            pcall(hooksecurefunc, ChallengesFrame, "Update", OnChallengesFrameUpdate)
             hooked = true
         end
         self:UnregisterEvent("ADDON_LOADED")
@@ -111,7 +111,7 @@ end)
 -- Handle case where Blizzard_ChallengesUI is already loaded
 if C_AddOns.IsAddOnLoaded("Blizzard_ChallengesUI") then
     if not hooked and ChallengesFrame then
-        hooksecurefunc(ChallengesFrame, "Update", OnChallengesFrameUpdate)
+        pcall(hooksecurefunc, ChallengesFrame, "Update", OnChallengesFrameUpdate)
         hooked = true
     end
 end

@@ -2505,7 +2505,7 @@ local function HookCharacterFrame()
     -- Keep Blizzard's stats pane hidden (we use custom stats panel)
     -- (Blizzard re-shows it when clicking "Character Stats" button)
     if CharacterStatsPane then
-        hooksecurefunc(CharacterStatsPane, "Show", function()
+        pcall(hooksecurefunc, CharacterStatsPane, "Show", function()
             local settings = GetSettings()
             if settings.enabled then
                 CharacterStatsPane:Hide()
@@ -2627,7 +2627,7 @@ local function HookCharacterFrame()
         end
 
         -- Reposition icon selector popup next to our floating popup
-        hooksecurefunc(GearManagerPopupFrame, "Show", function(self)
+        pcall(hooksecurefunc, GearManagerPopupFrame, "Show", function(self)
             if equipMgrPopup and equipMgrPopup:IsShown() then
                 self:ClearAllPoints()
                 self:SetPoint("TOPLEFT", equipMgrPopup, "TOPRIGHT", 5, 0)

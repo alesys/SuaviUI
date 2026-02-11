@@ -185,7 +185,7 @@ local function ApplyFrameHiding()
         -- Hook Show() once to prevent Blizzard from re-showing
         if not BuffFrame._SUI_ShowHooked then
             BuffFrame._SUI_ShowHooked = true
-            hooksecurefunc(BuffFrame, "Show", function(self)
+            pcall(hooksecurefunc, BuffFrame, "Show", function(self)
                 local s = GetSettings()
                 if s and s.hideBuffFrame then
                     self:Hide()
@@ -204,7 +204,7 @@ local function ApplyFrameHiding()
         -- Hook Show() once to prevent Blizzard from re-showing
         if not DebuffFrame._SUI_ShowHooked then
             DebuffFrame._SUI_ShowHooked = true
-            hooksecurefunc(DebuffFrame, "Show", function(self)
+            pcall(hooksecurefunc, DebuffFrame, "Show", function(self)
                 local s = GetSettings()
                 if s and s.hideDebuffFrame then
                     self:Hide()
@@ -224,28 +224,37 @@ local function ApplyBuffBorders()
     ApplyFrameHiding()
 
     -- Process BuffFrame containers (top right buffs)
-    if BuffFrame and BuffFrame.AuraContainer then
-        ProcessAuraContainer(BuffFrame.AuraContainer, "buff")
-    end
+    -- pcall: mixin properties (.AuraContainer, .Debuff) may be forbidden (12.0.5)
+    pcall(function()
+        if BuffFrame and BuffFrame.AuraContainer then
+            ProcessAuraContainer(BuffFrame.AuraContainer, "buff")
+        end
+    end)
     
     -- Process DebuffFrame if it exists separately
-    if DebuffFrame and DebuffFrame.AuraContainer then
-        ProcessAuraContainer(DebuffFrame.AuraContainer, "debuff")
-    end
+    pcall(function()
+        if DebuffFrame and DebuffFrame.AuraContainer then
+            ProcessAuraContainer(DebuffFrame.AuraContainer, "debuff")
+        end
+    end)
     
     -- Process DeadlyDebuffFrame (boss deadly mechanics, shown at 1.25x scale)
-    if DeadlyDebuffFrame then
-        local debuff = DeadlyDebuffFrame.Debuff
-        if debuff and (debuff.Icon or debuff.icon) then
-            AddBorderToButton(debuff, "deadly")
-            ApplyFontSettings(debuff)
+    pcall(function()
+        if DeadlyDebuffFrame then
+            local debuff = DeadlyDebuffFrame.Debuff
+            if debuff and (debuff.Icon or debuff.icon) then
+                AddBorderToButton(debuff, "deadly")
+                ApplyFontSettings(debuff)
+            end
         end
-    end
+    end)
 
     -- Process ExternalDefensivesFrame (Pain Suppression, Ironbark, etc.)
-    if ExternalDefensivesFrame and ExternalDefensivesFrame.AuraContainer then
-        ProcessAuraContainer(ExternalDefensivesFrame.AuraContainer, "external")
-    end
+    pcall(function()
+        if ExternalDefensivesFrame and ExternalDefensivesFrame.AuraContainer then
+            ProcessAuraContainer(ExternalDefensivesFrame.AuraContainer, "external")
+        end
+    end)
 
     -- Process temporary enchant frames (treat as buffs)
     if TemporaryEnchantFrame then
@@ -272,41 +281,54 @@ local function ScheduleBuffBorders()
 end
 
 -- Hook into aura update functions
+-- pcall all hooks: Blizzard aura frame mixin properties may be forbidden (12.0.5)
 local function HookAuraUpdates()
     -- Hook BuffFrame updates
-    if BuffFrame and BuffFrame.Update then
-        hooksecurefunc(BuffFrame, "Update", ScheduleBuffBorders)
-    end
+    pcall(function()
+        if BuffFrame and BuffFrame.Update then
+            hooksecurefunc(BuffFrame, "Update", ScheduleBuffBorders)
+        end
+    end)
 
     -- Hook AuraContainer updates if it exists (buffs)
-    if BuffFrame and BuffFrame.AuraContainer and BuffFrame.AuraContainer.Update then
-        hooksecurefunc(BuffFrame.AuraContainer, "Update", ScheduleBuffBorders)
-    end
+    pcall(function()
+        if BuffFrame and BuffFrame.AuraContainer and BuffFrame.AuraContainer.Update then
+            hooksecurefunc(BuffFrame.AuraContainer, "Update", ScheduleBuffBorders)
+        end
+    end)
 
     -- Hook DebuffFrame updates
-    if DebuffFrame and DebuffFrame.Update then
-        hooksecurefunc(DebuffFrame, "Update", ScheduleBuffBorders)
-    end
+    pcall(function()
+        if DebuffFrame and DebuffFrame.Update then
+            hooksecurefunc(DebuffFrame, "Update", ScheduleBuffBorders)
+        end
+    end)
 
     -- Hook DebuffFrame.AuraContainer updates if it exists
-    if DebuffFrame and DebuffFrame.AuraContainer and DebuffFrame.AuraContainer.Update then
-        hooksecurefunc(DebuffFrame.AuraContainer, "Update", ScheduleBuffBorders)
-    end
+    pcall(function()
+        if DebuffFrame and DebuffFrame.AuraContainer and DebuffFrame.AuraContainer.Update then
+            hooksecurefunc(DebuffFrame.AuraContainer, "Update", ScheduleBuffBorders)
+        end
+    end)
 
     -- Hook DeadlyDebuffFrame updates (boss deadly mechanics)
-    if DeadlyDebuffFrame and DeadlyDebuffFrame.Update then
-        hooksecurefunc(DeadlyDebuffFrame, "Update", ScheduleBuffBorders)
-    end
+    pcall(function()
+        if DeadlyDebuffFrame and DeadlyDebuffFrame.Update then
+            hooksecurefunc(DeadlyDebuffFrame, "Update", ScheduleBuffBorders)
+        end
+    end)
 
     -- Hook ExternalDefensivesFrame updates (external defensives like Pain Suppression)
-    if ExternalDefensivesFrame then
-        if ExternalDefensivesFrame.Update then
-            hooksecurefunc(ExternalDefensivesFrame, "Update", ScheduleBuffBorders)
+    pcall(function()
+        if ExternalDefensivesFrame then
+            if ExternalDefensivesFrame.Update then
+                hooksecurefunc(ExternalDefensivesFrame, "Update", ScheduleBuffBorders)
+            end
+            if ExternalDefensivesFrame.AuraContainer and ExternalDefensivesFrame.AuraContainer.Update then
+                hooksecurefunc(ExternalDefensivesFrame.AuraContainer, "Update", ScheduleBuffBorders)
+            end
         end
-        if ExternalDefensivesFrame.AuraContainer and ExternalDefensivesFrame.AuraContainer.Update then
-            hooksecurefunc(ExternalDefensivesFrame.AuraContainer, "Update", ScheduleBuffBorders)
-        end
-    end
+    end)
 
     -- Hook the global aura update function if available
     if type(AuraButton_Update) == "function" then

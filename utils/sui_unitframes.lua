@@ -4819,7 +4819,7 @@ function SUI_UF:HookBlizzardEditMode()
     -- Track if we triggered from Blizzard Edit Mode (vs /sui editmode)
     self.triggeredByBlizzEditMode = false
 
-    hooksecurefunc(EditModeManagerFrame, "EnterEditMode", function()
+    pcall(hooksecurefunc, EditModeManagerFrame, "EnterEditMode", function()
         if InCombatLockdown() then return end
         self.triggeredByBlizzEditMode = true
         -- Don't run old EnableEditMode() - LEM handles the Blizzard Edit Mode UI
@@ -4838,7 +4838,7 @@ function SUI_UF:HookBlizzardEditMode()
         self:HideBlizzardSelectionFrames()
     end)
 
-    hooksecurefunc(EditModeManagerFrame, "ExitEditMode", function()
+    pcall(hooksecurefunc, EditModeManagerFrame, "ExitEditMode", function()
         if InCombatLockdown() then return end
         if not self.triggeredByBlizzEditMode then return end  -- Don't exit if user used /sui editmode
         self.triggeredByBlizzEditMode = false

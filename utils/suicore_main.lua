@@ -4853,31 +4853,33 @@ function SUICore:HookEditMode()
     -- Hook EditModeManagerFrame if it exists
     if EditModeManagerFrame then
         -- Hook when Edit Mode is entered
-        hooksecurefunc(EditModeManagerFrame, "EnterEditMode", function()
+        pcall(hooksecurefunc, EditModeManagerFrame, "EnterEditMode", function()
             C_Timer.After(0.1, function()
                 self:ForceReskinAllViewers()
             end)
 
             -- Fix BossTargetFrameContainer crash: GetScaledSelectionSides fails when GetRect returns nil
             -- Apply hook here because the method may not exist at addon init time
-            if BossTargetFrameContainer and not BossTargetFrameContainer._quiScaledSidesHooked then
-                if BossTargetFrameContainer.GetScaledSelectionSides then
-                    local original = BossTargetFrameContainer.GetScaledSelectionSides
-                    BossTargetFrameContainer.GetScaledSelectionSides = function(frame)
-                        local left = frame:GetLeft()
-                        if left == nil then
-                            -- Return off-screen fallback sides (left, right, bottom, top)
-                            return -10000, -9999, 10000, 10001
+            pcall(function()
+                if BossTargetFrameContainer and not BossTargetFrameContainer._quiScaledSidesHooked then
+                    if BossTargetFrameContainer.GetScaledSelectionSides then
+                        local original = BossTargetFrameContainer.GetScaledSelectionSides
+                        BossTargetFrameContainer.GetScaledSelectionSides = function(frame)
+                            local left = frame:GetLeft()
+                            if left == nil then
+                                -- Return off-screen fallback sides (left, right, bottom, top)
+                                return -10000, -9999, 10000, 10001
+                            end
+                            return original(frame)
                         end
-                        return original(frame)
+                        BossTargetFrameContainer._quiScaledSidesHooked = true
                     end
-                    BossTargetFrameContainer._quiScaledSidesHooked = true
                 end
-            end
+            end)
         end)
         
         -- Hook when Edit Mode is exited
-        hooksecurefunc(EditModeManagerFrame, "ExitEditMode", function()
+        pcall(hooksecurefunc, EditModeManagerFrame, "ExitEditMode", function()
             C_Timer.After(0.1, function()
                 self:ForceReskinAllViewers()
 

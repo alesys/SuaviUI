@@ -1042,7 +1042,7 @@ end
 local function SetupEditModeHooks()
     if not EditModeManagerFrame then return end
     
-    hooksecurefunc(EditModeManagerFrame, "EnterEditMode", function()
+    pcall(hooksecurefunc, EditModeManagerFrame, "EnterEditMode", function()
         -- Ensure LibEditModeOverride layouts are loaded when entering Edit Mode
         if LibEditModeOverride and LibEditModeOverride:IsReady() then
             if not LibEditModeOverride:AreLayoutsLoaded() then
@@ -1063,7 +1063,7 @@ local function SetupEditModeHooks()
         -- SUICore:EnableMinimapEditMode()
     end)
 
-    hooksecurefunc(EditModeManagerFrame, "ExitEditMode", function()
+    pcall(hooksecurefunc, EditModeManagerFrame, "ExitEditMode", function()
         if FORCE_DISABLE_CDM_NUDGE then return end
         -- NudgeFrame is lazy-loaded, only hide if it exists
         if SUICore.nudgeFrame then

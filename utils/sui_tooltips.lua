@@ -166,7 +166,10 @@ local function GetTooltipContext(owner)
     end
 
     -- Frames: Check for unit frame patterns
-    if owner.unit or                            -- Standard unit attribute
+    -- pcall: owner.unit may be a forbidden mixin property (12.0.5)
+    local hasUnit = false
+    pcall(function() hasUnit = owner.unit end)
+    if hasUnit or                            -- Standard unit attribute
        strmatch(name, "UnitFrame") or
        strmatch(name, "PlayerFrame") or
        strmatch(name, "TargetFrame") or
@@ -261,7 +264,7 @@ local function SetupTooltipHook()
 
     -- Hook SetUnit to suppress tooltips when a UI frame blocks the mouse
     -- PERFORMANCE: Debounced to prevent spam with @mouseover macros (max 20 calls/sec)
-    hooksecurefunc(GameTooltip, "SetUnit", function(tooltip, unit)
+    pcall(hooksecurefunc, GameTooltip, "SetUnit", function(tooltip, unit)
         local settings = GetSettings()
         if not settings or not settings.enabled then return end
 
@@ -320,7 +323,7 @@ local function SetupTooltipHook()
 
     -- Hook SetSpellByID to suppress CDM and Custom Tracker tooltips
     -- These icons use SetSpellByID which bypasses GameTooltip_SetDefaultAnchor
-    hooksecurefunc(GameTooltip, "SetSpellByID", function(tooltip, spellID)
+    pcall(hooksecurefunc, GameTooltip, "SetSpellByID", function(tooltip, spellID)
         local settings = GetSettings()
         if not settings or not settings.enabled then return end
 
@@ -343,7 +346,7 @@ local function SetupTooltipHook()
     end)
 
     -- Hook SetItemByID to suppress Custom Tracker item tooltips
-    hooksecurefunc(GameTooltip, "SetItemByID", function(tooltip, itemID)
+    pcall(hooksecurefunc, GameTooltip, "SetItemByID", function(tooltip, itemID)
         local settings = GetSettings()
         if not settings or not settings.enabled then return end
 

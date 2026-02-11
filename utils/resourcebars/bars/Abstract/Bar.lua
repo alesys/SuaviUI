@@ -118,9 +118,9 @@ function BarMixin:InitCooldownManagerWidthHook(layoutName)
             end
         end
 
-        hooksecurefunc(v, "SetSize", hookEssentialCooldowns)
-        hooksecurefunc(v, "Show", hookEssentialCooldowns)
-        hooksecurefunc(v, "Hide", hookEssentialCooldowns)
+        pcall(hooksecurefunc, v, "SetSize", hookEssentialCooldowns)
+        pcall(hooksecurefunc, v, "Show", hookEssentialCooldowns)
+        pcall(hooksecurefunc, v, "Hide", hookEssentialCooldowns)
 
         self._SUI_Essential_hooked = true
     end
@@ -137,9 +137,9 @@ function BarMixin:InitCooldownManagerWidthHook(layoutName)
             end
         end
 
-        hooksecurefunc(v, "SetSize", hookUtilityCooldowns)
-        hooksecurefunc(v, "Show", hookUtilityCooldowns)
-        hooksecurefunc(v, "Hide", hookUtilityCooldowns)
+        pcall(hooksecurefunc, v, "SetSize", hookUtilityCooldowns)
+        pcall(hooksecurefunc, v, "Show", hookUtilityCooldowns)
+        pcall(hooksecurefunc, v, "Hide", hookUtilityCooldowns)
 
         self._SUI_Utility_hooked = true
     end
@@ -156,9 +156,9 @@ function BarMixin:InitCooldownManagerWidthHook(layoutName)
             end
         end
 
-        hooksecurefunc(v, "SetSize", hookTrackedBuffs)
-        hooksecurefunc(v, "Show", hookTrackedBuffs)
-        hooksecurefunc(v, "Hide", hookTrackedBuffs)
+        pcall(hooksecurefunc, v, "SetSize", hookTrackedBuffs)
+        pcall(hooksecurefunc, v, "Show", hookTrackedBuffs)
+        pcall(hooksecurefunc, v, "Hide", hookTrackedBuffs)
 
         self._SUI_tBuffs_hooked = true
     end

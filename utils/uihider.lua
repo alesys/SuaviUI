@@ -183,7 +183,7 @@ local function ApplyHideSettings()
             -- Hook Show() to prevent Blizzard from showing it again (quest updates, boss fights, etc.)
             if not ObjectiveTrackerFrame._SUI_ShowHooked then
                 ObjectiveTrackerFrame._SUI_ShowHooked = true
-                hooksecurefunc(ObjectiveTrackerFrame, "Show", function(self)
+                pcall(hooksecurefunc, ObjectiveTrackerFrame, "Show", function(self)
                     local s = GetSettings()
                     if s then
                         local shouldHideNow = false
@@ -234,7 +234,7 @@ local function ApplyHideSettings()
         -- Hook Show() to prevent Blizzard from re-showing when hidden
         if not GameTimeFrame._SUI_ShowHooked then
             GameTimeFrame._SUI_ShowHooked = true
-            hooksecurefunc(GameTimeFrame, "Show", function(self)
+            pcall(hooksecurefunc, GameTimeFrame, "Show", function(self)
                 local s = GetSettings()
                 if s and s.hideGameTime then
                     self:Hide()
@@ -251,12 +251,12 @@ local function ApplyHideSettings()
         if InCombatLockdown() then
             -- Skip protected operations during combat
         elseif settings.hideRaidFrameManager then
-            RegisterStateDriver(CompactRaidFrameManager, "visibility", "hide")
-            CompactRaidFrameManager:EnableMouse(false)
+            pcall(RegisterStateDriver, CompactRaidFrameManager, "visibility", "hide")
+            pcall(CompactRaidFrameManager.EnableMouse, CompactRaidFrameManager, false)
         else
-            UnregisterStateDriver(CompactRaidFrameManager, "visibility")
-            CompactRaidFrameManager:Show()
-            CompactRaidFrameManager:EnableMouse(true)
+            pcall(UnregisterStateDriver, CompactRaidFrameManager, "visibility")
+            pcall(CompactRaidFrameManager.Show, CompactRaidFrameManager)
+            pcall(CompactRaidFrameManager.EnableMouse, CompactRaidFrameManager, true)
         end
     end
     
@@ -368,7 +368,7 @@ end
             -- Hook Show() to keep it hidden
             if not TalkingHeadFrame._SUI_ShowHooked then
                 TalkingHeadFrame._SUI_ShowHooked = true
-                hooksecurefunc(TalkingHeadFrame, "Show", function(self)
+                pcall(hooksecurefunc, TalkingHeadFrame, "Show", function(self)
                     local s = GetSettings()
                     if s and s.hideTalkingHead then
                         self:Hide()
@@ -386,7 +386,7 @@ end
                 DisableTalkingHeadMouse()
 
                 -- Re-enable mouse when a talking head starts playing
-                hooksecurefunc(TalkingHeadFrame, "PlayCurrent", function()
+                pcall(hooksecurefunc, TalkingHeadFrame, "PlayCurrent", function()
                     EnableTalkingHeadMouse()
                 end)
 
@@ -400,7 +400,7 @@ end
         -- Talking Head Mute (hook PlayCurrent once)
         if not TalkingHeadFrame._SUI_MuteHooked then
             TalkingHeadFrame._SUI_MuteHooked = true
-            hooksecurefunc(TalkingHeadFrame, "PlayCurrent", function()
+            pcall(hooksecurefunc, TalkingHeadFrame, "PlayCurrent", function()
                 local s = GetSettings()
                 if s and s.muteTalkingHead and TalkingHeadFrame.voHandle then
                     StopSound(TalkingHeadFrame.voHandle, 0)
@@ -463,7 +463,7 @@ end
 
             if not StatusTrackingBarManager._SUI_ShowHooked then
                 StatusTrackingBarManager._SUI_ShowHooked = true
-                hooksecurefunc(StatusTrackingBarManager, "Show", function(self)
+                pcall(hooksecurefunc, StatusTrackingBarManager, "Show", function(self)
                     local s = GetSettings()
                     if s and s.hideExperienceBar and s.hideReputationBar then
                         self:Hide()
@@ -480,7 +480,7 @@ end
             -- Hook UpdateBarsShown to re-hide bars after Blizzard updates
             if not StatusTrackingBarManager._SUI_BarsHooked then
                 StatusTrackingBarManager._SUI_BarsHooked = true
-                hooksecurefunc(StatusTrackingBarManager, "UpdateBarsShown", function()
+                pcall(hooksecurefunc, StatusTrackingBarManager, "UpdateBarsShown", function()
                     C_Timer.After(0.01, HideStatusBars)
                 end)
             end
@@ -512,7 +512,7 @@ end
             -- IMPORTANT: Skip during combat to avoid taint propagation to SetPassThroughButtons
             if not WorldMapFrame.BlackoutFrame._SUI_BlackoutHooked then
                 WorldMapFrame.BlackoutFrame._SUI_BlackoutHooked = true
-                hooksecurefunc(WorldMapFrame.BlackoutFrame, "Show", function(self)
+                pcall(hooksecurefunc, WorldMapFrame.BlackoutFrame, "Show", function(self)
                     if InCombatLockdown() then return end  -- Avoid taint during combat
                     local s = GetSettings()
                     if s and s.hideWorldMapBlackout then
@@ -522,7 +522,7 @@ end
                 end)
 
                 -- Also hook SetAlpha to prevent alpha changes
-                hooksecurefunc(WorldMapFrame.BlackoutFrame, "SetAlpha", function(self, alpha)
+                pcall(hooksecurefunc, WorldMapFrame.BlackoutFrame, "SetAlpha", function(self, alpha)
                     if InCombatLockdown() then return end  -- Avoid taint during combat
                     local s = GetSettings()
                     if s and s.hideWorldMapBlackout and alpha > 0 then

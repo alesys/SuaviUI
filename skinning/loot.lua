@@ -1586,7 +1586,7 @@ function Loot:HookBlizzardEditMode()
 
     -- Only hook ExitEditMode to auto-hide movers
     -- EnterEditMode intentionally NOT hooked - users toggle movers manually via Skinning options
-    hooksecurefunc(EditModeManagerFrame, "ExitEditMode", function()
+    pcall(hooksecurefunc, EditModeManagerFrame, "ExitEditMode", function()
         if InCombatLockdown() then return end
         self:DisableEditMode()
     end)

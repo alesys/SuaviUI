@@ -632,7 +632,7 @@ HookExtraButtonPositioning = function()
     -- Hook ExtraActionBarFrame
     if ExtraActionBarFrame and not ExtraActionBarFrame._quiHooked then
         ExtraActionBarFrame._quiHooked = true
-        hooksecurefunc(ExtraActionBarFrame, "SetPoint", function(self)
+        pcall(hooksecurefunc, ExtraActionBarFrame, "SetPoint", function(self)
             if hookingSetPoint or InCombatLockdown() then return end
             -- Don't interfere during Edit Mode - let LEM handle positioning
             if EditModeManagerFrame and EditModeManagerFrame:IsShown() then return end
@@ -652,7 +652,7 @@ HookExtraButtonPositioning = function()
     -- Hook ZoneAbilityFrame
     if ZoneAbilityFrame and not ZoneAbilityFrame._quiHooked then
         ZoneAbilityFrame._quiHooked = true
-        hooksecurefunc(ZoneAbilityFrame, "SetPoint", function(self)
+        pcall(hooksecurefunc, ZoneAbilityFrame, "SetPoint", function(self)
             if hookingSetPoint or InCombatLockdown() then return end
             -- Don't interfere during Edit Mode - let LEM handle positioning
             if EditModeManagerFrame and EditModeManagerFrame:IsShown() then return end
@@ -2154,7 +2154,7 @@ local function SetupEditModeHooks()
     if not EditModeManagerFrame then return end
 
     -- Show movers when entering Edit Mode
-    hooksecurefunc(EditModeManagerFrame, "EnterEditMode", function()
+    pcall(hooksecurefunc, EditModeManagerFrame, "EnterEditMode", function()
         local extraSettings = GetExtraButtonDB("extraActionButton")
         local zoneSettings = GetExtraButtonDB("zoneAbility")
         -- Only show movers if at least one extra button feature is enabled
@@ -2164,7 +2164,7 @@ local function SetupEditModeHooks()
     end)
 
     -- Hide movers when exiting Edit Mode
-    hooksecurefunc(EditModeManagerFrame, "ExitEditMode", function()
+    pcall(hooksecurefunc, EditModeManagerFrame, "ExitEditMode", function()
         HideExtraButtonMovers()
     end)
 end

@@ -350,17 +350,18 @@ function ViewerAdapters.GetBuffIconFrames()
         return {}
     end
     local visible = {}
-    local children = { BuffIconCooldownViewer:GetChildren() }
-    for _, child in ipairs(children) do
+    local ok, children = pcall(BuffIconCooldownViewer.GetChildren, BuffIconCooldownViewer)
+    if not ok or not children then return visible end
+    for _, child in ipairs({ children }) do
         if child and (child.icon or child.Icon) then
             if child:IsShown() then
                 visible[#visible + 1] = child
             end
             if not child._wt_isHooked then
                 child._wt_isHooked = true
-                hooksecurefunc(child, "OnActiveStateChanged", StateTracker.MarkBuffIconsDirty)
-                hooksecurefunc(child, "OnUnitAuraAddedEvent", StateTracker.MarkBuffIconsDirty)
-                hooksecurefunc(child, "OnUnitAuraRemovedEvent", StateTracker.MarkBuffIconsDirty)
+                pcall(hooksecurefunc, child, "OnActiveStateChanged", StateTracker.MarkBuffIconsDirty)
+                pcall(hooksecurefunc, child, "OnUnitAuraAddedEvent", StateTracker.MarkBuffIconsDirty)
+                pcall(hooksecurefunc, child, "OnUnitAuraRemovedEvent", StateTracker.MarkBuffIconsDirty)
             end
         end
     end
@@ -406,9 +407,9 @@ function ViewerAdapters.GetBuffBarFrames()
         end
         if not frame._wt_isHooked and (frame.icon or frame.Icon or frame.bar or frame.Bar) then
             frame._wt_isHooked = true
-            hooksecurefunc(frame, "OnActiveStateChanged", StateTracker.MarkBuffBarsDirty)
-            hooksecurefunc(frame, "OnUnitAuraAddedEvent", StateTracker.MarkBuffBarsDirty)
-            hooksecurefunc(frame, "OnUnitAuraRemovedEvent", StateTracker.MarkBuffBarsDirty)
+            pcall(hooksecurefunc, frame, "OnActiveStateChanged", StateTracker.MarkBuffBarsDirty)
+            pcall(hooksecurefunc, frame, "OnUnitAuraAddedEvent", StateTracker.MarkBuffBarsDirty)
+            pcall(hooksecurefunc, frame, "OnUnitAuraRemovedEvent", StateTracker.MarkBuffBarsDirty)
         end
     end
     table.sort(active, function(a, b)
