@@ -4484,27 +4484,31 @@ local function HideBlizzardTargetVisuals()
     if not TargetFrame then return end
     
     -- Hide main art & bars but keep the frame alive for tooltips/buffs
-    KillBlizzardChildFrame(TargetFrame.TargetFrameContainer)
-    KillBlizzardChildFrame(TargetFrame.TargetFrameContent)
-    KillBlizzardChildFrame(TargetFrame.healthbar)
-    KillBlizzardChildFrame(TargetFrame.manabar)
-    KillBlizzardChildFrame(TargetFrame.powerBarAlt)
-    KillBlizzardChildFrame(TargetFrame.overAbsorbGlow)
-    KillBlizzardChildFrame(TargetFrame.overHealAbsorbGlow)
-    KillBlizzardChildFrame(TargetFrame.totalAbsorbBar)
-    KillBlizzardChildFrame(TargetFrame.tempMaxHealthLossBar)
-    KillBlizzardChildFrame(TargetFrame.myHealPredictionBar)
-    KillBlizzardChildFrame(TargetFrame.otherHealPredictionBar)
-    KillBlizzardChildFrame(TargetFrame.name)
-    KillBlizzardChildFrame(TargetFrame.portrait)
-    KillBlizzardChildFrame(TargetFrame.threatIndicator)
-    KillBlizzardChildFrame(TargetFrame.threatNumericIndicator)
+    -- pcall each property read: TargetFrame mixin properties may be forbidden (12.0.5)
+    local function SafeKill(prop)
+        pcall(function() KillBlizzardChildFrame(TargetFrame[prop]) end)
+    end
+    SafeKill("TargetFrameContainer")
+    SafeKill("TargetFrameContent")
+    SafeKill("healthbar")
+    SafeKill("manabar")
+    SafeKill("powerBarAlt")
+    SafeKill("overAbsorbGlow")
+    SafeKill("overHealAbsorbGlow")
+    SafeKill("totalAbsorbBar")
+    SafeKill("tempMaxHealthLossBar")
+    SafeKill("myHealPredictionBar")
+    SafeKill("otherHealPredictionBar")
+    SafeKill("name")
+    SafeKill("portrait")
+    SafeKill("threatIndicator")
+    SafeKill("threatNumericIndicator")
     
     -- Hide buff/debuff frames (modern WoW structure)
-    KillBlizzardChildFrame(TargetFrame.BuffFrame)
-    KillBlizzardChildFrame(TargetFrame.DebuffFrame)
-    KillBlizzardChildFrame(TargetFrame.buffsContainer)
-    KillBlizzardChildFrame(TargetFrame.debuffsContainer)
+    SafeKill("BuffFrame")
+    SafeKill("DebuffFrame")
+    SafeKill("buffsContainer")
+    SafeKill("debuffsContainer")
     
     -- Hide old-style aura buttons
     for i = 1, 40 do
@@ -4513,9 +4517,11 @@ local function HideBlizzardTargetVisuals()
     end
     
     -- Release aura pools (Dragonflight+)
-    if TargetFrame.auraPools and TargetFrame.auraPools.ReleaseAll then
-        TargetFrame.auraPools:ReleaseAll()
-    end
+    pcall(function()
+        if TargetFrame.auraPools and TargetFrame.auraPools.ReleaseAll then
+            TargetFrame.auraPools:ReleaseAll()
+        end
+    end)
     
     -- Hide the entire TargetFrame since we have our own
     KillBlizzardFrame(TargetFrame)
@@ -4524,27 +4530,31 @@ end
 local function HideBlizzardFocusVisuals()
     if not FocusFrame then return end
     
-    KillBlizzardChildFrame(FocusFrame.TargetFrameContainer)
-    KillBlizzardChildFrame(FocusFrame.TargetFrameContent)
-    KillBlizzardChildFrame(FocusFrame.healthbar)
-    KillBlizzardChildFrame(FocusFrame.manabar)
-    KillBlizzardChildFrame(FocusFrame.powerBarAlt)
-    KillBlizzardChildFrame(FocusFrame.overAbsorbGlow)
-    KillBlizzardChildFrame(FocusFrame.overHealAbsorbGlow)
-    KillBlizzardChildFrame(FocusFrame.totalAbsorbBar)
-    KillBlizzardChildFrame(FocusFrame.tempMaxHealthLossBar)
-    KillBlizzardChildFrame(FocusFrame.myHealPredictionBar)
-    KillBlizzardChildFrame(FocusFrame.otherHealPredictionBar)
-    KillBlizzardChildFrame(FocusFrame.name)
-    KillBlizzardChildFrame(FocusFrame.portrait)
-    KillBlizzardChildFrame(FocusFrame.threatIndicator)
-    KillBlizzardChildFrame(FocusFrame.threatNumericIndicator)
+    -- pcall each property read: FocusFrame mixin properties may be forbidden (12.0.5)
+    local function SafeKill(prop)
+        pcall(function() KillBlizzardChildFrame(FocusFrame[prop]) end)
+    end
+    SafeKill("TargetFrameContainer")
+    SafeKill("TargetFrameContent")
+    SafeKill("healthbar")
+    SafeKill("manabar")
+    SafeKill("powerBarAlt")
+    SafeKill("overAbsorbGlow")
+    SafeKill("overHealAbsorbGlow")
+    SafeKill("totalAbsorbBar")
+    SafeKill("tempMaxHealthLossBar")
+    SafeKill("myHealPredictionBar")
+    SafeKill("otherHealPredictionBar")
+    SafeKill("name")
+    SafeKill("portrait")
+    SafeKill("threatIndicator")
+    SafeKill("threatNumericIndicator")
     
     -- Hide buff/debuff frames (modern WoW structure)
-    KillBlizzardChildFrame(FocusFrame.BuffFrame)
-    KillBlizzardChildFrame(FocusFrame.DebuffFrame)
-    KillBlizzardChildFrame(FocusFrame.buffsContainer)
-    KillBlizzardChildFrame(FocusFrame.debuffsContainer)
+    SafeKill("BuffFrame")
+    SafeKill("DebuffFrame")
+    SafeKill("buffsContainer")
+    SafeKill("debuffsContainer")
     
     -- Hide old-style aura buttons
     for i = 1, 40 do
@@ -4553,9 +4563,11 @@ local function HideBlizzardFocusVisuals()
     end
     
     -- Release aura pools
-    if FocusFrame.auraPools and FocusFrame.auraPools.ReleaseAll then
-        FocusFrame.auraPools:ReleaseAll()
-    end
+    pcall(function()
+        if FocusFrame.auraPools and FocusFrame.auraPools.ReleaseAll then
+            FocusFrame.auraPools:ReleaseAll()
+        end
+    end)
     
     -- Hide the entire FocusFrame since we have our own
     KillBlizzardFrame(FocusFrame)
@@ -4573,20 +4585,22 @@ function SUI_UF:HideBlizzardFrames()
     -- Hide Blizzard Player Castbar if our SUI player castbar is enabled
     if db.player and db.player.castbar and db.player.castbar.enabled then
         if PlayerCastingBarFrame then
-            PlayerCastingBarFrame:SetAlpha(0)
-            PlayerCastingBarFrame:SetScale(0.0001)
-            PlayerCastingBarFrame:SetPoint("BOTTOMLEFT", UIParent, "TOPLEFT", -10000, 10000)
-            PlayerCastingBarFrame:UnregisterAllEvents()
-            if PlayerCastingBarFrame.SetUnit then
-                PlayerCastingBarFrame:SetUnit(nil)
-            end
-            -- Hook Show to prevent Blizzard from ever showing (catches talent changes, etc.)
-            if not PlayerCastingBarFrame._suiShowHooked then
-                PlayerCastingBarFrame._suiShowHooked = true
-                hooksecurefunc(PlayerCastingBarFrame, "Show", function(self)
-                    self:Hide()
-                end)
-            end
+            pcall(function()
+                PlayerCastingBarFrame:SetAlpha(0)
+                PlayerCastingBarFrame:SetScale(0.0001)
+                PlayerCastingBarFrame:SetPoint("BOTTOMLEFT", UIParent, "TOPLEFT", -10000, 10000)
+                PlayerCastingBarFrame:UnregisterAllEvents()
+                if PlayerCastingBarFrame.SetUnit then
+                    PlayerCastingBarFrame:SetUnit(nil)
+                end
+                -- Hook Show to prevent Blizzard from ever showing (catches talent changes, etc.)
+                if not PlayerCastingBarFrame._suiShowHooked then
+                    PlayerCastingBarFrame._suiShowHooked = true
+                    hooksecurefunc(PlayerCastingBarFrame, "Show", function(self)
+                        self:Hide()
+                    end)
+                end
+            end)
         end
         -- Also hide the pet castbar if it exists
         if PetCastingBarFrame then
@@ -4846,23 +4860,27 @@ end
 -- Called during EnableEditMode() to prevent visual conflicts
 function SUI_UF:HideBlizzardSelectionFrames()
     local function HideSelection(parent, unitKey)
-        if not parent or not parent.Selection then return end
+        if not parent then return end
+        -- pcall: parent.Selection may be a forbidden mixin property (12.0.5)
+        pcall(function()
+            if not parent.Selection then return end
 
-        local db = GetDB()
-        if not db or not db[unitKey] or not db[unitKey].enabled then return end
+            local db = GetDB()
+            if not db or not db[unitKey] or not db[unitKey].enabled then return end
 
-        parent.Selection:Hide()
+            parent.Selection:Hide()
 
-        -- Hook OnShow to persistently hide while SUI frames are enabled
-        if not parent.Selection._suiHooked then
-            parent.Selection._suiHooked = true
-            parent.Selection:HookScript("OnShow", function(self)
-                local db = GetDB()
-                if db and db[unitKey] and db[unitKey].enabled then
-                    self:Hide()
-                end
-            end)
-        end
+            -- Hook OnShow to persistently hide while SUI frames are enabled
+            if not parent.Selection._suiHooked then
+                parent.Selection._suiHooked = true
+                parent.Selection:HookScript("OnShow", function(self)
+                    local db = GetDB()
+                    if db and db[unitKey] and db[unitKey].enabled then
+                        self:Hide()
+                    end
+                end)
+            end
+        end)
     end
 
     HideSelection(PlayerFrame, "player")
