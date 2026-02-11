@@ -5266,8 +5266,12 @@ local function CreateCooldownViewersPage(parent)
             _G["BuffIconCooldownViewer"],
         }
         for _, viewer in ipairs(viewers) do
-            if viewer and viewer.RefreshLayout then
-                pcall(viewer.RefreshLayout, viewer)
+            if viewer then
+                pcall(function()
+                    if viewer.RefreshLayout then
+                        viewer:RefreshLayout()
+                    end
+                end)
             end
         end
 

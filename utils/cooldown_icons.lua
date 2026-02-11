@@ -280,7 +280,9 @@ local function ProcessViewer(viewer, viewerSettingName, applyStyle)
         return
     end
 
-    local children = { viewer:GetChildren() }
+    local children = {}
+    local ok = pcall(function() children = { viewer:GetChildren() } end)
+    if not ok then return end
     for _, child in ipairs(children) do
         if child.Icon then -- Only process icon-like children
             if applyStyle then
@@ -440,7 +442,8 @@ function StyledIcons:Shutdown()
     for viewerName, settingName in pairs(viewersSettingKey) do
         local viewerFrame = _G[viewerName]
         if viewerFrame then
-            local children = { viewerFrame:GetChildren() }
+            local children = {}
+            pcall(function() children = { viewerFrame:GetChildren() } end)
             for _, child in ipairs(children) do
                 if child.Icon then
                     RestoreOriginalStyle(child, settingName)
@@ -467,7 +470,7 @@ function StyledIcons:Enable()
         for viewerName, _ in pairs(viewersSettingKey) do
             local viewerFrame = _G[viewerName]
             if viewerFrame then
-                hooksecurefunc(viewerFrame, "RefreshLayout", function()
+                pcall(hooksecurefunc, viewerFrame, "RefreshLayout", function()
                     if not isModuleStyledEnabled then
                         return
                     end
@@ -540,7 +543,8 @@ function StyledIcons:ApplyNormalizedSize()
 
     local enabled = IsNormalizedSizeEnabled()
 
-    local children = { viewerFrame:GetChildren() }
+    local children = {}
+    pcall(function() children = { viewerFrame:GetChildren() } end)
     for _, child in ipairs(children) do
         if child.Icon then
             if enabled then
