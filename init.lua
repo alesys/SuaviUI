@@ -134,13 +134,24 @@ do
         if not IsSafeBool(frame.cooldownChargesShown) then frame.cooldownChargesShown = false end
     end
 
-    local function RecoverViewer(viewer)
-        if not viewer or not viewer.itemFramePool then return end
+    local function RecoverViewer(viewer, category)
+        if not viewer then return end
+        -- viewer.itemFramePool is a Lua mixin property on a forbidden table
+        local okPool, pool = pcall(function() return viewer.itemFramePool end)
+        if not okPool or not pool then return end
 
+        -- Bypass forbidden mixin method: use global data provider directly
         local cooldownIDs
-        pcall(function() cooldownIDs = viewer:GetCooldownIDs() end)
+        if category then
+            pcall(function()
+                cooldownIDs = CooldownViewerSettings:GetDataProvider():GetOrderedCooldownIDsForCategory(category)
+            end)
+        end
+        if not cooldownIDs then
+            pcall(function() cooldownIDs = viewer:GetCooldownIDs() end)
+        end
 
-        for frame in viewer.itemFramePool:EnumerateActive() do
+        for frame in pool:EnumerateActive() do
             SanitizeFrame(frame)
 
             -- Assign cooldownID to orphaned items (loop crashed before reaching them).
@@ -197,9 +208,10 @@ do
         -- Only recover Essential and Utility viewers.
         -- BuffIcon and BuffBar use custom containers (Option C Phase 1+2).
         local viewers = {
-            _G.EssentialCooldownViewer, _G.UtilityCooldownViewer,
+            { _G.EssentialCooldownViewer, Enum.CooldownViewerCategory.Essential },
+            { _G.UtilityCooldownViewer, Enum.CooldownViewerCategory.Utility },
         }
-        for _, v in ipairs(viewers) do RecoverViewer(v) end
+        for _, pair in ipairs(viewers) do RecoverViewer(pair[1], pair[2]) end
     end
 
     -- Proactive sanitization: PRE-hook RefreshData to sanitize BEFORE Blizzard's code runs

@@ -981,7 +981,8 @@ local function UpdateViewerKeybinds(viewerName)
     local viewer = _G[viewerName]
     if not viewer then return end
     
-    local container = viewer.viewerFrame or viewer
+    local okC, container = pcall(function() return viewer.viewerFrame end)
+    if not okC or not container then container = viewer end
     local children = { container:GetChildren() }
     
     for _, child in ipairs(children) do
@@ -996,7 +997,8 @@ local function ClearStoredKeybinds(viewerName)
     local viewer = _G[viewerName]
     if not viewer then return end
     
-    local container = viewer.viewerFrame or viewer
+    local okC, container = pcall(function() return viewer.viewerFrame end)
+    if not okC or not container then container = viewer end
     local children = { container:GetChildren() }
     
     for _, child in ipairs(children) do
@@ -1767,7 +1769,8 @@ local function UpdateViewerRotationHelper(viewerName, nextSpellID)
     local viewer = _G[viewerName]
     if not viewer then return end
     
-    local container = viewer.viewerFrame or viewer
+    local okC, container = pcall(function() return viewer.viewerFrame end)
+    if not okC or not container then container = viewer end
     local children = { container:GetChildren() }
     
     for _, child in ipairs(children) do

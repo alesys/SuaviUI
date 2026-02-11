@@ -4075,6 +4075,13 @@ local function IsCooldownIconFrame(frame)
     return frame and (frame.icon or frame.Icon) and frame.Cooldown
 end
 
+-- Safe helper: viewer.viewerFrame is a Lua mixin property on a forbidden table in 12.0.5
+local function SafeGetViewerContainer(viewer)
+    local ok, container = pcall(function() return viewer.viewerFrame end)
+    if ok and container then return container end
+    return viewer
+end
+
 local function StripBlizzardOverlay(icon)
     for _, region in ipairs({ icon:GetRegions() }) do
         if region:IsObjectType("Texture") and region.GetAtlas and region:GetAtlas() == "UI-HUD-CoolDownManager-IconOverlay" then
@@ -4368,7 +4375,7 @@ function SUICore:SkinAllIconsInViewer(viewer)
     local settings = self.db.profile.viewers[name]
     if not settings or not settings.enabled then return end
 
-    local container = viewer.viewerFrame or viewer
+    local container = SafeGetViewerContainer(viewer)
     local children  = { container:GetChildren() }
 
     for _, icon in ipairs(children) do
@@ -4464,7 +4471,7 @@ function SUICore:ApplyViewerLayout(viewer)
     local settings = self.db.profile.viewers[name]
     if not settings or not settings.enabled then return end
 
-    local container = viewer.viewerFrame or viewer
+    local container = SafeGetViewerContainer(viewer)
     local icons = {}
 
     for _, child in ipairs({ container:GetChildren() }) do
@@ -4644,7 +4651,7 @@ function SUICore:RescanViewer(viewer)
     local settings = self.db.profile.viewers[name]
     if not settings or not settings.enabled then return end
 
-    local container = viewer.viewerFrame or viewer
+    local container = SafeGetViewerContainer(viewer)
     local icons = {}
     local changed = false
     local inCombat = InCombatLockdown()
@@ -4818,16 +4825,18 @@ function SUICore:ForceReskinAllViewers()
     for _, name in ipairs(self.viewers) do
         local viewer = _G[name]
         if viewer then
-            local container = viewer.viewerFrame or viewer
-            local children = { container:GetChildren() }
-            for _, child in ipairs(children) do
-                -- Clear skinned flag to force re-skinning
-                child.__cdmSkinned = nil
-                child.__cdmSkinPending = nil
-                child.__cdmSkinFailed = nil
-            end
-            -- Reset icon count to force layout refresh
-            viewer.__cdmIconCount = nil
+            pcall(function()
+                local container = SafeGetViewerContainer(viewer)
+                local children = { container:GetChildren() }
+                for _, child in ipairs(children) do
+                    -- Clear skinned flag to force re-skinning
+                    child.__cdmSkinned = nil
+                    child.__cdmSkinPending = nil
+                    child.__cdmSkinFailed = nil
+                end
+            end)
+            -- Reset icon count to force layout refresh (write to forbidden table may fail)
+            pcall(function() viewer.__cdmIconCount = nil end)
             
             -- Note: We avoid calling viewer.Layout() directly as it can trigger
             -- Blizzard's internal code that accesses "secret" values and errors
@@ -4909,7 +4918,7 @@ function SUICore:HookEditMode()
                 for _, viewerName in ipairs(self.viewers) do
                     local viewer = _G[viewerName]
                     if viewer then
-                        local container = viewer.viewerFrame or viewer
+                        local container = SafeGetViewerContainer(viewer)
                         for _, child in ipairs({ container:GetChildren() }) do
                             if child.__cdmSkinFailed then
                                 needsReskin = true

@@ -305,12 +305,12 @@ local function FormatTimeRemaining(remaining)
     end
 end
 
--- Read cooldownIDs from hidden Blizzard viewer safely (no frame-state dependency)
+-- Read cooldownIDs for tracked bars using global data provider
+-- (viewer:GetCooldownIDs() is a Lua mixin method on a forbidden table — fails in 12.0.5)
 local function GetViewerCooldownIDs()
-    local viewer = SafeGetViewer("BuffBarCooldownViewer")
-    if not viewer then return {} end
-
-    local ok, ids = pcall(function() return viewer:GetCooldownIDs() end)
+    local ok, ids = pcall(function()
+        return CooldownViewerSettings:GetDataProvider():GetOrderedCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBar)
+    end)
     if not ok or not ids then return {} end
 
     -- Validate IDs are safe numbers (not secret values)
@@ -523,12 +523,12 @@ local function ReleaseAllCustomIcons()
     activeCustomIcons = {}
 end
 
--- Read cooldownIDs from BuffIconCooldownViewer safely
+-- Read cooldownIDs for tracked buff icons using global data provider
+-- (viewer:GetCooldownIDs() is a Lua mixin method on a forbidden table — fails in 12.0.5)
 local function GetIconViewerCooldownIDs()
-    local viewer = SafeGetViewer("BuffIconCooldownViewer")
-    if not viewer then return {} end
-
-    local ok, ids = pcall(function() return viewer:GetCooldownIDs() end)
+    local ok, ids = pcall(function()
+        return CooldownViewerSettings:GetDataProvider():GetOrderedCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBuff)
+    end)
     if not ok or not ids then return {} end
 
     local safe = {}
