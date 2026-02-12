@@ -291,43 +291,51 @@ local function ProcessViewer(viewer, viewerSettingName, applyStyle)
     local children = {}
     local ok = pcall(function() children = { viewer:GetChildren() } end)
     if not ok then return end
+    
     for _, child in ipairs(children) do
-        if child.Icon then -- Only process icon-like children
-            if applyStyle then
-                ApplySquareStyle(child, viewerSettingName)
-            else
-                RestoreOriginalStyle(child, viewerSettingName)
-            end
+        -- Guard against tainted children
+        if child and not (issecretvalue and issecretvalue(child)) then
+            -- Check Icon property safely
+            local hasIcon = false
+            if pcall(function() hasIcon = child.Icon ~= nil end) then
+                if hasIcon then
+                    if applyStyle then
+                        ApplySquareStyle(child, viewerSettingName)
+                    else
+                        RestoreOriginalStyle(child, viewerSettingName)
+                    end
 
-            -- Hook pandemic alerts
-            if child.TriggerPandemicAlert and not child._suiStyleHooked then
-                child._suiStyleHooked = true
-                hooksecurefunc(child, "TriggerPandemicAlert", function()
-                    if child.PandemicIcon then
+                    -- Hook pandemic alerts (guard against tainted child)
+                    if not (issecretvalue and issecretvalue(child)) and child.TriggerPandemicAlert and not child._suiStyleHooked then
+                        child._suiStyleHooked = true
+                        hooksecurefunc(child, "TriggerPandemicAlert", function()
+                            if child.PandemicIcon and not (issecretvalue and issecretvalue(child.PandemicIcon)) then
+                                if applyStyle then
+                                    child.PandemicIcon:SetScale(1.38)
+                                else
+                                    child.PandemicIcon:SetScale(1.0)
+                                end
+                            end
+                            C_Timer.After(0, function()
+                                if child.PandemicIcon and not (issecretvalue and issecretvalue(child.PandemicIcon)) then
+                                    if applyStyle then
+                                        child.PandemicIcon:SetScale(1.38)
+                                    else
+                                        child.PandemicIcon:SetScale(1.0)
+                                    end
+                                end
+                            end)
+                        end)
+                    end
+
+                    -- Scale debuff border (guard against tainted child)
+                    if child.DebuffBorder and not (issecretvalue and issecretvalue(child.DebuffBorder)) then
                         if applyStyle then
-                            child.PandemicIcon:SetScale(1.38)
+                            child.DebuffBorder:SetScale(1.7)
                         else
-                            child.PandemicIcon:SetScale(1.0)
+                            child.DebuffBorder:SetScale(1.0)
                         end
                     end
-                    C_Timer.After(0, function()
-                        if child.PandemicIcon then
-                            if applyStyle then
-                                child.PandemicIcon:SetScale(1.38)
-                            else
-                                child.PandemicIcon:SetScale(1.0)
-                            end
-                        end
-                    end)
-                end)
-            end
-
-            -- Scale debuff border
-            if child.DebuffBorder then
-                if applyStyle then
-                    child.DebuffBorder:SetScale(1.7)
-                else
-                    child.DebuffBorder:SetScale(1.0)
                 end
             end
         end
@@ -401,22 +409,29 @@ end
 
 local function ApplyNormalizedSizeToButton(button, viewerSettingName)
     local config = normalizedSizeConfig[viewerSettingName]
-    if not config then
+    if not config or not button or (issecretvalue and issecretvalue(button)) then
         return
     end
 
     button:SetSize(config.width, config.height)
 
-    for i = 1, select("#", button:GetRegions()) do
-        local texture = select(i, button:GetRegions())
-        if texture.GetAtlas and texture:GetAtlas() == "UI-HUD-CoolDownManager-IconOverlay" then
-            texture:ClearAllPoints()
-            texture:SetPoint("CENTER", button, "CENTER", 0, 0)
-            texture:SetSize(config.width * 1.36, config.height * 1.36)
+    local ok = pcall(function()
+        local regions = {button:GetRegions()}
+        for i, texture in ipairs(regions) do
+            if texture and not (issecretvalue and issecretvalue(texture)) then
+                if texture.GetAtlas and pcall(texture.GetAtlas, texture) then
+                    local atlas = texture:GetAtlas()
+                    if atlas == "UI-HUD-CoolDownManager-IconOverlay" then
+                        texture:ClearAllPoints()
+                        texture:SetPoint("CENTER", button, "CENTER", 0, 0)
+                        texture:SetSize(config.width * 1.36, config.height * 1.36)
+                    end
+                end
+            end
         end
-    end
+    end)
 
-    if button.Icon then
+    if not (issecretvalue and issecretvalue(button)) and button.Icon and not (issecretvalue and issecretvalue(button.Icon)) then
         local padding = button.suiSquareStyled and 4 or 0
         button.Icon:SetSize(config.width - padding, config.height - padding)
     end
@@ -424,21 +439,29 @@ end
 
 local function RestoreOriginalSizeToButton(button, viewerSettingName)
     local config = originalSizesConfig[viewerSettingName]
-    if not config then
+    if not config or not button or (issecretvalue and issecretvalue(button)) then
         return
     end
 
     button:SetSize(config.width, config.height)
-    for i = 1, select("#", button:GetRegions()) do
-        local texture = select(i, button:GetRegions())
-        if texture.GetAtlas and texture:GetAtlas() == "UI-HUD-CoolDownManager-IconOverlay" then
-            texture:ClearAllPoints()
-            texture:SetPoint("CENTER", button, "CENTER", 0, 0)
-            texture:SetSize(config.width * 1.36, config.height * 1.36)
+    
+    local ok = pcall(function()
+        local regions = {button:GetRegions()}
+        for i, texture in ipairs(regions) do
+            if texture and not (issecretvalue and issecretvalue(texture)) then
+                if texture.GetAtlas and pcall(texture.GetAtlas, texture) then
+                    local atlas = texture:GetAtlas()
+                    if atlas == "UI-HUD-CoolDownManager-IconOverlay" then
+                        texture:ClearAllPoints()
+                        texture:SetPoint("CENTER", button, "CENTER", 0, 0)
+                        texture:SetSize(config.width * 1.36, config.height * 1.36)
+                    end
+                end
+            end
         end
-    end
+    end)
 
-    if button.Icon then
+    if not (issecretvalue and issecretvalue(button)) and button.Icon and not (issecretvalue and issecretvalue(button.Icon)) then
         local padding = button.suiSquareStyled and 4 or 0
         button.Icon:SetSize(config.width - padding, config.height - padding)
     end
