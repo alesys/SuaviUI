@@ -439,10 +439,12 @@ function AB_EditMode:Initialize()
                     -- Show overlay and ensure frame is visible and interactable
                     local frame = self.registeredFrames[buttonType]
                     if frame then
-                        frame:Show()
-                        frame:SetFrameStrata("MEDIUM")  -- Match resource powerbar strata
-                        if frame._editModeOverlay then
-                            frame._editModeOverlay:Show()
+                        if not InCombatLockdown() and not (frame.IsProtected and frame:IsProtected()) then
+                            frame:SetFrameStrata("MEDIUM")  -- Match resource powerbar strata
+                            frame:Show()
+                            if frame._editModeOverlay then
+                                frame._editModeOverlay:Show()
+                            end
                         end
                     end
                 end
@@ -467,9 +469,11 @@ function AB_EditMode:Initialize()
                     -- Hide overlay and restore normal frame strata
                     local frame = self.registeredFrames[buttonType]
                     if frame then
-                        frame:SetFrameStrata("MEDIUM")  -- Normal strata when not in Edit Mode
-                        if frame._editModeOverlay then
-                            frame._editModeOverlay:Hide()
+                        if not InCombatLockdown() and not (frame.IsProtected and frame:IsProtected()) then
+                            frame:SetFrameStrata("MEDIUM")  -- Normal strata when not in Edit Mode
+                            if frame._editModeOverlay then
+                                frame._editModeOverlay:Hide()
+                            end
                         end
                     end
                 end

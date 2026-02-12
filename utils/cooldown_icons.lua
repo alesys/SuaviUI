@@ -10,7 +10,7 @@ ns.StyledIcons = StyledIcons
 SuaviUI.StyledIcons = StyledIcons
 
 -- TEMP: Force-disable CDM icon styling (square icons + size normalization)
--- Re-enabled to allow square styling from the CDM Options panel.
+-- Re-enabled to restore main CDM styling feature.
 local FORCE_DISABLE_CDM_STYLING = false
 
 local isModuleStyledEnabled = false

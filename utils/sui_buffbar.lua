@@ -203,11 +203,27 @@ end
 -- by the viewer's alpha (which we set to 0 to hide Blizzard's children).
 ---------------------------------------------------------------------------
 
-local USE_CUSTOM_BARS = true   -- Feature flag; set false to revert to legacy
+local USE_CUSTOM_BARS = false  -- Use Blizzard bars + SUI styling (custom bars disabled)
 local customContainer          -- Frame: SuaviBuffBarContainer (created lazily)
 local customBarPool = {}       -- All created bar frames (recycled via ._inUse)
 local activeCustomBars = {}    -- Currently visible custom bar frames
 local customBarNameCounter = 0
+
+local function EnsureCooldownViewerLoaded()
+    if InCombatLockdown() then return end
+    pcall(function()
+        if IsAddOnLoaded and UIParentLoadAddOn then
+            if not IsAddOnLoaded("Blizzard_CooldownViewer") then
+                UIParentLoadAddOn("Blizzard_CooldownViewer")
+            end
+        end
+    end)
+    pcall(function()
+        if SetCVar then
+            SetCVar("cooldownViewerEnabled", 1)
+        end
+    end)
+end
 
 -- Lazily create the container (parented to UIParent, anchored to viewer)
 local function GetOrCreateContainer()
@@ -309,19 +325,20 @@ end
 -- (viewer:GetCooldownIDs() is a Lua mixin method on a forbidden table — fails in 12.0.5)
 local function GetViewerCooldownIDs()
     local ok, ids = pcall(function()
-        return CooldownViewerSettings:GetDataProvider():GetOrderedCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBar)
-    end)
-    if not ok or not ids then return {} end
-
-    -- Validate IDs are safe numbers (not secret values)
-    local safe = {}
-    for _, id in ipairs(ids) do
-        local numOk = pcall(function() return id + 0 end)
-        if numOk then
-            safe[#safe + 1] = id
+        local settings = CooldownViewerSettings
+        if settings and settings.GetDataProvider then
+            local provider = settings:GetDataProvider()
+            if provider and provider.GetOrderedCooldownIDsForCategory then
+                return provider:GetOrderedCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBar, true)
+            end
         end
-    end
-    return safe
+        if C_CooldownViewer and C_CooldownViewer.GetCooldownIDsForCategory then
+            return C_CooldownViewer.GetCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBar)
+        end
+        return nil
+    end)
+    if not ok or type(ids) ~= "table" then return {} end
+    return ids
 end
 
 -- Fetch active aura data using clean C APIs only (no Blizzard frame reads)
@@ -527,18 +544,20 @@ end
 -- (viewer:GetCooldownIDs() is a Lua mixin method on a forbidden table — fails in 12.0.5)
 local function GetIconViewerCooldownIDs()
     local ok, ids = pcall(function()
-        return CooldownViewerSettings:GetDataProvider():GetOrderedCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBuff)
-    end)
-    if not ok or not ids then return {} end
-
-    local safe = {}
-    for _, id in ipairs(ids) do
-        local numOk = pcall(function() return id + 0 end)
-        if numOk then
-            safe[#safe + 1] = id
+        local settings = CooldownViewerSettings
+        if settings and settings.GetDataProvider then
+            local provider = settings:GetDataProvider()
+            if provider and provider.GetOrderedCooldownIDsForCategory then
+                return provider:GetOrderedCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBuff, true)
+            end
         end
-    end
-    return safe
+        if C_CooldownViewer and C_CooldownViewer.GetCooldownIDsForCategory then
+            return C_CooldownViewer.GetCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBuff)
+        end
+        return nil
+    end)
+    if not ok or type(ids) ~= "table" then return {} end
+    return ids
 end
 
 -- Fetch active aura data for icons
@@ -2295,6 +2314,8 @@ local function Initialize()
     if initialized then return end
     initialized = true
 
+    EnsureCooldownViewerLoaded()
+
     ---------------------------------------------------------------------------
     -- CUSTOM BARS INITIALIZATION
     ---------------------------------------------------------------------------
@@ -2530,6 +2551,60 @@ local function Initialize()
                             self.isHorizontal = false
                             self.layoutFramesGoingRight = settings.growUp ~= false
                             self.layoutFramesGoingUp = false
+                        end
+                    end)
+                end)
+            end
+
+            -- FEAT-008: Hook child Hide() to prevent Blizzard from hiding tracked bars
+            -- This prevents the flicker when Blizzard's Layout() hides/shows child frames
+            if BuffBarCooldownViewer then
+                -- Hook each bar frame's Hide method
+                local function HookBarVisibility(barFrame)
+                    if not barFrame or not barFrame.Hide then return end
+                    if barFrame._SUI_VisibilityHooked then return end
+                    barFrame._SUI_VisibilityHooked = true
+                    
+                    hooksecurefunc(barFrame, "Hide", function(self)
+                        -- Don't actually hide tracked bar frames during normal operation
+                        -- (only in custom bar mode or Edit Mode should they be controlled)
+                        if not USE_CUSTOM_BARS and BuffBarCooldownViewer:IsShown() then
+                            local settings = GetTrackedBarSettings()
+                            if settings.enabled then
+                                -- Re-show immediately if hidden by Blizzard
+                                if not EditModeManagerFrame or not EditModeManagerFrame.editModeActive then
+                                    self:Show()
+                                end
+                            end
+                        end
+                    end)
+                end
+                
+                -- Hook Show method to apply styling when bar becomes visible
+                local function HookBarShow(barFrame)
+                    if not barFrame or not barFrame.Show then return end
+                    if barFrame._SUI_ShowHooked then return end
+                    barFrame._SUI_ShowHooked = true
+                    
+                    hooksecurefunc(barFrame, "Show", function(self)
+                        if not USE_CUSTOM_BARS then
+                            local settings = GetTrackedBarSettings()
+                            if settings.enabled then
+                                ApplyBarStyle(self, settings)
+                            end
+                        end
+                    end)
+                end
+                
+                -- Apply hooks to all current and future bar frames
+                C_Timer.NewTicker(0.2, function()
+                    pcall(function()
+                        local bars = GetBuffBarFrames()
+                        for _, bar in ipairs(bars) do
+                            if bar then
+                                HookBarVisibility(bar)
+                                HookBarShow(bar)
+                            end
                         end
                     end)
                 end)

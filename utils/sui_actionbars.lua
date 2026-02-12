@@ -669,19 +669,8 @@ HookExtraButtonPositioning = function()
         end)
     end
 
-    -- Remove from Blizzard's managed frame container to prevent Edit Mode interference
-    -- Only do this if SUI is actually managing these frames (at least one feature enabled)
-    local extraSettings = GetExtraButtonDB("extraActionButton")
-    local zoneSettings = GetExtraButtonDB("zoneAbility")
-    local quiManagingFrames = (extraSettings and extraSettings.enabled) or (zoneSettings and zoneSettings.enabled)
-    -- BUG-008: Use C_Timer.After(0) and combat check to avoid taint propagation to secure frame manager
-    if quiManagingFrames and UIParentBottomManagedFrameContainer and ExtraAbilityContainer then
-        C_Timer.After(0, function()
-            if not InCombatLockdown() and UIParentBottomManagedFrameContainer.showingFrames then
-                UIParentBottomManagedFrameContainer.showingFrames[ExtraAbilityContainer] = nil
-            end
-        end)
-    end
+    -- Avoid modifying Blizzard's managed frame container here.
+    -- Direct table edits can taint Edit Mode layout updates in 12.0.5.
 end
 
 -- Show/hide mover overlays

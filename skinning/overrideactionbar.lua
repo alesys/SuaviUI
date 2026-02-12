@@ -10,6 +10,7 @@ local BUTTON_SPACING = 3  -- Tight but readable spacing
 local LEAVE_BUTTON_SIZE = 28  -- Visible leave button
 local RESOURCE_BAR_WIDTH = 12  -- Slim vertical bar
 local RESOURCE_BAR_HEIGHT = 40  -- Match button height
+local pendingOverrideSkin = false
 
 -- Get skinning colors
 local function GetColors()
@@ -125,6 +126,11 @@ end
 
 -- Main skinning function
 local function SkinOverrideActionBar()
+    if InCombatLockdown() then
+        pendingOverrideSkin = true
+        return
+    end
+
     local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
     local settings = SUICore and SUICore.db and SUICore.db.profile and SUICore.db.profile.general
     if not settings or not settings.skinOverrideActionBar then return end
@@ -358,6 +364,7 @@ end
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 frame:SetScript("OnEvent", function(self, event, addon)
     if event == "ADDON_LOADED" and addon == "Blizzard_OverrideActionBar" then
         SetupOverrideBarHooks()
@@ -367,6 +374,11 @@ frame:SetScript("OnEvent", function(self, event, addon)
             SetupOverrideBarHooks()
         end
         self:UnregisterEvent("PLAYER_ENTERING_WORLD")
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        if pendingOverrideSkin then
+            pendingOverrideSkin = false
+            SkinOverrideActionBar()
+        end
     end
 end)
 
