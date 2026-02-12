@@ -7,12 +7,12 @@
     <Script file="cooldown_coordinator.lua"/>
     <Script file="cooldownmanager.lua"/>
     <Script file="cooldown_editmode.lua"/>
-    <!-- DISABLED: Testing taint source - <Script file="cooldown_icons.lua"/> -->
+    <Script file="cooldown_icons.lua"/>
     <Script file="cooldown_fonts.lua"/>
     <Script file="cooldown_advanced.lua"/>
     <Script file="customglows.lua"/>
     <Script file="cooldowneffects.lua"/>
-    <!-- DISABLED: Testing taint source - <Script file="cooldownswipe.lua"/> -->
+    <Script file="cooldownswipe.lua"/>
     <Script file="uihider.lua"/>
     <Script file="buffborders.lua"/>
     <Script file="suicore_main.lua"/>

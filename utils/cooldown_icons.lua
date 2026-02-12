@@ -96,6 +96,11 @@ local function ApplySquareStyle(button, viewerSettingName)
         return
     end
 
+    -- Guard against secret-value taint when accessing button internals
+    if issecretvalue and (issecretvalue(button) or issecretvalue(button.Icon) or issecretvalue(button.icon)) then
+        return
+    end
+
     local width = GetViewerIconSize(viewerSettingName)
     local borderKey = "cooldownManager_squareIconsBorder_" .. viewerSettingName
     local borderThickness = profile[borderKey] or 1
@@ -103,7 +108,7 @@ local function ApplySquareStyle(button, viewerSettingName)
     button:SetSize(width, width)
 
     local iconTexture = button.Icon or button.icon or button.texture or button.Texture
-    if iconTexture then
+    if iconTexture and not (issecretvalue and issecretvalue(iconTexture)) then
         iconTexture:ClearAllPoints()
         iconTexture:SetPoint("TOPLEFT", button, "TOPLEFT", -config.paddingFixup / 2, config.paddingFixup / 2)
         iconTexture:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", config.paddingFixup / 2, -config.paddingFixup / 2)
@@ -117,10 +122,11 @@ local function ApplySquareStyle(button, viewerSettingName)
         end
     end
 
-    -- Update swipe texture for cooldown children
-    for i = 1, select("#", button:GetChildren()) do
-        local texture = select(i, button:GetChildren())
-        if texture and texture.SetSwipeTexture then
+    -- Update swipe texture for cooldown children (guard iterator)
+    local children = {button:GetChildren()}
+    for i = 1, #children do
+        local texture = children[i]
+        if texture and not (issecretvalue and issecretvalue(texture)) and texture.SetSwipeTexture then
             texture:SetSwipeTexture(BASE_SQUARE_MASK)
             texture:ClearAllPoints()
             texture:SetPoint(
@@ -140,13 +146,15 @@ local function ApplySquareStyle(button, viewerSettingName)
         end
     end
 
-    -- Update textures
-    for _, region in next, { button:GetRegions() } do
-        if region:IsObjectType("Texture") then
+    -- Update textures (guard against secret values)
+    local regions = {button:GetRegions()}
+    for _, region in ipairs(regions) do
+        if region and not (issecretvalue and issecretvalue(region)) and region:IsObjectType("Texture") then
             local texture = region:GetTexture()
             local atlas = region:GetAtlas()
 
-            if (issecretvalue and not issecretvalue(texture) or not issecretvalue) and texture == 6707800 then
+            -- Safe texture comparison with issecretvalue guards
+            if texture and not (issecretvalue and issecretvalue(texture)) and texture == 6707800 then
                 region:SetTexture(BASE_SQUARE_MASK)
                 region.__sui_set6707800 = true
             elseif atlas == "UI-HUD-CoolDownManager-IconOverlay" then
