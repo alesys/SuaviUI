@@ -414,7 +414,12 @@ local function BuildCastbarSettings(unitKey)
         set = function(layoutName, r, g, b, a)
             local s = GetCastSettings(unitKey)
             if s then
-                s.color = {r, g, b, a or 1}
+                -- Handle both number args and color table object
+                if type(r) == "table" then
+                    s.color = {r.r or 1, r.g or 0.7, r.b or 0, r.a or 1}
+                else
+                    s.color = {r or 1, g or 0.7, b or 0, a or 1}
+                end
                 RefreshCastbar(unitKey)
             end
         end,
@@ -438,7 +443,12 @@ local function BuildCastbarSettings(unitKey)
         set = function(layoutName, r, g, b, a)
             local s = GetCastSettings(unitKey)
             if s then
-                s.bgColor = {r, g, b, a or 1}
+                -- Handle both number args and color table object
+                if type(r) == "table" then
+                    s.bgColor = {r.r or 0.149, r.g or 0.149, r.b or 0.149, r.a or 1}
+                else
+                    s.bgColor = {r or 0.149, g or 0.149, b or 0.149, a or 1}
+                end
                 RefreshCastbar(unitKey)
             end
         end,

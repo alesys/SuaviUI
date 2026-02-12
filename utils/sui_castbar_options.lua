@@ -42,6 +42,12 @@ local mainOptions = ns.SUI_Options or {}
 --   GetDB: Function to get main database
 ---------------------------------------------------------------------------
 local function BuildCastbarOptions(tabContent, unitKey, y, PAD, FORM_ROW, RefreshUnit, GetTextureList, NINE_POINT_ANCHOR_OPTIONS, GetUFDB, GetDB)
+    -- Castbar configuration moved entirely to Edit Mode
+    -- Use Ctrl+Shift+Home to access Edit Mode and configure castbars there
+    return y
+end
+
+local function BuildCastbarOptions_LEGACY(tabContent, unitKey, y, PAD, FORM_ROW, RefreshUnit, GetTextureList, NINE_POINT_ANCHOR_OPTIONS, GetUFDB, GetDB)
     local ufdb = GetUFDB()
     if not ufdb or not ufdb[unitKey] then
         return y
