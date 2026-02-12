@@ -185,6 +185,36 @@ local function InitializeDefaultSettings(castSettings)
     if castSettings.iconSpacing == nil then castSettings.iconSpacing = 0 end
     if castSettings.showIcon == nil then castSettings.showIcon = true end
     
+    -- Normalize color format (fix corrupted nested/object colors from database)
+    local function NormalizeColor(color)
+        if not color then return nil end
+        if type(color.r) == "number" and type(color.g) == "number" and type(color.b) == "number" then
+            return {color.r, color.g, color.b, color.a or 1}
+        end
+        if type(color[1]) == "number" and type(color[2]) == "number" and type(color[3]) == "number" then
+            return {color[1], color[2], color[3], color[4] or 1}
+        end
+        return nil
+    end
+    
+    -- Normalize main colors
+    if castSettings.color then
+        local normalized = NormalizeColor(castSettings.color)
+        if normalized then castSettings.color = normalized end
+    end
+    if castSettings.bgColor then
+        local normalized = NormalizeColor(castSettings.bgColor)
+        if normalized then castSettings.bgColor = normalized end
+    end
+    if castSettings.borderColor then
+        local normalized = NormalizeColor(castSettings.borderColor)
+        if normalized then castSettings.borderColor = normalized end
+    end
+    if castSettings.iconBorderColor then
+        local normalized = NormalizeColor(castSettings.iconBorderColor)
+        if normalized then castSettings.iconBorderColor = normalized end
+    end
+    
     if not castSettings.borderColor then
         castSettings.borderColor = {0, 0, 0, 1}
     elseif not castSettings.borderColor[4] then
@@ -254,10 +284,24 @@ local DEFAULT_BG_COLOR = {0.149, 0.149, 0.149, 1}
 local NOT_INTERRUPTIBLE_COLOR = {0.7, 0.2, 0.2, 1}
 
 -- Safe color getter - returns valid color table or fallback
+-- Handles both array format {r, g, b, a} and object format {r=r, g=g, b=b, a=a}
 local function GetSafeColor(color, fallback)
-    if color and color[1] and color[2] and color[3] then
+    if not color then
+        fallback = fallback or DEFAULT_BAR_COLOR
+        return fallback[1], fallback[2], fallback[3], fallback[4] or 1
+    end
+    
+    -- Handle object format {r=0.4, g=0.05, b=0.08, a=1}
+    if type(color.r) == "number" and type(color.g) == "number" and type(color.b) == "number" then
+        return color.r, color.g, color.b, color.a or 1
+    end
+    
+    -- Handle array format {0.4, 0.05, 0.08, 1} and corrupted nested format
+    if type(color[1]) == "number" and type(color[2]) == "number" and type(color[3]) == "number" then
         return color[1], color[2], color[3], color[4] or 1
     end
+    
+    -- Fallback if color is invalid
     fallback = fallback or DEFAULT_BAR_COLOR
     return fallback[1], fallback[2], fallback[3], fallback[4] or 1
 end
