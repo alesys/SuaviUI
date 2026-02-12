@@ -2555,60 +2555,6 @@ local function Initialize()
                     end)
                 end)
             end
-
-            -- FEAT-008: Hook child Hide() to prevent Blizzard from hiding tracked bars
-            -- This prevents the flicker when Blizzard's Layout() hides/shows child frames
-            if BuffBarCooldownViewer then
-                -- Hook each bar frame's Hide method
-                local function HookBarVisibility(barFrame)
-                    if not barFrame or not barFrame.Hide then return end
-                    if barFrame._SUI_VisibilityHooked then return end
-                    barFrame._SUI_VisibilityHooked = true
-                    
-                    hooksecurefunc(barFrame, "Hide", function(self)
-                        -- Don't actually hide tracked bar frames during normal operation
-                        -- (only in custom bar mode or Edit Mode should they be controlled)
-                        if not USE_CUSTOM_BARS and BuffBarCooldownViewer:IsShown() then
-                            local settings = GetTrackedBarSettings()
-                            if settings.enabled then
-                                -- Re-show immediately if hidden by Blizzard
-                                if not EditModeManagerFrame or not EditModeManagerFrame.editModeActive then
-                                    self:Show()
-                                end
-                            end
-                        end
-                    end)
-                end
-                
-                -- Hook Show method to apply styling when bar becomes visible
-                local function HookBarShow(barFrame)
-                    if not barFrame or not barFrame.Show then return end
-                    if barFrame._SUI_ShowHooked then return end
-                    barFrame._SUI_ShowHooked = true
-                    
-                    hooksecurefunc(barFrame, "Show", function(self)
-                        if not USE_CUSTOM_BARS then
-                            local settings = GetTrackedBarSettings()
-                            if settings.enabled then
-                                ApplyBarStyle(self, settings)
-                            end
-                        end
-                    end)
-                end
-                
-                -- Apply hooks to all current and future bar frames
-                C_Timer.NewTicker(0.2, function()
-                    pcall(function()
-                        local bars = GetBuffBarFrames()
-                        for _, bar in ipairs(bars) do
-                            if bar then
-                                HookBarVisibility(bar)
-                                HookBarShow(bar)
-                            end
-                        end
-                    end)
-                end)
-            end
         end)
     end
 

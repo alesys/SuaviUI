@@ -360,8 +360,8 @@ function ViewerAdapters.GetBuffIconFrames()
             if not child._wt_isHooked then
                 child._wt_isHooked = true
                 pcall(hooksecurefunc, child, "OnActiveStateChanged", StateTracker.MarkBuffIconsDirty)
-                pcall(hooksecurefunc, child, "OnUnitAuraAddedEvent", StateTracker.MarkBuffIconsDirty)
-                pcall(hooksecurefunc, child, "OnUnitAuraRemovedEvent", StateTracker.MarkBuffIconsDirty)
+                -- TAINT-FIX: Remove OnUnitAura hooks - they taint spellID values used in Blizzard comparisons
+                -- Fallback to OnUpdate polling (0.05s) is already in place and sufficient
             end
         end
     end
@@ -408,8 +408,8 @@ function ViewerAdapters.GetBuffBarFrames()
         if not frame._wt_isHooked and (frame.icon or frame.Icon or frame.bar or frame.Bar) then
             frame._wt_isHooked = true
             pcall(hooksecurefunc, frame, "OnActiveStateChanged", StateTracker.MarkBuffBarsDirty)
-            pcall(hooksecurefunc, frame, "OnUnitAuraAddedEvent", StateTracker.MarkBuffBarsDirty)
-            pcall(hooksecurefunc, frame, "OnUnitAuraRemovedEvent", StateTracker.MarkBuffBarsDirty)
+            -- TAINT-FIX: Remove OnUnitAura hooks - they taint spellID/charges values used in Blizzard comparisons
+            -- Fallback to OnUpdate polling (0.05s) is already in place and sufficient
         end
     end
     table.sort(active, function(a, b)
