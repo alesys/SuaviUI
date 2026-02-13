@@ -7,14 +7,14 @@
     <Script file="cooldown_coordinator.lua"/>
     <Script file="cooldownmanager.lua"/>
     <Script file="cooldown_editmode.lua"/>
-    <!-- DIAGNOSTIC: Disable cooldown_icons.lua to verify it's the taint source -->
-    <!-- <Script file="cooldown_icons.lua"/> -->
+    <!-- cooldown_icons.lua: FIXED with issecretvalue guards -->
+    <Script file="cooldown_icons.lua"/>
     <Script file="cooldown_fonts.lua"/>
     <Script file="cooldown_advanced.lua"/>
     <Script file="customglows.lua"/>
     <Script file="cooldowneffects.lua"/>
-    <!-- DIAGNOSTIC: Disable cooldownswipe.lua to isolate remaining taint -->
-    <!-- <Script file="cooldownswipe.lua"/> -->
+    <!-- cooldownswipe.lua: Helpful (reduces taint) -->
+    <Script file="cooldownswipe.lua"/>
     <Script file="uihider.lua"/>
     <Script file="buffborders.lua"/>
     <Script file="suicore_main.lua"/>
