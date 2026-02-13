@@ -12,9 +12,9 @@
     <Script file="cooldown_fonts.lua"/>
     <Script file="cooldown_advanced.lua"/>
     <Script file="customglows.lua"/>
-    <!-- DIAGNOSTIC: Disable cooldowneffects.lua to isolate remaining taint -->
-    <!-- <Script file="cooldowneffects.lua"/> -->
-    <Script file="cooldownswipe.lua"/>
+    <Script file="cooldowneffects.lua"/>
+    <!-- DIAGNOSTIC: Disable cooldownswipe.lua to isolate remaining taint -->
+    <!-- <Script file="cooldownswipe.lua"/> -->
     <Script file="uihider.lua"/>
     <Script file="buffborders.lua"/>
     <Script file="suicore_main.lua"/>
