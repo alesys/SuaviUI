@@ -853,6 +853,8 @@ EventHandler.EventRefreshMap = {
     CINEMATIC_STOP = { essential = true, utility = true },
 }
 
+EventHandler._lastSpellCooldownRefreshAt = 0
+
 EventHandler.frame:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" and arg1 == "Blizzard_CooldownManager" then
         RefreshViewerRefs()
@@ -875,8 +877,17 @@ EventHandler.frame:SetScript("OnEvent", function(_, event, arg1)
         end)
         return
     end
-    -- SPELL_UPDATE_COOLDOWN: defer refresh to avoid tainting Blizzard's event chain
-    if event == "SPELL_UPDATE_COOLDOWN" and GetSetting("cooldownManager_utility_dimWhenNotOnCD", false) then
+    -- SPELL_UPDATE_COOLDOWN fires very frequently; never fall through to full refresh.
+    -- Only refresh utility when dimWhenNotOnCD is enabled, and throttle updates.
+    if event == "SPELL_UPDATE_COOLDOWN" then
+        if not GetSetting("cooldownManager_utility_dimWhenNotOnCD", false) then
+            return
+        end
+        local now = GetTime() or 0
+        if (now - (EventHandler._lastSpellCooldownRefreshAt or 0)) < 0.05 then
+            return
+        end
+        EventHandler._lastSpellCooldownRefreshAt = now
         C_Timer.After(0, function()
             if not RequestCoordinatedRefresh({ utility = true }, "cmc", { delay = 0 }) then
                 CooldownManager.ForceRefresh({ utility = true })
