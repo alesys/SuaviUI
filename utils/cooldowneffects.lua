@@ -180,18 +180,23 @@ local function HookAllGlows()
     -- Our custom glow (via LibCustomGlow) is completely separate and won't be affected
     if type(ActionButton_ShowOverlayGlow) == "function" then
         hooksecurefunc("ActionButton_ShowOverlayGlow", function(button)
-            -- Low-frequency hook: defer to avoid tainting Blizzard's glow chain
-            C_Timer.After(0, function()
-                if not button or not button:GetParent() then return end
-                local parent = button:GetParent()
-                local parentName = parent:GetName()
-                if parentName and (
-                    parentName:find("EssentialCooldown") or 
-                    parentName:find("UtilityCooldown")
-                ) then
-                    pcall(HideBlizzardGlows, button)
-                end
-            end)
+            if not button or not button.GetParent then return end
+            local parent = button:GetParent()
+            if not parent or not parent.GetName then return end
+            local parentName = parent:GetName()
+            if not parentName then return end
+            if not (parentName:find("EssentialCooldown") or parentName:find("UtilityCooldown")) then
+                return
+            end
+
+            -- PERF: avoid timer flood and duplicate work within the same frame.
+            local now = GetTime()
+            if button._SuaviUI_LastGlowSuppressTime == now then
+                return
+            end
+            button._SuaviUI_LastGlowSuppressTime = now
+
+            pcall(HideBlizzardGlows, button)
         end)
     end
     
