@@ -4087,7 +4087,10 @@ local function StripBlizzardOverlay(icon)
         if region:IsObjectType("Texture") and region.GetAtlas and region:GetAtlas() == "UI-HUD-CoolDownManager-IconOverlay" then
             region:SetTexture("")
             region:Hide()
-            region.Show = function() end
+            -- TAINT-FIX: hooksecurefunc preserves the original C Show as secure.
+            hooksecurefunc(region, "Show", function(self)
+                self:Hide()
+            end)
         end
     end
 end

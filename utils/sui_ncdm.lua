@@ -176,7 +176,12 @@ local function StripBlizzardOverlay(icon)
             if ok and atlas == "UI-HUD-CoolDownManager-IconOverlay" then
                 region:SetTexture("")
                 region:Hide()
-                region.Show = function() end
+                -- TAINT-FIX: Use hooksecurefunc instead of method replacement.
+                -- Replacing Show with addon function makes all Show() calls execute
+                -- in insecure context, tainting Blizzard's execution chain.
+                hooksecurefunc(region, "Show", function(self)
+                    self:Hide()
+                end)
             end
         end
     end
