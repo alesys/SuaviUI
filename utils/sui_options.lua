@@ -2518,14 +2518,14 @@ local function CreateGeneralQoLPage(parent)
     end
 
     -- =====================================================
-    -- SUB-TAB: Dragonriding
+    -- SUB-TAB: Skyriding
     -- =====================================================
-    local function BuildDragonridingTab(tabContent)
+    local function BuildSkyridingTab(tabContent)
         local y = -10
         local FORM_ROW = 30
 
         -- Set search context for auto-registration
-        GUI:SetSearchContext({tabIndex = 1, tabName = "General & QoL", subTabIndex = 8, subTabName = "Dragonriding"})
+        GUI:SetSearchContext({tabIndex = 1, tabName = "General & QoL", subTabIndex = 8, subTabName = "Skyriding"})
 
         -- Refresh callback
         local function RefreshSkyriding()
@@ -2571,103 +2571,11 @@ local function CreateGeneralQoLPage(parent)
         enableCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        local desc = GUI:CreateLabel(tabContent, "Displays vigor charges, recharge progress, and speed while skyriding.", 10, C.textMuted)
+        local desc = GUI:CreateLabel(tabContent, "Displays vigor charges, recharge progress, and speed while skyriding. Use Edit Mode to adjust size, position, and text display.", 10, C.textMuted)
         desc:SetPoint("TOPLEFT", PADDING, y)
         desc:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         desc:SetJustifyH("LEFT")
-        y = y - 24
-
-        -- ═══════════════════════════════════════════════════════════════
-        -- SECTION: Visibility
-        -- ═══════════════════════════════════════════════════════════════
-        GUI:SetSearchSection("Visibility")
-        local visHeader = GUI:CreateSectionHeader(tabContent, "Visibility")
-        visHeader:SetPoint("TOPLEFT", PADDING, y)
-        y = y - visHeader.gap
-
-        local visOptions = {
-            {value = "ALWAYS", text = "Always Visible"},
-            {value = "FLYING_ONLY", text = "Only When Flying"},
-            {value = "AUTO", text = "Auto (fade when grounded)"},
-        }
-        local visDropdown = GUI:CreateFormDropdown(tabContent, "Visibility Mode", visOptions, "visibility", sr, RefreshSkyriding)
-        visDropdown:SetPoint("TOPLEFT", PADDING, y)
-        visDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        y = y - FORM_ROW
-
-        local fadeDelaySlider = GUI:CreateFormSlider(tabContent, "Fade Delay (sec)", 0, 10, 0.5, "fadeDelay", sr, RefreshSkyriding)
-        fadeDelaySlider:SetPoint("TOPLEFT", PADDING, y)
-        fadeDelaySlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        y = y - FORM_ROW
-
-        local fadeDurationSlider = GUI:CreateFormSlider(tabContent, "Fade Speed (sec)", 0.1, 1.0, 0.1, "fadeDuration", sr, RefreshSkyriding)
-        fadeDurationSlider:SetPoint("TOPLEFT", PADDING, y)
-        fadeDurationSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        y = y - FORM_ROW
-
-        local visInfo = GUI:CreateLabel(tabContent, "Auto mode shows the bar while in a skyriding zone and fades after landing.", 10, C.textMuted)
-        visInfo:SetPoint("TOPLEFT", PADDING, y)
-        visInfo:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        visInfo:SetJustifyH("LEFT")
-        visInfo:SetWordWrap(true)
         y = y - 30
-
-        -- ═══════════════════════════════════════════════════════════════
-        -- SECTION: Bar Size
-        -- ═══════════════════════════════════════════════════════════════
-        GUI:SetSearchSection("Bar Size")
-        local sizeHeader = GUI:CreateSectionHeader(tabContent, "Bar Size")
-        sizeHeader:SetPoint("TOPLEFT", PADDING, y)
-        y = y - sizeHeader.gap
-
-        local widthSlider = GUI:CreateFormSlider(tabContent, "Width", 100, 500, 1, "width", sr, RefreshSkyriding)
-        widthSlider:SetPoint("TOPLEFT", PADDING, y)
-        widthSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        y = y - FORM_ROW
-
-        local vigorHeightSlider = GUI:CreateFormSlider(tabContent, "Vigor Height", 4, 30, 1, "vigorHeight", sr, RefreshSkyriding)
-        vigorHeightSlider:SetPoint("TOPLEFT", PADDING, y)
-        vigorHeightSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        y = y - FORM_ROW
-
-        local swHeightSlider = GUI:CreateFormSlider(tabContent, "Second Wind Height", 2, 20, 1, "secondWindHeight", sr, RefreshSkyriding)
-        swHeightSlider:SetPoint("TOPLEFT", PADDING, y)
-        swHeightSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        y = y - FORM_ROW
-
-        local textureDropdown = GUI:CreateFormDropdown(tabContent, "Bar Texture", GetTextureList(), "barTexture", sr, RefreshSkyriding)
-        textureDropdown:SetPoint("TOPLEFT", PADDING, y)
-        textureDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        y = y - FORM_ROW
-
-        -- ═══════════════════════════════════════════════════════════════
-        -- SECTION: Position
-        -- ═══════════════════════════════════════════════════════════════
-        GUI:SetSearchSection("Position")
-        local posHeader = GUI:CreateSectionHeader(tabContent, "Position")
-        posHeader:SetPoint("TOPLEFT", PADDING, y)
-        y = y - posHeader.gap
-
-        local lockCheck = GUI:CreateFormCheckbox(tabContent, "Lock Position", "locked", sr, RefreshSkyriding)
-        lockCheck:SetPoint("TOPLEFT", PADDING, y)
-        lockCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        y = y - FORM_ROW
-
-        local lockInfo = GUI:CreateLabel(tabContent, "Uncheck to drag the bar to a new position.", 10, C.textMuted)
-        lockInfo:SetPoint("TOPLEFT", PADDING, y)
-        lockInfo:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        lockInfo:SetJustifyH("LEFT")
-        y = y - 20
-
-        local xSlider = GUI:CreateFormSlider(tabContent, "X Offset", -1000, 1000, 1, "offsetX", sr, RefreshSkyriding)
-        xSlider:SetPoint("TOPLEFT", PADDING, y)
-        xSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        y = y - FORM_ROW
-
-        local ySlider = GUI:CreateFormSlider(tabContent, "Y Offset", -1000, 1000, 1, "offsetY", sr, RefreshSkyriding)
-        ySlider:SetPoint("TOPLEFT", PADDING, y)
-        ySlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        y = y - FORM_ROW
 
         -- ═══════════════════════════════════════════════════════════════
         -- SECTION: Fill Colors
@@ -2751,46 +2659,17 @@ local function CreateGeneralQoLPage(parent)
         textHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - textHeader.gap
 
-        local showVigorCheck = GUI:CreateFormCheckbox(tabContent, "Show Vigor Count", "showVigorText", sr, RefreshSkyriding)
-        showVigorCheck:SetPoint("TOPLEFT", PADDING, y)
-        showVigorCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        y = y - FORM_ROW
-
-        local vigorFormatOptions = {
-            {value = "FRACTION", text = "Fraction (4/6)"},
-            {value = "CURRENT", text = "Current Only (4)"},
-        }
-        local vigorFormatDropdown = GUI:CreateFormDropdown(tabContent, "Vigor Format", vigorFormatOptions, "vigorTextFormat", sr, RefreshSkyriding)
-        vigorFormatDropdown:SetPoint("TOPLEFT", PADDING, y)
-        vigorFormatDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        y = y - FORM_ROW
-
-        local showSpeedCheck = GUI:CreateFormCheckbox(tabContent, "Show Speed", "showSpeed", sr, RefreshSkyriding)
-        showSpeedCheck:SetPoint("TOPLEFT", PADDING, y)
-        showSpeedCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        y = y - FORM_ROW
-
-        local speedFormatOptions = {
-            {value = "PERCENT", text = "Percentage (312%)"},
-            {value = "RAW", text = "Raw Speed (9.5)"},
-        }
-        local speedFormatDropdown = GUI:CreateFormDropdown(tabContent, "Speed Format", speedFormatOptions, "speedFormat", sr, RefreshSkyriding)
-        speedFormatDropdown:SetPoint("TOPLEFT", PADDING, y)
-        speedFormatDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        y = y - FORM_ROW
-
         local showAbilityIconCheck = GUI:CreateFormCheckbox(tabContent, "Show Whirling Surge Icon", "showAbilityIcon", sr, RefreshSkyriding)
         showAbilityIconCheck:SetPoint("TOPLEFT", PADDING, y)
         showAbilityIconCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        local fontSizeSlider = GUI:CreateFormSlider(tabContent, "Text Font Size", 8, 24, 1, "vigorFontSize", sr, function()
-            sr.speedFontSize = sr.vigorFontSize  -- Keep both in sync
-            RefreshSkyriding()
-        end)
-        fontSizeSlider:SetPoint("TOPLEFT", PADDING, y)
-        fontSizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        y = y - FORM_ROW
+        local textNote = GUI:CreateLabel(tabContent, "All other settings (height, width, fonts, visibility, text display, etc.) are configured in Edit Mode.", 10, C.textMuted)
+        textNote:SetPoint("TOPLEFT", PADDING, y)
+        textNote:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        textNote:SetJustifyH("LEFT")
+        textNote:SetWordWrap(true)
+        y = y - 30
 
         tabContent:SetHeight(math.abs(y) + 50)
     end
@@ -2806,7 +2685,7 @@ local function CreateGeneralQoLPage(parent)
         {name = "Chat", builder = BuildChatTab},
         {name = "Tooltip", builder = BuildTooltipTab},
         {name = "Character Pane", builder = BuildCharacterPaneTab},
-        {name = "Dragonriding", builder = BuildDragonridingTab},
+        {name = "Skyriding", builder = BuildSkyridingTab},
     }, { rows = 2, perRow = 4 })
     subTabs:SetPoint("TOPLEFT", 5, -5)
     subTabs:SetPoint("TOPRIGHT", -5, -5)
@@ -3692,7 +3571,7 @@ local function CreateAutohidesPage(parent)
             overrideBarHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - overrideBarHeader.gap
 
-            local overrideBarDesc = GUI:CreateLabel(tabContent, "Skin the vehicle/override action bar (dragonriding, possession, etc.).", 11, C.textMuted)
+            local overrideBarDesc = GUI:CreateLabel(tabContent, "Skin the vehicle/override action bar (skyriding, possession, etc.).", 11, C.textMuted)
             overrideBarDesc:SetPoint("TOPLEFT", PAD, y)
             overrideBarDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             overrideBarDesc:SetJustifyH("LEFT")

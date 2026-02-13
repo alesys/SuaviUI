@@ -845,7 +845,11 @@ EventHandler.frame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 EventHandler.frame:RegisterEvent("TRAIT_CONFIG_UPDATED")
 EventHandler.frame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
 EventHandler.frame:RegisterEvent("PLAYER_REGEN_DISABLED")
-EventHandler.frame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+-- TAINT-FIX: Disable SPELL_UPDATE_COOLDOWN registration to prevent hasTotem taint
+-- This event fires when Blizzard's CooldownViewer processes totem data; our handler
+-- triggers layout refreshes that access viewer properties, tainting hasTotem values.
+-- Refreshes are already handled by other events (combat, spec changes, etc.)
+-- EventHandler.frame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 EventHandler.frame:RegisterEvent("CINEMATIC_STOP")
 EventHandler.frame:RegisterEvent("ADDON_LOADED")
 
@@ -877,14 +881,7 @@ EventHandler.frame:SetScript("OnEvent", function(_, event, arg1)
         end)
         return
     end
-    if event == "SPELL_UPDATE_COOLDOWN" and GetSetting("cooldownManager_utility_dimWhenNotOnCD", false) then
-        C_Timer.After(0, function()
-            if not RequestCoordinatedRefresh({ utility = true }, "cmc", { delay = 0 }) then
-                CooldownManager.ForceRefresh({ utility = true })
-            end
-        end)
-        return
-    end
+    -- SPELL_UPDATE_COOLDOWN handler removed (event no longer registered to prevent hasTotem taint)
     if parts then
         if not RequestCoordinatedRefresh(parts, "cmc", { delay = 0 }) then
             CooldownManager.ForceRefresh(parts)

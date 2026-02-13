@@ -1,1 +1,36 @@
-﻿8x attempted to index a forbidden table
+﻿183x ...s/Blizzard_CooldownViewer/CooldownViewerItemData.lua:419: attempt to perform boolean test on local 'hasTotem' (a secret boolean value tainted by 'SuaviUI')
+[Blizzard_CooldownViewer/CooldownViewerItemData.lua]:419: in function <...s/Blizzard_CooldownViewer/CooldownViewerItemData.lua:411>
+[tail call]: ?
+[Blizzard_CooldownViewer/CooldownViewer.lua]:221: in function 'RefreshTotemData'
+[Blizzard_CooldownViewer/CooldownViewer.lua]:793: in function 'CheckCacheCooldownValuesFromAura'
+[Blizzard_CooldownViewer/CooldownViewer.lua]:940: in function 'CacheCooldownValues'
+[Blizzard_CooldownViewer/CooldownViewer.lua]:1004: in function 'RefreshSpellCooldownInfo'
+[Blizzard_CooldownViewer/CooldownViewer.lua]:1108: in function 'RefreshData'
+[Blizzard_CooldownViewer/CooldownViewer.lua]:176: in function 'OnSpellUpdateCooldownEvent'
+[Blizzard_CooldownViewer/CooldownViewer.lua]:1550: in function 'OnEvent'
+[Blizzard_CooldownViewer/CooldownViewer.lua]:1909: in function 'OnEvent'
+[Blizzard_CooldownViewer/CooldownViewer.lua]:1958: in function <...ceBlizzard_CooldownViewer/CooldownViewer.lua:1957>
+
+Locals:
+now = 147730.432000
+workingCacheBySpellID = <table> {
+}
+(for index) = 1
+(for limit) = 5
+(for step) = 1
+slot = 1
+hasTotem = <no value>
+name = <no value>
+startTime = <no value>
+duration = <no value>
+_icon = nil
+modRate = <no value>
+spellID = <no value>
+(*temporary) = <no value>
+(*temporary) = <no value>
+(*temporary) = nil
+(*temporary) = nil
+(*temporary) = "attempt to perform boolean test on local 'hasTotem' (a secret boolean value tainted by 'SuaviUI')"
+playerTotemCache = <table> {
+}
+playerTotemCacheTime = 147728.425000
