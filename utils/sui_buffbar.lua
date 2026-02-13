@@ -792,10 +792,13 @@ local function StripBlizzardOverlay(icon)
                     region:Hide()
                     -- TAINT-FIX: hooksecurefunc preserves the original C Show as secure.
                     -- Don't call Hide() — causes Show→Hide→Show infinite loop.
-                    hooksecurefunc(region, "Show", function(self)
-                        self:SetTexture("")
-                        self:SetAlpha(0)
-                    end)
+                    if not region.__SUI_OverlayShowHooked then
+                        region.__SUI_OverlayShowHooked = true
+                        hooksecurefunc(region, "Show", function(self)
+                            self:SetTexture("")
+                            self:SetAlpha(0)
+                        end)
+                    end
                 end
             end
         end

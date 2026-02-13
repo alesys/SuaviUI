@@ -179,10 +179,13 @@ local function StripBlizzardOverlay(icon)
                 -- TAINT-FIX: Use hooksecurefunc instead of method replacement.
                 -- Don't call Hide() in the hook — it can cause Show→Hide→Show infinite loops.
                 -- Just clear the texture and alpha so it's invisible without toggling visibility.
-                hooksecurefunc(region, "Show", function(self)
-                    self:SetTexture("")
-                    self:SetAlpha(0)
-                end)
+                if not region.__SUI_OverlayShowHooked then
+                    region.__SUI_OverlayShowHooked = true
+                    hooksecurefunc(region, "Show", function(self)
+                        self:SetTexture("")
+                        self:SetAlpha(0)
+                    end)
+                end
             end
         end
     end
