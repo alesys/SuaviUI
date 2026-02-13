@@ -9,7 +9,8 @@
     <Script file="cooldown_editmode.lua"/>
     <!-- DIAGNOSTIC: Disable cooldown_icons.lua to verify it's the taint source -->
     <!-- <Script file="cooldown_icons.lua"/> -->
-    <Script file="cooldown_fonts.lua"/>
+    <!-- DIAGNOSTIC: Disable cooldown_fonts.lua to find remaining taint source -->
+    <!-- <Script file="cooldown_fonts.lua"/> -->
     <Script file="cooldown_advanced.lua"/>
     <Script file="customglows.lua"/>
     <Script file="cooldowneffects.lua"/>
