@@ -4,8 +4,7 @@
     <Script file="constants.lua"/>
     <Script file="sui_debug.lua"/>
     <Script file="backwards.lua"/>
-    <!-- TEST: Disable coordinator to see if it's the hasTotem taint source -->
-    <!-- <Script file="cooldown_coordinator.lua"/> -->
+    <Script file="cooldown_coordinator.lua"/>
     <Script file="cooldownmanager.lua"/>
     <Script file="cooldown_editmode.lua"/>
     <Script file="cooldown_icons.lua"/>
