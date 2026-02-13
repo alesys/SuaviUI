@@ -39,28 +39,21 @@ local function HideCooldownEffects(child)
                 -- Hook Show to prevent it from showing
                 if frame.Show then
                     hooksecurefunc(frame, "Show", function(self)
-                        -- TAINT-FIX: Defer Hide to avoid tainting Blizzard's execution context.
-                        -- The effect may flash for one frame (~16ms) but prevents hasTotem taint.
-                        C_Timer.After(0, function()
-                            if self and self.Hide then
-                                self:Hide()
-                                self:SetAlpha(0)
-                            end
-                        end)
+                        -- Synchronous hook - hooksecurefunc doesn't taint the caller.
+                        -- C_Timer.After caused FPS drops from hundreds of closures/sec.
+                        self:Hide()
+                        self:SetAlpha(0)
                     end)
                 end
                 
                 -- Also hook parent OnShow
                 if child.HookScript then
                     child:HookScript("OnShow", function(self)
-                        -- TAINT-FIX: Defer to avoid tainting execution context
-                        C_Timer.After(0, function()
-                            local f = self[frameName]
-                            if f then
-                                f:Hide()
-                                f:SetAlpha(0)
-                            end
-                        end)
+                        local f = self[frameName]
+                        if f then
+                            f:Hide()
+                            f:SetAlpha(0)
+                        end
                     end)
                 end
             end
@@ -189,9 +182,7 @@ local function HookAllGlows()
     -- Our custom glow (via LibCustomGlow) is completely separate and won't be affected
     if type(ActionButton_ShowOverlayGlow) == "function" then
         hooksecurefunc("ActionButton_ShowOverlayGlow", function(button)
-            -- TAINT-FIX: Defer ALL work including property reads to avoid
-            -- tainting Blizzard's CooldownViewer execution context.
-            -- Reading button:GetParent() in the hook body taints the context.
+            -- Low-frequency hook: defer to avoid tainting Blizzard's glow chain
             C_Timer.After(0, function()
                 if not button or not button:GetParent() then return end
                 local parent = button:GetParent()

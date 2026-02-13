@@ -38,54 +38,51 @@ local function HookSetCooldown(icon)
     icon.Cooldown._QUIParentIcon = icon
 
     hooksecurefunc(icon.Cooldown, "SetCooldown", function(self)
-        -- TAINT-FIX: Defer ALL work to next frame to prevent tainting
-        -- Blizzard's CooldownViewer execution context (hasTotem taint).
-        -- hooksecurefunc runs inside Blizzard's secure event chain;
-        -- any reads/writes here taint subsequent GetTotemInfo() calls.
-        C_Timer.After(0, function()
-            local parentIcon = self._QUIParentIcon
-            if not parentIcon then return end
+        -- Synchronous hook (like CDM reference addon). hooksecurefunc is designed
+        -- to not taint the caller. C_Timer.After caused FPS drops from hundreds
+        -- of closure allocations per second.
+        local parentIcon = self._QUIParentIcon
+        if not parentIcon then return end
 
-            -- Skip if we're the ones calling SetCooldown (recursion guard)
-            if parentIcon._SUI_BypassCDHook then return end
+        -- Skip if we're the ones calling SetCooldown (recursion guard)
+        if parentIcon._SUI_BypassCDHook then return end
 
-            local settings = GetSettings()
-            local showSwipe
-            local auraActive = parentIcon.auraInstanceID and parentIcon.auraInstanceID > 0
+        local settings = GetSettings()
+        local showSwipe
+        local auraActive = parentIcon.auraInstanceID and parentIcon.auraInstanceID > 0
 
-            -- Swipe logic
-            -- Priority 1: Buff duration (auraInstanceID > 0)
-            if auraActive then
-                -- Check if this icon is in BuffIconCooldownViewer (separate toggle)
-                local parent = parentIcon:GetParent()
-                if parent == _G.BuffIconCooldownViewer then
-                    showSwipe = settings.showBuffIconSwipe
-                else
-                    showSwipe = settings.showBuffSwipe
-                end
-            -- Priority 2: GCD vs Cooldown (use CooldownFlash visibility)
-            elseif parentIcon.CooldownFlash then
-                if parentIcon.CooldownFlash:IsShown() then
-                    showSwipe = settings.showCooldownSwipe
-                else
-                    showSwipe = settings.showGCDSwipe
-                end
-            -- Fallback: treat as cooldown
+        -- Swipe logic
+        -- Priority 1: Buff duration (auraInstanceID > 0)
+        if auraActive then
+            -- Check if this icon is in BuffIconCooldownViewer (separate toggle)
+            local parent = parentIcon:GetParent()
+            if parent == _G.BuffIconCooldownViewer then
+                showSwipe = settings.showBuffIconSwipe
             else
+                showSwipe = settings.showBuffSwipe
+            end
+        -- Priority 2: GCD vs Cooldown (use CooldownFlash visibility)
+        elseif parentIcon.CooldownFlash then
+            if parentIcon.CooldownFlash:IsShown() then
                 showSwipe = settings.showCooldownSwipe
-            end
-
-            self:SetDrawSwipe(showSwipe)
-
-            -- Edge logic: Buff icons use their swipe setting, cooldowns use showRechargeEdge
-            local showEdge
-            if auraActive then
-                showEdge = showSwipe  -- Buff icons: edge follows swipe toggle
             else
-                showEdge = settings.showRechargeEdge  -- Cooldowns: separate setting
+                showSwipe = settings.showGCDSwipe
             end
-            self:SetDrawEdge(showEdge)
-        end)
+        -- Fallback: treat as cooldown
+        else
+            showSwipe = settings.showCooldownSwipe
+        end
+
+        self:SetDrawSwipe(showSwipe)
+
+        -- Edge logic: Buff icons use their swipe setting, cooldowns use showRechargeEdge
+        local showEdge
+        if auraActive then
+            showEdge = showSwipe  -- Buff icons: edge follows swipe toggle
+        else
+            showEdge = settings.showRechargeEdge  -- Cooldowns: separate setting
+        end
+        self:SetDrawEdge(showEdge)
     end)
 end
 

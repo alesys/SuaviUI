@@ -359,11 +359,8 @@ function ViewerAdapters.GetBuffIconFrames()
             end
             if not child._wt_isHooked then
                 child._wt_isHooked = true
-                -- TAINT-FIX: Defer callback to avoid tainting Blizzard's execution context.
-                -- OnActiveStateChanged fires inside RefreshData's event chain.
-                pcall(hooksecurefunc, child, "OnActiveStateChanged", function()
-                    C_Timer.After(0, StateTracker.MarkBuffIconsDirty)
-                end)
+                -- Synchronous hook - hooksecurefunc doesn't taint the caller.
+                pcall(hooksecurefunc, child, "OnActiveStateChanged", StateTracker.MarkBuffIconsDirty)
             end
         end
     end
@@ -409,11 +406,8 @@ function ViewerAdapters.GetBuffBarFrames()
         end
         if not frame._wt_isHooked and (frame.icon or frame.Icon or frame.bar or frame.Bar) then
             frame._wt_isHooked = true
-            -- TAINT-FIX: Defer callback to avoid tainting Blizzard's execution context.
-            -- OnActiveStateChanged fires inside RefreshData's event chain.
-            pcall(hooksecurefunc, frame, "OnActiveStateChanged", function()
-                C_Timer.After(0, StateTracker.MarkBuffBarsDirty)
-            end)
+            -- Synchronous hook - hooksecurefunc doesn't taint the caller.
+            pcall(hooksecurefunc, frame, "OnActiveStateChanged", StateTracker.MarkBuffBarsDirty)
         end
     end
     table.sort(active, function(a, b)
