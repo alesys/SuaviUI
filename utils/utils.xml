@@ -7,8 +7,8 @@
     <Script file="cooldown_coordinator.lua"/>
     <Script file="cooldownmanager.lua"/>
     <Script file="cooldown_editmode.lua"/>
-    <!-- cooldown_icons.lua: FIXED with issecretvalue guards -->
-    <Script file="cooldown_icons.lua"/>
+    <!-- TEST: Disable cooldown_icons to verify issecretvalue guards effectiveness -->
+    <!-- <Script file="cooldown_icons.lua"/> -->
     <Script file="cooldown_fonts.lua"/>
     <Script file="cooldown_advanced.lua"/>
     <Script file="customglows.lua"/>
