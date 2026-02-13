@@ -13,8 +13,8 @@
     <Script file="cooldown_advanced.lua"/>
     <Script file="customglows.lua"/>
     <Script file="cooldowneffects.lua"/>
-    <!-- cooldownswipe.lua: Helpful (reduces taint) -->
-    <Script file="cooldownswipe.lua"/>
+    <!-- TEST: Disable cooldownswipe to isolate remaining 12x taint -->
+    <!-- <Script file="cooldownswipe.lua"/> -->
     <Script file="uihider.lua"/>
     <Script file="buffborders.lua"/>
     <Script file="suicore_main.lua"/>
