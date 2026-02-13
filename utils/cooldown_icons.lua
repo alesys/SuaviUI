@@ -309,13 +309,8 @@ local function ProcessViewer(viewer, viewerSettingName, applyStyle)
                     if not (issecretvalue and issecretvalue(child)) and child.TriggerPandemicAlert and not child._suiStyleHooked then
                         child._suiStyleHooked = true
                         hooksecurefunc(child, "TriggerPandemicAlert", function()
-                            if child.PandemicIcon and not (issecretvalue and issecretvalue(child.PandemicIcon)) then
-                                if applyStyle then
-                                    child.PandemicIcon:SetScale(1.38)
-                                else
-                                    child.PandemicIcon:SetScale(1.0)
-                                end
-                            end
+                            -- TAINT-FIX: Defer ALL work to avoid tainting execution context.
+                            -- TriggerPandemicAlert fires inside RefreshData's event chain.
                             C_Timer.After(0, function()
                                 if child.PandemicIcon and not (issecretvalue and issecretvalue(child.PandemicIcon)) then
                                     if applyStyle then
@@ -502,16 +497,19 @@ function StyledIcons:Enable()
             local viewerFrame = _G[viewerName]
             if viewerFrame then
                 pcall(hooksecurefunc, viewerFrame, "RefreshLayout", function()
-                    if not isModuleStyledEnabled then
-                        return
-                    end
-                    -- Wrap in pcall to prevent affecting Blizzard's Edit Mode flow
-                    -- which can trigger EncounterWarnings bugs
-                    pcall(function()
-                        StyledIcons:RefreshViewer(viewerName)
-                        if viewerName == "UtilityCooldownViewer" then
-                            StyledIcons:ApplyNormalizedSize()
+                    -- TAINT-FIX: Defer ALL work to avoid tainting execution context.
+                    -- Even reads of isModuleStyledEnabled (local) are safe, but all
+                    -- Blizzard frame access must be deferred.
+                    C_Timer.After(0, function()
+                        if not isModuleStyledEnabled then
+                            return
                         end
+                        pcall(function()
+                            StyledIcons:RefreshViewer(viewerName)
+                            if viewerName == "UtilityCooldownViewer" then
+                                StyledIcons:ApplyNormalizedSize()
+                            end
+                        end)
                     end)
                 end)
             end

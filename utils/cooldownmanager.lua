@@ -359,9 +359,11 @@ function ViewerAdapters.GetBuffIconFrames()
             end
             if not child._wt_isHooked then
                 child._wt_isHooked = true
-                pcall(hooksecurefunc, child, "OnActiveStateChanged", StateTracker.MarkBuffIconsDirty)
-                -- TAINT-FIX: Remove OnUnitAura hooks - they taint spellID values used in Blizzard comparisons
-                -- Fallback to OnUpdate polling (0.05s) is already in place and sufficient
+                -- TAINT-FIX: Defer callback to avoid tainting Blizzard's execution context.
+                -- OnActiveStateChanged fires inside RefreshData's event chain.
+                pcall(hooksecurefunc, child, "OnActiveStateChanged", function()
+                    C_Timer.After(0, StateTracker.MarkBuffIconsDirty)
+                end)
             end
         end
     end
@@ -407,9 +409,11 @@ function ViewerAdapters.GetBuffBarFrames()
         end
         if not frame._wt_isHooked and (frame.icon or frame.Icon or frame.bar or frame.Bar) then
             frame._wt_isHooked = true
-            pcall(hooksecurefunc, frame, "OnActiveStateChanged", StateTracker.MarkBuffBarsDirty)
-            -- TAINT-FIX: Remove OnUnitAura hooks - they taint spellID/charges values used in Blizzard comparisons
-            -- Fallback to OnUpdate polling (0.05s) is already in place and sufficient
+            -- TAINT-FIX: Defer callback to avoid tainting Blizzard's execution context.
+            -- OnActiveStateChanged fires inside RefreshData's event chain.
+            pcall(hooksecurefunc, frame, "OnActiveStateChanged", function()
+                C_Timer.After(0, StateTracker.MarkBuffBarsDirty)
+            end)
         end
     end
     table.sort(active, function(a, b)
@@ -845,11 +849,7 @@ EventHandler.frame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 EventHandler.frame:RegisterEvent("TRAIT_CONFIG_UPDATED")
 EventHandler.frame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
 EventHandler.frame:RegisterEvent("PLAYER_REGEN_DISABLED")
--- TAINT-FIX: Disable SPELL_UPDATE_COOLDOWN registration to prevent hasTotem taint
--- This event fires when Blizzard's CooldownViewer processes totem data; our handler
--- triggers layout refreshes that access viewer properties, tainting hasTotem values.
--- Refreshes are already handled by other events (combat, spec changes, etc.)
--- EventHandler.frame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+EventHandler.frame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 EventHandler.frame:RegisterEvent("CINEMATIC_STOP")
 EventHandler.frame:RegisterEvent("ADDON_LOADED")
 
@@ -881,7 +881,15 @@ EventHandler.frame:SetScript("OnEvent", function(_, event, arg1)
         end)
         return
     end
-    -- SPELL_UPDATE_COOLDOWN handler removed (event no longer registered to prevent hasTotem taint)
+    -- SPELL_UPDATE_COOLDOWN: defer refresh to avoid tainting Blizzard's event chain
+    if event == "SPELL_UPDATE_COOLDOWN" and GetSetting("cooldownManager_utility_dimWhenNotOnCD", false) then
+        C_Timer.After(0, function()
+            if not RequestCoordinatedRefresh({ utility = true }, "cmc", { delay = 0 }) then
+                CooldownManager.ForceRefresh({ utility = true })
+            end
+        end)
+        return
+    end
     if parts then
         if not RequestCoordinatedRefresh(parts, "cmc", { delay = 0 }) then
             CooldownManager.ForceRefresh(parts)
@@ -936,15 +944,10 @@ function CooldownManager.HookViewerRefreshLayout()
         end)
         if ok and hasRL and not isHooked then
             pcall(function() v.__suiCMCRefreshHooked = true end)
+            -- TAINT-FIX: Defer ALL work from RefreshLayout hook to avoid
+            -- tainting Blizzard's execution context. The hook body must be
+            -- empty of any reads/writes to Blizzard frames.
             local hookOk = pcall(hooksecurefunc, v, "RefreshLayout", function()
-                if IsCoordinatorInProgress() then
-                    return
-                end
-                pcall(function()
-                    if not RequestCoordinatedRefresh(viewerReasonPartsMap[n], "cmc", { delay = 0 }) then
-                        CooldownManager.ForceRefresh(viewerReasonPartsMap[n])
-                    end
-                end)
                 C_Timer.After(0, function()
                     if IsCoordinatorInProgress() then
                         return

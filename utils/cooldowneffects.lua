@@ -39,19 +39,28 @@ local function HideCooldownEffects(child)
                 -- Hook Show to prevent it from showing
                 if frame.Show then
                     hooksecurefunc(frame, "Show", function(self)
-                        self:Hide()
-                        self:SetAlpha(0)
+                        -- TAINT-FIX: Defer Hide to avoid tainting Blizzard's execution context.
+                        -- The effect may flash for one frame (~16ms) but prevents hasTotem taint.
+                        C_Timer.After(0, function()
+                            if self and self.Hide then
+                                self:Hide()
+                                self:SetAlpha(0)
+                            end
+                        end)
                     end)
                 end
                 
                 -- Also hook parent OnShow
                 if child.HookScript then
                     child:HookScript("OnShow", function(self)
-                        local f = self[frameName]
-                        if f then
-                            f:Hide()
-                            f:SetAlpha(0)
-                        end
+                        -- TAINT-FIX: Defer to avoid tainting execution context
+                        C_Timer.After(0, function()
+                            local f = self[frameName]
+                            if f then
+                                f:Hide()
+                                f:SetAlpha(0)
+                            end
+                        end)
                     end)
                 end
             end
@@ -180,25 +189,20 @@ local function HookAllGlows()
     -- Our custom glow (via LibCustomGlow) is completely separate and won't be affected
     if type(ActionButton_ShowOverlayGlow) == "function" then
         hooksecurefunc("ActionButton_ShowOverlayGlow", function(button)
-            -- Only hide glows on Essential/Utility cooldown viewers, NOT BuffIcon
-            if button and button:GetParent() then
+            -- TAINT-FIX: Defer ALL work including property reads to avoid
+            -- tainting Blizzard's CooldownViewer execution context.
+            -- Reading button:GetParent() in the hook body taints the context.
+            C_Timer.After(0, function()
+                if not button or not button:GetParent() then return end
                 local parent = button:GetParent()
                 local parentName = parent:GetName()
                 if parentName and (
                     parentName:find("EssentialCooldown") or 
                     parentName:find("UtilityCooldown")
-                    -- BuffIconCooldown is NOT included - we want glows on buff icons
                 ) then
-                    -- Hide Blizzard's glow immediately
-                    -- customglows.lua runs first (load order) and applies LibCustomGlow
-                    -- which is NOT affected by HideBlizzardGlows
-                    C_Timer.After(0.01, function()
-                        if button then
-                            pcall(HideBlizzardGlows, button)
-                        end
-                    end)
+                    pcall(HideBlizzardGlows, button)
                 end
-            end
+            end)
         end)
     end
     
