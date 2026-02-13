@@ -37,11 +37,10 @@ local function HideCooldownEffects(child)
                 frame._SuaviUI_NoShow = true
                 
                 -- Hook Show to prevent it from showing
+                -- Don't call Hide() in the hook — it can cause Show→Hide→Show infinite loops.
+                -- Just zero alpha so it's invisible without toggling visibility state.
                 if frame.Show then
                     hooksecurefunc(frame, "Show", function(self)
-                        -- Synchronous hook - hooksecurefunc doesn't taint the caller.
-                        -- C_Timer.After caused FPS drops from hundreds of closures/sec.
-                        self:Hide()
                         self:SetAlpha(0)
                     end)
                 end
@@ -51,7 +50,6 @@ local function HideCooldownEffects(child)
                     child:HookScript("OnShow", function(self)
                         local f = self[frameName]
                         if f then
-                            f:Hide()
                             f:SetAlpha(0)
                         end
                     end)

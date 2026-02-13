@@ -177,10 +177,11 @@ local function StripBlizzardOverlay(icon)
                 region:SetTexture("")
                 region:Hide()
                 -- TAINT-FIX: Use hooksecurefunc instead of method replacement.
-                -- Replacing Show with addon function makes all Show() calls execute
-                -- in insecure context, tainting Blizzard's execution chain.
+                -- Don't call Hide() in the hook — it can cause Show→Hide→Show infinite loops.
+                -- Just clear the texture and alpha so it's invisible without toggling visibility.
                 hooksecurefunc(region, "Show", function(self)
-                    self:Hide()
+                    self:SetTexture("")
+                    self:SetAlpha(0)
                 end)
             end
         end
