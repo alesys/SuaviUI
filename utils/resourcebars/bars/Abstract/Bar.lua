@@ -465,12 +465,13 @@ function BarMixin:HideBlizzardPlayerContainer(layoutName, data)
     if PlayerFrame then
         if data.hideBlizzardPlayerContainerUi == true then
             if LEM:IsInEditMode() then
-                PlayerFrame:Show()
+                -- Wrap Show() in pcall to prevent taint from Blizzard's heal prediction updates
+                pcall(function() PlayerFrame:Show() end)
             else
-                PlayerFrame:Hide()
+                pcall(function() PlayerFrame:Hide() end)
             end
         else
-            PlayerFrame:Show()
+            pcall(function() PlayerFrame:Show() end)
         end
     end
 end
