@@ -6,6 +6,9 @@
 
 local _, SUI = ...
 
+-- Emergency stability mode: prioritize FPS by avoiding persistent/high-frequency hooks.
+local EMERGENCY_STABILITY_MODE = true
+
 -- Get settings from AceDB
 local function GetSettings()
     local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
@@ -32,27 +35,29 @@ local function HideCooldownEffects(child)
             frame:Hide()
             frame:SetAlpha(0)
             
-            -- Hook to keep it hidden
-            if not frame._SuaviUI_NoShow then
-                frame._SuaviUI_NoShow = true
-                
-                -- Hook Show to prevent it from showing
-                -- Don't call Hide() in the hook — it can cause Show→Hide→Show infinite loops.
-                -- Just zero alpha so it's invisible without toggling visibility state.
-                if frame.Show then
-                    hooksecurefunc(frame, "Show", function(self)
-                        self:SetAlpha(0)
-                    end)
-                end
-                
-                -- Also hook parent OnShow
-                if child.HookScript then
-                    child:HookScript("OnShow", function(self)
-                        local f = self[frameName]
-                        if f then
-                            f:SetAlpha(0)
-                        end
-                    end)
+            if not EMERGENCY_STABILITY_MODE then
+                -- Hook to keep it hidden
+                if not frame._SuaviUI_NoShow then
+                    frame._SuaviUI_NoShow = true
+                    
+                    -- Hook Show to prevent it from showing
+                    -- Don't call Hide() in the hook — it can cause Show→Hide→Show infinite loops.
+                    -- Just zero alpha so it's invisible without toggling visibility state.
+                    if frame.Show then
+                        hooksecurefunc(frame, "Show", function(self)
+                            self:SetAlpha(0)
+                        end)
+                    end
+                    
+                    -- Also hook parent OnShow
+                    if child.HookScript then
+                        child:HookScript("OnShow", function(self)
+                            local f = self[frameName]
+                            if f then
+                                f:SetAlpha(0)
+                            end
+                        end)
+                    end
                 end
             end
         end
@@ -134,7 +139,7 @@ local function ProcessViewer(viewerName)
     ProcessIcons()
     
     -- Hook Layout to reprocess when viewer updates
-    if viewer.Layout and not viewer._SuaviUI_EffectsHooked then
+    if (not EMERGENCY_STABILITY_MODE) and viewer.Layout and not viewer._SuaviUI_EffectsHooked then
         viewer._SuaviUI_EffectsHooked = true
         hooksecurefunc(viewer, "Layout", function()
             C_Timer.After(0.15, ProcessIcons)  -- 150ms debounce for CPU efficiency
@@ -142,7 +147,7 @@ local function ProcessViewer(viewerName)
     end
     
     -- Hook OnShow
-    if not viewer._SuaviUI_EffectsShowHooked then
+    if (not EMERGENCY_STABILITY_MODE) and not viewer._SuaviUI_EffectsShowHooked then
         viewer._SuaviUI_EffectsShowHooked = true
         viewer:HookScript("OnShow", function()
             C_Timer.After(0.15, ProcessIcons)  -- 150ms debounce for CPU efficiency
@@ -175,6 +180,12 @@ local function HideExistingBlizzardGlows()
 end
 
 local function HookAllGlows()
+    if EMERGENCY_STABILITY_MODE then
+        -- One-shot cleanup only; skip global runtime hook while stabilizing FPS.
+        HideExistingBlizzardGlows()
+        return
+    end
+
     -- Hook the standard ActionButton_ShowOverlayGlow
     -- When Blizzard tries to show a glow, we ALWAYS hide Blizzard's glow
     -- Our custom glow (via LibCustomGlow) is completely separate and won't be affected
