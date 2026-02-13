@@ -11,9 +11,9 @@
     <!-- <Script file="cooldown_icons.lua"/> -->
     <Script file="cooldown_fonts.lua"/>
     <Script file="cooldown_advanced.lua"/>
-    <!-- DIAGNOSTIC: Disable customglows.lua to isolate remaining taint -->
-    <!-- <Script file="customglows.lua"/> -->
-    <Script file="cooldowneffects.lua"/>
+    <Script file="customglows.lua"/>
+    <!-- DIAGNOSTIC: Disable cooldowneffects.lua to isolate remaining taint -->
+    <!-- <Script file="cooldowneffects.lua"/> -->
     <Script file="cooldownswipe.lua"/>
     <Script file="uihider.lua"/>
     <Script file="buffborders.lua"/>
