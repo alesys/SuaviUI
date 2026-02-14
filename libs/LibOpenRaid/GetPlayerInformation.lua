@@ -605,19 +605,26 @@ function openRaidLib.GearManager.BuildPlayerEquipmentList()
 end
 
 local playerHasPetOfNpcId = function(npcId)
-    local petHealth = UnitHealth("pet")
-    if (UnitExists("pet") and not issecretvalue(petHealth) and petHealth >= 1) then
-        local guid = UnitGUID("pet")
-        if (guid) then
-            local split = {strsplit("-", guid)}
-            local playerPetNpcId = tonumber(split[6])
-            if (playerPetNpcId) then
-                if (npcId == playerPetNpcId) then
-                    return true
+    -- TAINT-FIX: Wrap pet detection in pcall to prevent tainting CooldownViewer cache
+    -- UnitExists("pet") and UnitGUID("pet") are secret values that can propagate taint
+    -- during combat events like UNIT_PET or SPELL_UPDATE_COOLDOWN
+    local ok, hasPet = pcall(function()
+        local petHealth = UnitHealth("pet")
+        if (UnitExists("pet") and not issecretvalue(petHealth) and petHealth >= 1) then
+            local guid = UnitGUID("pet")
+            if (guid) then
+                local split = {strsplit("-", guid)}
+                local playerPetNpcId = tonumber(split[6])
+                if (playerPetNpcId) then
+                    if (npcId == playerPetNpcId) then
+                        return true
+                    end
                 end
             end
         end
-    end
+        return false
+    end)
+    return ok and hasPet or false
 end
 
 local addCooldownToTable = function(cooldowns, cooldownsHash, cooldownSpellId, timeNow)

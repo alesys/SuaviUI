@@ -1,5 +1,31 @@
 # SuaviUI Changelog
 
+## [v0.2.5](https://github.com/alesys/SuaviUI/tree/v0.2.5) (2026-02-14)
+
+### 🔧 Bug Fixes - Continued Taint Protection
+
+#### LibOpenRaid Pet Query Protection
+- **Fixed pet status checks causing "hasTotem secret value tainted" errors**
+  - Wrapped `UNIT_PET` event handler in `pcall()` to protect `UnitIsUnit("player")`, `UnitHealth("pet")`, `UnitExists("pet")` calls
+  - Wrapped `playerHasPetOfNpcId()` function in `pcall()` to protect `UnitExists("pet")` and `UnitGUID("pet")` calls in `GetPlayerInformation.lua`
+  - Prevents LibOpenRaid from propagating tainted pet data to Blizzard's CooldownViewer cache during UNIT_PET combat events
+  - Resolves 431+ repeated taint warnings in combat logs
+
+#### Rotation Assist Spell Query Protection
+- **Fixed UpdateIconDisplay() secret value taint during combat**
+  - Wrapped `C_Spell.GetSpellTexture()`, `C_Spell.IsSpellUsable()`, `C_Spell.SpellHasRange()`, `C_Spell.IsSpellInRange()` calls in `pcall()`
+  - Prevents SPELL_UPDATE_COOLDOWN event flooding from tainting spell usability checks
+  - Maintains safe fallback behavior when pcall() fails (defaults: no texture, unusable, no range)
+
+### 📊 Summary (Cumulative)
+- **7 low-level safety guards** (empty viewers)
+- **12 taint protection fixes** (secret API calls + LibOpenRaid + rotation assist)
+- **5 debounce/re-entry improvements** (layout hooks)
+- **1 optimization** (empty tracker bars)
+- **Total: 25+ targeted fixes** for stability on low-level characters
+
+---
+
 ## [v0.2.4](https://github.com/alesys/SuaviUI/tree/v0.2.4) (2026-02-14)
 
 ### 🔧 Bug Fixes & Performance

@@ -249,23 +249,24 @@ UpdateIconDisplay = function(spellID)
     -- We have a spell - make sure frame is visible (respecting visibility mode)
     UpdateVisibility()
 
-    -- Get spell texture
-    local texture = C_Spell.GetSpellTexture(spellID)
+    -- Get spell texture and usability state (TAINT-FIX: wrapped in pcall)
+    local texture, isUsable, notEnoughMana, hasRange, inRange = nil, false, false, false, true
+    
+    local ok = pcall(function()
+        texture = C_Spell.GetSpellTexture(spellID)
+        isUsable, notEnoughMana = C_Spell.IsSpellUsable(spellID)
+        hasRange = C_Spell.SpellHasRange(spellID)
+        
+        if hasRange and UnitExists("target") then
+            local rangeCheck = C_Spell.IsSpellInRange(spellID, "target")
+            if rangeCheck == false then
+                inRange = false
+            end
+        end
+    end)
+    
     if texture then
         iconFrame.icon:SetTexture(texture)
-    end
-
-    -- Get usability state for icon tinting
-    local isUsable, notEnoughMana = C_Spell.IsSpellUsable(spellID)
-    local inRange = true
-
-    -- Check range if spell has range
-    local hasRange = C_Spell.SpellHasRange(spellID)
-    if hasRange and UnitExists("target") then
-        local rangeCheck = C_Spell.IsSpellInRange(spellID, "target")
-        if rangeCheck == false then
-            inRange = false
-        end
     end
 
     -- Apply icon tint based on state

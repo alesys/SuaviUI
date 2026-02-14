@@ -1195,14 +1195,17 @@ end
         end,
 
         ["UNIT_PET"] = function(unitId)
-            if (UnitIsUnit(unitId, "player")) then
-                openRaidLib.Schedules.NewUniqueTimer(1.1, function() openRaidLib.internalCallback.TriggerEvent("playerPetChange") end, "mainControl", "petStatus_Schedule")
-                --if the pet is alive, register to know when it dies
-                local petHealth = UnitHealth("pet")
-                if (UnitExists("pet") and not issecretvalue(petHealth) and petHealth >= 1) then
-                    eventFrame:RegisterUnitEvent("UNIT_FLAGS", "pet")
+            -- TAINT-FIX: Wrap pet status checks in pcall to prevent taint propagation
+            local ok = pcall(function()
+                if (UnitIsUnit(unitId, "player")) then
+                    openRaidLib.Schedules.NewUniqueTimer(1.1, function() openRaidLib.internalCallback.TriggerEvent("playerPetChange") end, "mainControl", "petStatus_Schedule")
+                    --if the pet is alive, register to know when it dies
+                    local petHealth = UnitHealth("pet")
+                    if (UnitExists("pet") and not issecretvalue(petHealth) and petHealth >= 1) then
+                        eventFrame:RegisterUnitEvent("UNIT_FLAGS", "pet")
+                    end
                 end
-            end
+            end)
         end,
 
         ["UNIT_FLAGS"] = function(unitId)
