@@ -1,5 +1,52 @@
 # SuaviUI Changelog
 
+## [v0.2.6](https://github.com/alesys/SuaviUI/tree/v0.2.6) (2026-02-14)
+
+### 🔧 Critical Bug Fixes - HasPetSpells() Taint Elimination
+
+#### Root Cause Analysis
+- **Problem:** `HasPetSpells()` returns secret/tainted values during combat that contaminate Blizzard's CooldownViewer cache
+- **Impact:** 665+ "hasTotem secret value tainted" errors in BugGrabber, occurring during UNIT_PET events
+- **Why v0.2.5 didn't work:** pcall() prevents errors when reading secret values, but does NOT remove taint from those values. Tainted data stored in LibOpenRaid's cache later causes Blizzard's RefreshTotemData() to fail
+
+#### Implemented Fixes
+1. **Guard HasPetSpells() calls with issecretvalue() checks** (LibOpenRaid/GetPlayerInformation.lua)
+   - Lines 768-778: Added taint detection to first pet spell scanning loop
+   - Lines 1265-1275: Added taint detection to second pet spell scanning loop  
+   - Returns `nil` if HasPetSpells() returns a tainted value, preventing loop contamination
+
+2. **Prevent spellbook scanning during combat** (LibOpenRaid/GetPlayerInformation.lua line 797)
+   - Added `InCombatLockdown()` guard to `updateCooldownAvailableList()`
+   - Prevents tainted values from being stored in `LIB_OPEN_RAID_PLAYERCOOLDOWNS` global table during combat
+
+3. **Prevent cooldown updates during combat** (LibOpenRaid/LibOpenRaid.lua line 2581)
+   - Added `InCombatLockdown()` guard to `OnPlayerPetChanged()`
+   - Stops UNIT_PET event from triggering spellbook scans during combat
+
+#### Technical Details
+**Taint propagation path:**
+```
+UNIT_PET (combat) → OnPlayerPetChanged() → CheckCooldownChanges() →
+GetPlayerCooldownList() → updateCooldownAvailableList() → 
+getSpellListAsHashTableFromSpellBook() → HasPetSpells() [TAINTED] →
+Loop iteration stores tainted data → Blizzard's cache contaminated →
+GetTotemInfo() returns tainted hasTotem → RefreshTotemData() errors
+```
+
+**Solution:** Block the taint at source by:
+- Detecting tainted HasPetSpells() return values and rejecting them
+- Preventing LibOpenRaid from updating cooldown lists during combat
+- Allowing cooldown updates only when out of combat (safe context)
+
+### 📊 Summary (Cumulative)
+- **7 low-level safety guards** (empty viewers)
+- **15 taint protection fixes** (secret API calls + LibOpenRaid guards + HasPetSpells)
+- **5 debounce/re-entry improvements** (layout hooks)
+- **1 optimization** (empty tracker bars)
+- **Total: 28 targeted fixes** for stability
+
+---
+
 ## [v0.2.5](https://github.com/alesys/SuaviUI/tree/v0.2.5) (2026-02-14)
 
 ### 🔧 Bug Fixes - Continued Taint Protection

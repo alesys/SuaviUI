@@ -2578,6 +2578,10 @@ end
     end
 
     function openRaidLib.CooldownManager.OnPlayerPetChanged()
+        -- TAINT-FIX: Don't update cooldowns during combat to prevent HasPetSpells() taint propagation
+        if InCombatLockdown() then
+            return
+        end
         openRaidLib.CooldownManager.CheckCooldownChanges()
     end
 

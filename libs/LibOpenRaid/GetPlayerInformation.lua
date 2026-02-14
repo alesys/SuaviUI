@@ -767,7 +767,12 @@ local getSpellListAsHashTableFromSpellBook = function()
 
     local getNumPetSpells = function()
         --'HasPetSpells' contradicts the name and return the amount of pet spells available instead of a boolean
-        return HasPetSpells()
+        -- TAINT-FIX: HasPetSpells() returns tainted/secret values during combat
+        local num = HasPetSpells()
+        if num and issecretvalue(num) then
+            return nil  -- Don't use tainted values
+        end
+        return num
     end
 
     --get pet spells from the pet spellbook
@@ -793,6 +798,11 @@ local getSpellListAsHashTableFromSpellBook = function()
 end
 
 local updateCooldownAvailableList = function()
+    -- TAINT-FIX: Don't scan spellbook during combat to prevent taint propagation to Blizzard's cache
+    if InCombatLockdown() then
+        return
+    end
+    
     table.wipe(LIB_OPEN_RAID_PLAYERCOOLDOWNS)
     local _, playerClass = UnitClass("player")
     local locPlayerRace, playerRace, playerRaceId = UnitRace("player")
@@ -1254,7 +1264,12 @@ function openRaidLib.Util.GetPlayerSpellList()
 
     local getNumPetSpells = function()
         --'HasPetSpells' contradicts the name and return the amount of pet spells available instead of a boolean
-        return HasPetSpells()
+        -- TAINT-FIX: HasPetSpells() returns tainted/secret values during combat
+        local num = HasPetSpells()
+        if num and issecretvalue(num) then
+            return nil  -- Don't use tainted values
+        end
+        return num
     end
 
     --get pet spells from the pet spellbook
