@@ -620,10 +620,17 @@ local function LayoutViewer(viewerName, trackerKey)
     end
     
     if #iconsToLayout == 0 then
+        -- LOW-LEVEL SAFETY: Set tolerance values so OnSizeChanged can short-circuit.
+        -- Without these, the tolerance check (nil and nil) always fails,
+        -- causing every OnSizeChanged to call LayoutViewer on empty viewers.
+        viewer.__cdmIconWidth = 0
+        viewer.__cdmTotalHeight = 0
+        viewer.__cdmEmpty = true
         NCDM.applying[trackerKey] = false
         viewer.__cdmLayoutRunning = nil
         return
     end
+    viewer.__cdmEmpty = nil
     
     -- Build row config
     local viewerKey = (trackerKey == "essential") and "Essential" or "Utility"
@@ -1121,7 +1128,16 @@ local function HookViewer(viewerName, trackerKey)
         viewer.__ncdmElapsed = (viewer.__ncdmElapsed or 0) + elapsed
 
         -- Adaptive throttle - slower polling since events handle immediate updates
-        local updateInterval = UnitAffectingCombat("player") and combatInterval or idleInterval
+        -- LOW-LEVEL SAFETY: Much slower polling when viewer is empty (no spells learned)
+        local emptyIdleInterval = 5.0  -- 5s when viewer has no icons (low-level/no spells)
+        local updateInterval
+        if viewer.__cdmEmpty then
+            updateInterval = emptyIdleInterval
+        elseif UnitAffectingCombat("player") then
+            updateInterval = combatInterval
+        else
+            updateInterval = idleInterval
+        end
 
         -- Step 4: Check event flag to skip throttle (immediate response to cooldown changes)
         if viewer.__ncdmEventFired then
@@ -1541,7 +1557,16 @@ local function ShouldCDMBeVisible()
     if not vis then return true end
 
     -- Hide When Mounted overrides all other conditions (includes Druid flight form)
-    if vis.hideWhenMounted and (IsMounted() or GetShapeshiftFormID() == 27) then return false end
+    if vis.hideWhenMounted then
+        if IsMounted() then return false end
+        -- TAINT-FIX: Wrap GetShapeshiftFormID() in pcall to prevent contaminating
+        -- Blizzard's taint-protected CooldownViewer during combat.
+        local isInFlightForm = false
+        pcall(function()
+            isInFlightForm = GetShapeshiftFormID() == 27
+        end)
+        if isInFlightForm then return false end
+    end
 
     -- Show Always overrides all other conditions
     if vis.showAlways then return true end
@@ -1774,7 +1799,16 @@ local function ShouldUnitframesBeVisible()
     if not vis then return true end
 
     -- Hide When Mounted overrides all other conditions (includes Druid flight form)
-    if vis.hideWhenMounted and (IsMounted() or GetShapeshiftFormID() == 27) then return false end
+    if vis.hideWhenMounted then
+        if IsMounted() then return false end
+        -- TAINT-FIX: Wrap GetShapeshiftFormID() in pcall to prevent contaminating
+        -- Blizzard's taint-protected CooldownViewer during combat.
+        local isInFlightForm = false
+        pcall(function()
+            isInFlightForm = GetShapeshiftFormID() == 27
+        end)
+        if isInFlightForm then return false end
+    end
 
     -- Show Always overrides all other conditions
     if vis.showAlways then return true end

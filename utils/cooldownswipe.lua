@@ -114,7 +114,11 @@ local function ApplyAllSettings()
         if viewer and viewer.Layout and not viewer._SUI_LayoutHooked then
             viewer._SUI_LayoutHooked = true
             hooksecurefunc(viewer, "Layout", function()
-                C_Timer.After(0.15, function()  -- 150ms debounce for CPU efficiency
+                -- LOW-LEVEL SAFETY: Debounce to prevent timer flooding on empty viewers.
+                if viewer._SUI_SwipePending then return end
+                viewer._SUI_SwipePending = true
+                C_Timer.After(0.15, function()
+                    viewer._SUI_SwipePending = nil
                     ProcessViewer(viewer)
                 end)
             end)

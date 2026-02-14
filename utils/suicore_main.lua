@@ -4785,7 +4785,13 @@ function SUICore:HookViewers()
             end)
 
             viewer:HookScript("OnSizeChanged", function(f)
+                -- LOW-LEVEL SAFETY: Prevent re-entrant layout calls.
+                -- If ApplyViewerLayout sets child sizes that cause the viewer
+                -- to auto-resize, this guard stops the infinite cascade.
+                if f.__cdmLayoutRunning then return end
+                f.__cdmLayoutRunning = true
                 self:ApplyViewerLayout(f)
+                f.__cdmLayoutRunning = nil
             end)
 
             -- Reduced update rate - layout operations don't need high frequency

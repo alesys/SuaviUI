@@ -124,8 +124,11 @@ local function ScanSpellFromBuffs(castSpellID, itemID)
     local bestMatch = nil
 
     for i = 1, 40 do
-        local aura = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
-        if not aura then break end
+        -- TAINT-FIX: Wrap secret API call in pcall to prevent taint during combat.
+        -- C_UnitAuras.GetAuraDataByIndex returns secret values that can contaminate
+        -- Blizzard's CooldownViewer cache if read unprotected during combat events.
+        local ok, aura = pcall(function() return C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL") end)
+        if not ok or not aura then break end
 
         -- Secret values in Midnight: reading doesn't error, but comparisons/arithmetic do
         local spellId = aura.spellId

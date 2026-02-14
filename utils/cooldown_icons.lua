@@ -499,7 +499,11 @@ function StyledIcons:Enable()
                     -- TAINT-FIX: Defer ALL work to avoid tainting execution context.
                     -- Even reads of isModuleStyledEnabled (local) are safe, but all
                     -- Blizzard frame access must be deferred.
+                    -- LOW-LEVEL SAFETY: Debounce to prevent timer flooding on empty viewers.
+                    if viewerFrame.__suiStyledRefreshPending then return end
+                    viewerFrame.__suiStyledRefreshPending = true
                     C_Timer.After(0, function()
+                        viewerFrame.__suiStyledRefreshPending = nil
                         if not isModuleStyledEnabled then
                             return
                         end

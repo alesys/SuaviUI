@@ -359,7 +359,13 @@ local function SetupViewerHooking(viewerName, trackerKey)
     -- Watch for new icons via layout changes
     if not viewer._QUIGlowLayoutHooked then
         viewer:HookScript("OnSizeChanged", function()
+            -- LOW-LEVEL SAFETY: Debounce to prevent timer flooding.
+            -- Without this, rapid OnSizeChanged on empty viewers queues
+            -- unbounded C_Timer closures (each a no-op but still allocation overhead).
+            if viewer._QUIGlowPending then return end
+            viewer._QUIGlowPending = true
             C_Timer.After(0.1, function()
+                viewer._QUIGlowPending = nil
                 HookViewerIcons(viewerName)
             end)
         end)

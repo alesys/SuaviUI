@@ -377,8 +377,11 @@ local function GetCachedSpellInfo(spellID)
     if CustomTrackers.infoCache[cacheKey] then
         return CustomTrackers.infoCache[cacheKey]
     end
-    local info = C_Spell.GetSpellInfo(spellID)
-    if info then
+    -- TAINT-FIX: Wrap secret API call in pcall to prevent taint.
+    -- C_Spell.GetSpellInfo returns secret values that can contaminate
+    -- Blizzard's CooldownViewer if read unprotected during combat events.
+    local ok, info = pcall(function() return C_Spell.GetSpellInfo(spellID) end)
+    if ok and info then
         CustomTrackers.infoCache[cacheKey] = {
             name = info.name,
             icon = info.iconID,
@@ -416,9 +419,12 @@ end
 ---------------------------------------------------------------------------
 local function GetSpellCooldownInfo(spellID)
     if not spellID then return 0, 0, false, nil end
-    local cooldownInfo = C_Spell.GetSpellCooldown(spellID)
-    if cooldownInfo then
-        return cooldownInfo.startTime, cooldownInfo.duration, cooldownInfo.isEnabled, cooldownInfo.isOnGCD
+    -- TAINT-FIX: Wrap secret API call in pcall to prevent taint during combat.
+    -- C_Spell.GetSpellCooldown returns secret values during combat that can
+    -- contaminate Blizzard's CooldownViewer cache if read unprotected.
+    local ok, cooldownInfo = pcall(function() return C_Spell.GetSpellCooldown(spellID) end)
+    if ok and cooldownInfo then
+        return cooldownInfo.startTime or 0, cooldownInfo.duration or 0, cooldownInfo.isEnabled ~= false, cooldownInfo.isOnGCD
     end
     return 0, 0, true, nil
 end
@@ -445,10 +451,12 @@ end
 
 local function GetSpellChargeCount(spellID)
     if not spellID then return 0, 1, 0, 0 end
-    local chargeInfo = C_Spell.GetSpellCharges(spellID)
-
-    if not chargeInfo or not chargeInfo.maxCharges then
-        return 0, 1, 0, 0  -- Not a charge-based spell
+    -- TAINT-FIX: Wrap secret API call in pcall to prevent taint during combat.
+    -- C_Spell.GetSpellCharges returns secret values during combat that can
+    -- contaminate Blizzard's CooldownViewer cache if read unprotected.
+    local ok, chargeInfo = pcall(function() return C_Spell.GetSpellCharges(spellID) end)
+    if not ok or not chargeInfo or not chargeInfo.maxCharges then
+        return 0, 1, 0, 0  -- Not a charge-based spell or API failed
     end
 
     -- Handle secret values (protected in combat)
@@ -499,8 +507,11 @@ end
 -- Check if spell is known and usable
 local function IsSpellUsable(spellID)
     -- Check if spell exists
-    local spellInfo = C_Spell.GetSpellInfo(spellID)
-    if not spellInfo then return false end
+    -- TAINT-FIX: Wrap secret API call in pcall to prevent taint.
+    -- C_Spell.GetSpellInfo returns secret values that can contaminate
+    -- Blizzard's CooldownViewer if read unprotected during combat events.
+    local ok, spellInfo = pcall(function() return C_Spell.GetSpellInfo(spellID) end)
+    if not ok or not spellInfo then return false end
 
     -- Check if known (handles talent overrides)
     if IsSpellKnownOrOverridesKnown then
@@ -999,8 +1010,9 @@ local function ApplyKeybindToTrackerIcon(icon)
         keybind = QUIKeybinds.GetKeybindForSpell(entry.id)
         -- Try spell name fallback if no keybind found
         if not keybind and QUIKeybinds.GetKeybindForSpellName then
-            local spellInfo = C_Spell.GetSpellInfo(entry.id)
-            if spellInfo and spellInfo.name then
+            -- TAINT-FIX: Wrap secret API call in pcall to prevent taint.
+            local ok, spellInfo = pcall(function() return C_Spell.GetSpellInfo(entry.id) end)
+            if ok and spellInfo and spellInfo.name then
                 keybind = QUIKeybinds.GetKeybindForSpellName(spellInfo.name)
             end
         end
@@ -1323,6 +1335,12 @@ function CustomTrackers:StartCooldownPolling(bar)
     -- Create update function that can be called from both ticker and events
     bar.DoUpdate = function()
         if not bar:IsShown() then return end
+
+        -- LOW-LEVEL SAFETY: Skip all per-icon work when no usable spells exist.
+        -- At low level, RebuildActiveSet may produce 0 active icons.
+        -- Without this guard, DoUpdate runs every 0.5s + every UNIT_AURA/SPELL_UPDATE
+        -- doing config reads and feature-flag checks for zero benefit.
+        if bar.activeIcons and #bar.activeIcons == 0 then return end
 
         local config = bar.config
         local hideNonUsable = config.hideNonUsable
@@ -2330,7 +2348,16 @@ local function ShouldCustomTrackersBeVisible()
     if not vis then return true end
 
     -- Hide When Mounted overrides all other conditions (includes Druid flight form)
-    if vis.hideWhenMounted and (IsMounted() or GetShapeshiftFormID() == 27) then return false end
+    if vis.hideWhenMounted then
+        if IsMounted() then return false end
+        -- TAINT-FIX: Wrap GetShapeshiftFormID() in pcall to prevent contaminating
+        -- Blizzard's taint-protected CooldownViewer during combat.
+        local isInFlightForm = false
+        pcall(function()
+            isInFlightForm = GetShapeshiftFormID() == 27
+        end)
+        if isInFlightForm then return false end
+    end
 
     -- Show Always overrides all conditions
     if vis.showAlways then return true end

@@ -953,7 +953,11 @@ function CooldownManager.HookViewerRefreshLayout()
             -- tainting Blizzard's execution context. The hook body must be
             -- empty of any reads/writes to Blizzard frames.
             local hookOk = pcall(hooksecurefunc, v, "RefreshLayout", function()
+                -- LOW-LEVEL SAFETY: Debounce to prevent timer flooding on empty viewers.
+                if v.__suiCMCRefreshPending then return end
+                v.__suiCMCRefreshPending = true
                 C_Timer.After(0, function()
+                    v.__suiCMCRefreshPending = nil
                     if IsCoordinatorInProgress() then
                         return
                     end

@@ -142,7 +142,15 @@ local function ProcessViewer(viewerName)
     if (not EMERGENCY_STABILITY_MODE) and viewer.Layout and not viewer._SuaviUI_EffectsHooked then
         viewer._SuaviUI_EffectsHooked = true
         hooksecurefunc(viewer, "Layout", function()
-            C_Timer.After(0.15, ProcessIcons)  -- 150ms debounce for CPU efficiency
+            -- LOW-LEVEL SAFETY: Debounce to prevent timer flooding.
+            -- Without this, each Layout call queues a new C_Timer closure
+            -- even when viewer has 0 children (all are no-ops but still allocate).
+            if viewer._SuaviUI_EffectsPending then return end
+            viewer._SuaviUI_EffectsPending = true
+            C_Timer.After(0.15, function()
+                viewer._SuaviUI_EffectsPending = nil
+                ProcessIcons()
+            end)
         end)
     end
     
