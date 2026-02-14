@@ -1406,5 +1406,3 @@ do
 	end)
 	loadLibDatabase()
 end
-
-

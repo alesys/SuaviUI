@@ -1,8 +1,8 @@
 
---data for war within expansion
+--data for midnight expansion
 do
 	local versionString, revision, launchDate, gameVersion = GetBuildInfo()
-	if (gameVersion >= 120000 or gameVersion < 110000) then
+	if (gameVersion >= 130000 or gameVersion < 120000) then
 		return
 	end
 
@@ -1406,3 +1406,5 @@ do
 	end)
 	loadLibDatabase()
 end
+
+

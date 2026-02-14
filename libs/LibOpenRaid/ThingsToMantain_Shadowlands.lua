@@ -677,5 +677,3 @@ LIB_OPEN_RAID_SPELL_DEFAULT_IDS = {
 --need to add mass dispell (32375)
 
 LIB_OPEN_RAID_DATABASE_LOADED = true
-
-

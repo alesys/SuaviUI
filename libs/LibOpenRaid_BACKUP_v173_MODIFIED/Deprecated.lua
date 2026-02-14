@@ -118,3 +118,5 @@ local spamLimit = {}
         end
     end
     setmetatable(openRaidLib.cooldownManager, deprecatedMetatable)
+
+

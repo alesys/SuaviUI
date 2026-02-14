@@ -1,5 +1,57 @@
 # SuaviUI Changelog
 
+## [v0.2.8](https://github.com/alesys/SuaviUI/tree/v0.2.8) (2026-02-14)
+
+### 📦 Library Refresh - All Libraries Updated to Latest Pristine Versions
+
+#### ⚠️ Breaking Change: LibOpenRaid Restored to Pristine v175
+- **REMOVED all taint protection patches** from LibOpenRaid
+- Restored to 100% upstream version from Details! addon
+- Backed up modified v173 to `libs/LibOpenRaid_BACKUP_v173_MODIFIED/`
+- **Expected Impact:** Taint errors will likely return (~1,000+ instances)
+- **Reason:** Following proper library management - no direct library modifications
+
+#### 📚 Library Updates Applied
+
+**Core Libraries Updated:**
+- **LibOpenRaid:** v173 (modified) → v175 (pristine from Details!)
+- **LibSharedMedia-3.0:** r151 → r164 (from WeakAuras)
+- **LibDualSpec-1.0:** r27 → r28 (from BigWigs)
+
+**Libraries Added:**
+- **AceConfig-3.0:** v3 (from AccWideUILayoutSelection)
+- **AceDBOptions-3.0:** v15 (from AccWideUILayoutSelection)
+- **LibSerialize:** r5 (from SenseiClassResourceBar)
+
+**Already Up-to-Date (Verified):**
+- AceAddon-3.0 r13, AceComm-3.0 r14, AceConsole-3.0 r7
+- AceDB-3.0 r33, AceEvent-3.0 r4, AceLocale-3.0 r6
+- CallbackHandler-1.0 r8, LibStub r2
+- LibCustomGlow-1.0 r21, LibDBIcon-1.0 r55
+- LibKeyBound-1.0 r126, LibDataBroker-1.1 r4
+- LibDeflate 1.0.2-release
+
+#### 📝 Code Policy Updates
+- Added **Rule #7** to `.copilot-instructions.md`: **NEVER Modify External Library Code**
+- Libraries must remain pristine for easy updates
+- Use wrapper/patch files if fixes needed (e.g., `LibraryName_Patches.lua`)
+- Document all patches in library folder
+
+#### 🎯 Purpose of This Release
+This is a **tester feedback release** to validate:
+1. Impact of pristine libraries on real-world gameplay
+2. Whether taint errors affect user experience significantly
+3. Community feedback on error frequency vs functionality
+
+**Total Libraries:** 19 (was 16)  
+**Libraries Updated/Added:** 6
+
+**Documentation:**
+- See `docs/LIBRARY_AUDIT.md` for complete library inventory
+- See `libs/LibOpenRaid/SUAVIUI_PATCHES.md` for historical patch documentation
+
+---
+
 ## [v0.2.7](https://github.com/alesys/SuaviUI/tree/v0.2.7) (2026-02-14)
 
 ### 🔧 Critical Bug Fix - sui_key_tracker.lua Taint Source

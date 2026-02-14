@@ -574,3 +574,5 @@ function openRaidLib.GearManager.BuildEquipmentItemLinks(equippedGearList)
         end
     end
 end
+
+
