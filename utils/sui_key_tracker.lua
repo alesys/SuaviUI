@@ -299,12 +299,18 @@ _G.SuaviUI_RefreshKeyTrackerFonts = UpdateAllButtonFonts
 local function UpdateButtonCooldown(button)
     if InCombatLockdown() then return end
     if button.spellID then
-        local cooldownInfo = C_Spell.GetSpellCooldown(button.spellID)
+        -- TAINT-FIX: Wrap C_Spell.GetSpellCooldown to prevent triggering Blizzard's cache refresh
+        local success, cooldownInfo = pcall(C_Spell.GetSpellCooldown, button.spellID)
+        if not success or not cooldownInfo then
+            button.cooldownOverlay:Hide()
+            return
+        end
+        
         -- Use pcall to handle secret values in Midnight (startTime/duration can be protected)
-        local success, showCooldown = pcall(function()
+        local success2, showCooldown = pcall(function()
             return cooldownInfo and cooldownInfo.startTime > 0 and cooldownInfo.duration > 5
         end)
-        if success and showCooldown then
+        if success2 and showCooldown then
             button.cooldownOverlay:Show()
         else
             button.cooldownOverlay:Hide()
@@ -542,6 +548,10 @@ eventFrame:RegisterEvent("GROUP_LEFT")
 eventFrame:RegisterEvent("CHALLENGE_MODE_COMPLETED")
 eventFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 
+-- TAINT-FIX: Debounce cooldown updates to prevent constant cache refresh
+local lastCooldownUpdate = 0
+local COOLDOWN_UPDATE_THROTTLE = 3  -- Only update cooldowns every 3 seconds
+
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
         local loadedAddon = ...
@@ -579,7 +589,10 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             end
         end)
     elseif event == "SPELL_UPDATE_COOLDOWN" then
-        if not InCombatLockdown() then
+        -- TAINT-FIX: Throttle to prevent triggering Blizzard's spell cache refresh constantly
+        local now = GetTime()
+        if not InCombatLockdown() and (now - lastCooldownUpdate) >= COOLDOWN_UPDATE_THROTTLE then
+            lastCooldownUpdate = now
             for i = 0, 4 do
                 UpdateButtonCooldown(keystoneButtons[i])
             end

@@ -1,5 +1,53 @@
 # SuaviUI Changelog
 
+## [v0.2.7](https://github.com/alesys/SuaviUI/tree/v0.2.7) (2026-02-14)
+
+### 🔧 Critical Bug Fix - sui_key_tracker.lua Taint Source
+
+#### Root Cause (Why v0.2.6 Didn't Work)
+- **v0.2.6 Protected:** LibOpenRaid from tainting during combat ✅
+- **v0.2.6 Missed:** sui_key_tracker.lua calling `C_Spell.GetSpellCooldown()` OUTSIDE combat
+- **Result:** Error count increased 665→771 (+106) because SPELL_UPDATE_COOLDOWN fires constantly after combat ends
+
+#### The Real Taint Path
+```
+SPELL_UPDATE_COOLDOWN (fires constantly post-combat) →
+sui_key_tracker.lua handler (runs when NOT in combat) →
+UpdateButtonCooldown() →
+C_Spell.GetSpellCooldown(dungeonTeleportSpellID) [UNPROTECTED] →
+Blizzard's internal cooldown code triggers →
+Blizzard calls HasPetSpells() to refresh spell cache →
+HasPetSpells() returns tainted value →
+Blizzard stores tainted value in cache →
+hasTotem becomes tainted →
+ERROR: "hasTotem (a secret boolean value tainted by 'SuaviUI'"
+```
+
+#### Fixes Applied
+
+1. **Wrap C_Spell.GetSpellCooldown with pcall()** (sui_key_tracker.lua:300)
+   - Prevents triggering Blizzard's spell cache refresh
+   - Safe fallback if call fails
+
+2. **Add aggressive throttle to SPELL_UPDATE_COOLDOWN handler** (sui_key_tracker.lua:547-558)
+   - Only updates cooldowns every 3 seconds (was: every event)
+   - Reduces cache refresh triggers from 100s/minute to ~20/minute
+   - Maintains functionality while minimizing taint opportunities
+
+3. **Combat lockdown checks remain in place**
+   - LibOpenRaid still blocked during combat (v0.2.6)
+   - Key tracker blocks updates during combat
+   - Combined protection for all scenarios
+
+### 📊 Summary (Cumulative)
+- **15 taint protection fixes** (secret API calls + LibOpenRaid guards + HasPetSpells + C_Spell.GetSpellCooldown)
+- **7 low-level safety guards** (empty viewers)
+- **6 debounce/throttle improvements** (layout hooks + SPELL_UPDATE_COOLDOWN)
+- **1 optimization** (empty tracker bars)
+- **Total: 29 targeted fixes**
+
+---
+
 ## [v0.2.6](https://github.com/alesys/SuaviUI/tree/v0.2.6) (2026-02-14)
 
 ### 🔧 Critical Bug Fixes - HasPetSpells() Taint Elimination
