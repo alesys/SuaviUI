@@ -12,6 +12,7 @@ SuaviUI.StyledIcons = StyledIcons
 -- TEMP: Force-disable CDM icon styling (square icons + size normalization)
 -- Re-enabled to restore main CDM styling feature.
 local FORCE_DISABLE_CDM_STYLING = false
+local DISABLE_PANDEMIC_ALERT_HOOK = true
 
 local isModuleStyledEnabled = false
 local areHooksInitialized = false
@@ -297,39 +298,37 @@ local function ProcessViewer(viewer, viewerSettingName, applyStyle)
         if child and not (issecretvalue and issecretvalue(child)) then
             -- Check Icon property safely
             local hasIcon = false
-            if pcall(function() hasIcon = child.Icon ~= nil end) then
-                if hasIcon then
-                    if applyStyle then
-                        ApplySquareStyle(child, viewerSettingName)
-                    else
-                        RestoreOriginalStyle(child, viewerSettingName)
-                    end
+            if pcall(function() hasIcon = child.Icon ~= nil end) and hasIcon then
+                if applyStyle then
+                    ApplySquareStyle(child, viewerSettingName)
+                else
+                    RestoreOriginalStyle(child, viewerSettingName)
+                end
 
-                    -- Hook pandemic alerts (guard against tainted child)
-                    if not (issecretvalue and issecretvalue(child)) and child.TriggerPandemicAlert and not child._suiStyleHooked then
-                        child._suiStyleHooked = true
-                        hooksecurefunc(child, "TriggerPandemicAlert", function()
-                            -- TAINT-FIX: Defer ALL work to avoid tainting execution context.
-                            -- TriggerPandemicAlert fires inside RefreshData's event chain.
-                            C_Timer.After(0, function()
-                                if child.PandemicIcon and not (issecretvalue and issecretvalue(child.PandemicIcon)) then
-                                    if applyStyle then
-                                        child.PandemicIcon:SetScale(1.38)
-                                    else
-                                        child.PandemicIcon:SetScale(1.0)
-                                    end
+                -- Hook pandemic alerts (guard against tainted child)
+                if (not DISABLE_PANDEMIC_ALERT_HOOK) and not (issecretvalue and issecretvalue(child)) and child.TriggerPandemicAlert and not child._suiStyleHooked then
+                    child._suiStyleHooked = true
+                    hooksecurefunc(child, "TriggerPandemicAlert", function()
+                        -- TAINT-FIX: Defer ALL work to avoid tainting execution context.
+                        -- TriggerPandemicAlert fires inside RefreshData's event chain.
+                        C_Timer.After(0, function()
+                            if child.PandemicIcon and not (issecretvalue and issecretvalue(child.PandemicIcon)) then
+                                if applyStyle then
+                                    child.PandemicIcon:SetScale(1.38)
+                                else
+                                    child.PandemicIcon:SetScale(1.0)
                                 end
-                            end)
+                            end
                         end)
-                    end
+                    end)
+                end
 
-                    -- Scale debuff border (guard against tainted child)
-                    if child.DebuffBorder and not (issecretvalue and issecretvalue(child.DebuffBorder)) then
-                        if applyStyle then
-                            child.DebuffBorder:SetScale(1.7)
-                        else
-                            child.DebuffBorder:SetScale(1.0)
-                        end
+                -- Scale debuff border (guard against tainted child)
+                if child.DebuffBorder and not (issecretvalue and issecretvalue(child.DebuffBorder)) then
+                    if applyStyle then
+                        child.DebuffBorder:SetScale(1.7)
+                    else
+                        child.DebuffBorder:SetScale(1.0)
                     end
                 end
             end
