@@ -51,28 +51,24 @@ local function GetPlayerKeystoneData()
         timestamp = GetTime(),
     }
 
-    -- Get current key level and map
-    local currentMapID = C_MythicPlus.GetCurrentMapID()
-    if currentMapID and currentMapID > 0 then
-        keystoneData.mapID = currentMapID
-        keystoneData.level = C_MythicPlus.GetCurrentLevel() or 0
-        keystoneData.challengeMapID = C_MythicPlus.GetMapChallengeModeID(currentMapID) or currentMapID
-        keystoneData.mythicPlusMapID = currentMapID
-    else
-        -- If not in a key, get the keystone in inventory
-        local level, mapID = C_MythicPlus.GetCurrentEarned()
-        if mapID and mapID > 0 then
-            keystoneData.level = level or 0
-            keystoneData.mapID = mapID
-            keystoneData.challengeMapID = C_MythicPlus.GetMapChallengeModeID(mapID) or mapID
-            keystoneData.mythicPlusMapID = mapID
-        end
+    -- Try using C_ChallengeMode to detect active keystone
+    local challengeID = C_ChallengeMode.GetActiveChallengeMapID()
+    if challengeID and challengeID > 0 then
+        -- We're in an active M+ dungeon
+        keystoneData.challengeMapID = challengeID
+        keystoneData.mapID = challengeID
+        -- Get level from C_ChallengeMode
+        local level = C_ChallengeMode.GetActiveKeystoneLevel()
+        keystoneData.level = level or 0
+        keystoneData.mythicPlusMapID = challengeID
     end
 
     -- Get M+ rating
-    local ratingInfo = C_PlayerInfo.GetPlayerMythicPlusRatingSummary("player")
-    if ratingInfo and ratingInfo.currentSeasonScore then
-        keystoneData.rating = ratingInfo.currentSeasonScore or 0
+    if C_PlayerInfo and C_PlayerInfo.GetPlayerMythicPlusRatingSummary then
+        local ratingInfo = C_PlayerInfo.GetPlayerMythicPlusRatingSummary("player")
+        if ratingInfo and ratingInfo.currentSeasonScore then
+            keystoneData.rating = ratingInfo.currentSeasonScore or 0
+        end
     end
 
     return keystoneData
@@ -282,10 +278,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 end)
 
 -- Sync keystone when it changes during gameplay
-frame:RegisterEvent("MYTHIC_PLUS_DUNGEON_CHANGED")
 frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-frame:RegisterEvent("UNIT_INVENTORY_CHANGED")
-frame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+frame:RegisterEvent("CHALLENGE_MODE_START")
+frame:RegisterEvent("CHALLENGE_MODE_COMPLETED")
 
 -- Update our cache and notify if in group
 local syncTimer = nil
@@ -302,9 +297,9 @@ local function OnKeystoneChange()
 end
 
 frame:HookScript("OnEvent", function(self, event, ...)
-    if event == "MYTHIC_PLUS_DUNGEON_CHANGED" or 
-       event == "ZONE_CHANGED_NEW_AREA" or 
-       event == "UNIT_INVENTORY_CHANGED" then
+    if event == "ZONE_CHANGED_NEW_AREA" or 
+       event == "CHALLENGE_MODE_START" or 
+       event == "CHALLENGE_MODE_COMPLETED" then
         OnKeystoneChange()
     end
 end)
