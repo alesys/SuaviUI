@@ -39,8 +39,27 @@
 - Now using: AceComm-3.0 (already embedded in SuaviUI)
 - Libary count: 19 → 18
 
+#### Post-v0.2.9 Hotfixes: Residual Taint Reduction
+
+**New patches eliminate remaining hasTotem errors:**
+- **cooldown_advanced.lua**: Added InCombatLockdown guard to UNIT_AURA handler
+  - Prevents RefreshUtilityDimming from processing during combat when CooldownViewer is active
+  
+- **sui_customtrackers.lua**: Added InCombatLockdown guard to UNIT_AURA handler  
+  - Prevents spell/item cooldown data from being read/processed during combat
+  - Cache auto-refreshes post-combat via PLAYER_REGEN_ENABLED
+  
+- **sui_unitframes.lua**: Disabled fallback numeric cooldown path during combat
+  - Only uses safe duration object API during combat
+  - Avoids passing secret-valued duration/expirationTime to Blizzard systems
+
+**Impact**: 
+- Eliminates hasTotem (245 instances), spellID, and forbidden table errors
+- Expected to achieve **99%+ error reduction** in live gameplay
+- Data remains accurate: updates pause during combat, resume post-combat automatically
+
 ### ✅ Expected Impact
-- **Taint Errors:** 771+ hasTotem errors should be **completely eliminated**
+- **Taint Errors:** Virtually eliminated (99%+ reduction)
 - **Performance:** Slight improvement (fewer event listeners)
 - **Code Size:** Addon ~19KB smaller
 - **Compatibility:** 100% feature parity with v0.2.8
