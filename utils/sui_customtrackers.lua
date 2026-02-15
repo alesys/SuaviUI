@@ -588,29 +588,40 @@ end
 local function GetSpellActiveInfo(spellID)
     if not spellID then return false end
 
-    -- Check casting first (shortest duration typically)
-    local isCasting, castStart, castEnd = GetSpellCastInfo(spellID)
-    if isCasting and castStart and castEnd then
-        local startSec = castStart / 1000
-        local durationSec = (castEnd - castStart) / 1000
-        return true, startSec, durationSec, "cast"
-    end
+    -- TAINT-FIX: Wrap arithmetic with secret values in pcall to prevent taint introduction
+    -- Secret values returned from APIs can contaminate Blizzard systems if used in unprotected arithmetic.
+    -- Even though GetSpellBuffInfo uses pcall for the API call, the RETURNED secret values
+    -- are used in arithmetic (expiration - buffDuration) outside pcall. This introduces taint.
+    local ok, result = pcall(function()
+        -- Check casting first (shortest duration typically)
+        local isCasting, castStart, castEnd = GetSpellCastInfo(spellID)
+        if isCasting and castStart and castEnd then
+            local startSec = castStart / 1000
+            local durationSec = (castEnd - castStart) / 1000
+            return { isActive=true, startSec=startSec, duration=durationSec, type="cast" }
+        end
 
-    -- Check channeling
-    local isChanneling, channelStart, channelEnd = GetSpellChannelInfo(spellID)
-    if isChanneling and channelStart and channelEnd then
-        local startSec = channelStart / 1000
-        local durationSec = (channelEnd - channelStart) / 1000
-        return true, startSec, durationSec, "channel"
-    end
+        -- Check channeling
+        local isChanneling, channelStart, channelEnd = GetSpellChannelInfo(spellID)
+        if isChanneling and channelStart and channelEnd then
+            local startSec = channelStart / 1000
+            local durationSec = (channelEnd - channelStart) / 1000
+            return { isActive=true, startSec=startSec, duration=durationSec, type="channel" }
+        end
 
-    -- Check buff (longest duration typically)
-    local hasBuff, expiration, buffDuration = GetSpellBuffInfo(spellID)
-    if hasBuff and expiration and buffDuration then
-        local startSec = expiration - buffDuration
-        return true, startSec, buffDuration, "buff"
-    end
+        -- Check buff (longest duration typically) - SECRET VALUES PROTECTED HERE
+        local hasBuff, expiration, buffDuration = GetSpellBuffInfo(spellID)
+        if hasBuff and expiration and buffDuration then
+            local startSec = expiration - buffDuration  -- Arithmetic with secret values now protected by pcall
+            return { isActive=true, startSec=startSec, duration=buffDuration, type="buff" }
+        end
 
+        return { isActive=false }
+    end)
+
+    if ok and result and result.isActive then
+        return true, result.startSec, result.duration, result.type
+    end
     return false
 end
 
