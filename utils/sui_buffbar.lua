@@ -352,24 +352,30 @@ local function FetchBuffBarData()
         if ok and info then
             local spellID = info.overrideSpellID or info.spellID
             if spellID then
-                local auraData
+                -- TAINT-FIX: Wrap both API call AND data access in pcall
+                -- Comparing/accessing secret-valued auraData outside pcall introduces taint
+                local auraResult = {}
                 pcall(function()
-                    auraData = C_UnitAuras.GetPlayerAuraBySpellID(spellID)
-                end)
-                if auraData and auraData.duration and auraData.duration > 0 then
-                    local texture = auraData.icon
-                    if not texture then
-                        pcall(function() texture = C_Spell.GetSpellTexture(spellID) end)
+                    local auraData = C_UnitAuras.GetPlayerAuraBySpellID(spellID)
+                    if auraData and auraData.duration and auraData.duration > 0 then
+                        local texture = auraData.icon
+                        if not texture then
+                            local texOk, tex = pcall(C_Spell.GetSpellTexture, spellID)
+                            if texOk then texture = tex end
+                        end
+                        auraResult = {
+                            cooldownID     = cdID,
+                            spellID        = spellID,
+                            layoutIndex    = layoutIdx,
+                            name           = auraData.name or "",
+                            texture        = texture,
+                            duration       = auraData.duration,
+                            expirationTime = auraData.expirationTime,
+                        }
                     end
-                    results[#results + 1] = {
-                        cooldownID  = cdID,
-                        spellID     = spellID,
-                        layoutIndex = layoutIdx,
-                        name        = auraData.name or "",
-                        texture     = texture,
-                        duration    = auraData.duration,
-                        expirationTime = auraData.expirationTime,
-                    }
+                end)
+                if auraResult.cooldownID then
+                    results[#results + 1] = auraResult
                 end
             end
         end
@@ -571,25 +577,31 @@ local function FetchBuffIconData()
         if ok and info then
             local spellID = info.overrideSpellID or info.spellID
             if spellID then
-                local auraData
+                -- TAINT-FIX: Wrap both API call AND data access in pcall
+                -- Accessing secret-valued auraData outside pcall introduces taint
+                local auraResult = {}
                 pcall(function()
-                    auraData = C_UnitAuras.GetPlayerAuraBySpellID(spellID)
-                end)
-                if auraData then
-                    local texture = auraData.icon
-                    if not texture then
-                        pcall(function() texture = C_Spell.GetSpellTexture(spellID) end)
+                    local auraData = C_UnitAuras.GetPlayerAuraBySpellID(spellID)
+                    if auraData then
+                        local texture = auraData.icon
+                        if not texture then
+                            local texOk, tex = pcall(C_Spell.GetSpellTexture, spellID)
+                            if texOk then texture = tex end
+                        end
+                        auraResult = {
+                            cooldownID     = cdID,
+                            spellID        = spellID,
+                            layoutIndex    = layoutIdx,
+                            name           = auraData.name or "",
+                            texture        = texture,
+                            duration       = auraData.duration or 0,
+                            expirationTime = auraData.expirationTime or 0,
+                            applications   = auraData.applications or 0,
+                        }
                     end
-                    results[#results + 1] = {
-                        cooldownID     = cdID,
-                        spellID        = spellID,
-                        layoutIndex    = layoutIdx,
-                        name           = auraData.name or "",
-                        texture        = texture,
-                        duration       = auraData.duration or 0,
-                        expirationTime = auraData.expirationTime or 0,
-                        applications   = auraData.applications or 0,
-                    }
+                end)
+                if auraResult.cooldownID then
+                    results[#results + 1] = auraResult
                 end
             end
         end
