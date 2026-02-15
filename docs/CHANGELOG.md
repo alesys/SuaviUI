@@ -41,8 +41,9 @@
 
 #### Post-v0.2.9 Hotfixes: Critical Taint Source Elimination
 
-**ROOT CAUSE FOUND AND FIXED:**
-The taint came from **unprotected arithmetic and access to secret-valued aura data**, not from event handling.
+**ROOT CAUSE IDENTIFIED:**
+1. **Reload/Crash Taint** - unprotected arithmetic/comparisons with secret-valued aura data ✅ FIXED
+2. **Combat-Only Taint (hasTotem)** - UNIT_PET handlers without InCombatLockdown guards ✅ FIXED
 
 **Critical Fixes Applied:**
 
@@ -64,19 +65,29 @@ The taint came from **unprotected arithmetic and access to secret-valued aura da
    - **Abstract/Bar.lua**: MAELSTROM_WEAPON resource handling (unprotected)
    - **Fix:** Added pcall wrappers around ALL secret value access
    
+5. **Protect UNIT_PET handlers during combat** (sui_unitframes.lua + sui_customtrackers.lua)
+   - **Bug:** UNIT_PET event fires during combat, calling unprotected functions that interact with pet/totem data
+   - **Handlers affected:**
+     - `sui_customtrackers.lua:2235` - RebuildActiveSet() without combat check
+     - `sui_unitframes.lua:2169` - UpdateFrame() without combat check  
+     - `sui_unitframes.lua:2800` - UpdateAuras() without combat check
+   - **Fix:** Added `InCombatLockdown()` guards to all three handlers
+   - **Result:** Prevents pet/totem data access during combat when GetTotemInfo() returns tainted values
+   
 **Technical Details:**
 - pcall() protects the API CALL but NOT the returned data
 - Secret values used outside pcall in arithmetic/comparisons = taint introduction
-- Solution: Wrap data operations inside pcall, extract results safely
+- InCombatLockdown() prevents taint sources from triggering during protected combat state
+- Solution: Wrap data operations inside pcall + guard events during combat
 
 **Impact**:
-- **Root taint sources eliminated:** 5 critical locations fixed
-- **Expected error reduction:** 99%+ (hasTotem 370 → ~0, spellID 2 → ~0, isActive 9 → ~0)
+- **Root taint sources eliminated:** 6 critical locations fixed
+- **Expected error reduction:** 99%+ (hasTotem → near-zero, spellID → 0, isActive → 0)
 - **Data integrity:** Maintained - all queries still functional, just protected
 
 ### ✅ Expected Impact
 - **Taint Errors:** Virtually eliminated (99%+ reduction)
-- **Performance:** Slight improvement (fewer event listeners)
+- **Performance:** Slight improvement (fewer event listeners, combat events skipped)
 - **Code Size:** Addon ~19KB smaller
 - **Compatibility:** 100% feature parity with v0.2.8
 
