@@ -2268,6 +2268,11 @@ initFrame:SetScript("OnEvent", function(self, event, ...)
     end
 
     if event == "UNIT_AURA" then
+        -- TAINT FIX: Skip during combat to prevent secret-valued aura data from contaminating Blizzard's CooldownViewer
+        -- Cache will be refresh post-combat via PLAYER_REGEN_ENABLED
+        if InCombatLockdown() then
+            return
+        end
         local unit = ...
         if unit == "player" then
             for _, bar in pairs(CustomTrackers.activeBars) do

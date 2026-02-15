@@ -2515,6 +2515,10 @@ local function UpdateAuras(frame)
 
         local applied = false
 
+        -- TAINT FIX: During combat, only use duration object API to avoid secret-valued arithmetic
+        -- The fallback numeric path uses secret values that can contaminate Blizzard systems
+        local inCombat = InCombatLockdown()
+
         -- Prefer duration object API (combat-safe on enemy targets)
         if cooldownFrame.SetCooldownFromDurationObject and auraData.auraInstanceID then
             local durationObj
@@ -2530,7 +2534,7 @@ local function UpdateAuras(frame)
                 if setOk then
                     applied = true
                 else
-                    -- Fallback: derive numbers from duration object methods
+                    -- Fallback: derive numbers from duration object methods (safe - only uses non-secret API returns)
                     local eOK, elapsed = pcall(durationObj.GetElapsedDuration, durationObj)
                     local rOK, remaining = pcall(durationObj.GetRemainingDuration, durationObj)
                     if eOK and rOK and elapsed and remaining then
@@ -2545,8 +2549,10 @@ local function UpdateAuras(frame)
             end
         end
 
-        -- Fallback: numeric start/duration (avoid comparisons; allow secret-safe arithmetic)
-        if not applied then
+        -- Fallback: numeric start/duration - ONLY use outside combat
+        -- During combat, Blizzard's CooldownViewer is active and we should not pass secret-valued data
+        -- This fallback uses secret values (auraData.duration, auraData.expirationTime) which can contaminate
+        if not applied and not inCombat then
             local duration = auraData.duration
             local expirationTime = auraData.expirationTime
             if duration and expirationTime then

@@ -298,6 +298,10 @@ local function HookCooldownUpdates()
                 CooldownAdvanced.RefreshViewerSwipeColors(viewerName)
             end
         elseif event == "UNIT_AURA" then
+            -- TAINT FIX: Skip during combat to prevent Blizzard CooldownViewer from encountering tainted aura data
+            if InCombatLockdown() then
+                return
+            end
             local unit = ...
             if unit == "player" then
                 CooldownAdvanced.RefreshUtilityDimming()
