@@ -2167,7 +2167,7 @@ local function CreateUnitFrame(unit, unitKey)
                 end
             end
         elseif event == "UNIT_PET" then
-            if self.unitKey == "pet" and not InCombatLockdown() then
+            if self.unitKey == "pet" then
                 -- State driver handles visibility, just update if unit exists
                 if UnitExists(self.unit) then
                     UpdateFrame(self)
@@ -2799,12 +2799,8 @@ local function SetupAuraTracking(frame)
             UpdateAuras(self)
         elseif event == "UNIT_PET" and self.unit == "pet" then
             -- Pet changed (summoned/dismissed)
-            -- Protected in combat: skip aura updates during InCombatLockdown
-            -- to prevent accessing tainted pet data (hasTotem taint in CooldownViewer)
-            if not InCombatLockdown() then
-                lastAuraUpdate["pet"] = 0
-                UpdateAuras(self)
-            end
+            lastAuraUpdate["pet"] = 0
+            UpdateAuras(self)
         elseif event == "UNIT_TARGET" and self.unit == "targettarget" then
             -- Target's target changed
             lastAuraUpdate["targettarget"] = 0

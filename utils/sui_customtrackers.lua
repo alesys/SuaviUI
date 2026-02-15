@@ -2234,7 +2234,7 @@ initFrame:SetScript("OnEvent", function(self, event, ...)
     -- and new pet abilities need to be picked up.
     if event == "UNIT_PET" then
         local unit = ...
-        if unit == "player" and not InCombatLockdown() then
+        if unit == "player" then
             -- Small delay to ensure pet spell info is fully updated
             C_Timer.After(0.2, function()
                 for _, bar in pairs(CustomTrackers.activeBars) do
