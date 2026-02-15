@@ -559,7 +559,13 @@ local function OnTooltipSetItem(tooltip, data)
 
     -- Skip if in Auction House or vehicle
     if (AuctionFrame or AuctionHouseFrame) and (AuctionFrame or AuctionHouseFrame):IsVisible() then return end
-    if UnitHasVehicleUI and UnitHasVehicleUI('player') then return end
+    
+    -- TAINT-FIX: Protect vehicle UI check
+    local hasVehicleUI = false
+    pcall(function()
+        hasVehicleUI = UnitHasVehicleUI and UnitHasVehicleUI('player') or false
+    end)
+    if hasVehicleUI then return end
 
     -- Get item info from tooltip data
     local itemID, itemLink

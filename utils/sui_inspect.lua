@@ -530,8 +530,15 @@ local function UpdateInspectILvlDisplay()
     unit = unit or "target"
 
     -- Validate that unit matches our stored GUID (handles target changes mid-inspect)
-    if currentInspectGUID and UnitGUID(unit) ~= currentInspectGUID then
-        return  -- Unit changed, skip stale update
+    -- TAINT-FIX: Protect UnitGUID calls during frame updates
+    if currentInspectGUID then
+        local unitGUID
+        pcall(function()
+            unitGUID = UnitGUID(unit)
+        end)
+        if unitGUID and unitGUID ~= currentInspectGUID then
+            return  -- Unit changed, skip stale update
+        end
     end
 
     -- Get target info

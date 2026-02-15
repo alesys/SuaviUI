@@ -246,7 +246,15 @@ local function ShowUnitTooltip(frame)
         end
     end
 
-    if not unit or not UnitExists(unit) then return end
+    if not unit then return end
+
+    -- TAINT-FIX: Protect UnitExists call in tooltip functions
+    -- These can be triggered during combat mouseovers
+    local unitExists = false
+    pcall(function()
+        unitExists = UnitExists(unit)
+    end)
+    if not unitExists then return end
 
     -- Position and show tooltip
     GameTooltip_SetDefaultAnchor(GameTooltip, frame)
@@ -587,8 +595,12 @@ local function GetHealthBarColor(unit, settings)
             end
         else
             -- Unit is not a player (pet, NPC, etc.) - use owner's class color for pets
-            local petCheck = UnitIsUnit(unit, "pet")
-            local playerPetCheck = UnitIsUnit(unit, "playerpet")
+            -- TAINT-FIX: Protect unit comparison calls during combat in color calculation
+            local petCheck, playerPetCheck = false, false
+            pcall(function()
+                petCheck = UnitIsUnit(unit, "pet") or false
+                playerPetCheck = UnitIsUnit(unit, "playerpet") or false
+            end)
             local isPet = (not IsSecretValue(petCheck) and petCheck == true) or (not IsSecretValue(playerPetCheck) and playerPetCheck == true)
             if isPet then
                 -- Pet: use player's class color

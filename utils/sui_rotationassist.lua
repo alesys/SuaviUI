@@ -346,7 +346,13 @@ UpdateVisibility = function()
     elseif visibility == "combat" then
         shouldShow = inCombat
     elseif visibility == "hostile" then
-        shouldShow = UnitExists("target") and UnitCanAttack("player", "target")
+        -- TAINT-FIX: Protect UnitExists() calls during SPELL_UPDATE_COOLDOWN combat events
+        -- These protected APIs return secret values during combat that can taint Blizzard systems
+        local canAttackTarget = false
+        pcall(function()
+            canAttackTarget = UnitExists("target") and UnitCanAttack("player", "target")
+        end)
+        shouldShow = canAttackTarget
     end
 
     if shouldShow then
