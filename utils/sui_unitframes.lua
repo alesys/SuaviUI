@@ -4820,13 +4820,29 @@ function SUI_UF:Initialize()
         end
     end
 
-    -- Single delayed refresh to catch health values once available
-    -- (Consolidated from 3 calls at 0.5s/1.0s/2.0s to reduce CPU spike on login)
-    C_Timer.After(1.5, function() self:RefreshAll() end)
+    -- Start ticker-based health/power updates (NEW: replaces event-based updates)
+    -- This is critical - we removed UNIT_HEALTH, UNIT_POWER_UPDATE event listeners
+    -- because calling protected APIs in event handlers during combat causes taint
+    -- Instead, ticker safely calls Update* functions from timer context
+    if not self.updateTicker then
+        self.updateTicker = C_Timer.NewTicker(0.1, function()
+            -- Update all visible frames' health/power/text without event handling
+            for unitKey, frame in pairs(self.frames) do
+                if frame and frame.unit and frame:IsShown() then
+                    if not self.previewMode[unitKey] and UnitExists(frame.unit) then
+                        UpdateHealth(frame)
+                        UpdateAbsorbs(frame)
+                        UpdatePower(frame)
+                        UpdatePowerText(frame)
+                        UpdateName(frame)
+                    end
+                end
+            end
+        end)
+    end
 
-    -- Performance: Removed 200ms health polling ticker
-    -- UNIT_HEALTH and UNIT_POWER_UPDATE events already handle updates reliably
-    -- The ticker was polling ALL unit frames 5x/sec even when no health changed
+    -- Single delayed refresh to catch health values once available
+    C_Timer.After(1.5, function() self:RefreshAll() end)
 end
 
 ---------------------------------------------------------------------------
@@ -5248,62 +5264,3 @@ end
 
 
 
-
-
-
----------------------------------------------------------------------------
--- SHARED TICKER: Update all visible frames' health/power periodically
--- This replaces event-based UNIT_HEALTH, UNIT_POWER_UPDATE, UNIT_POWER_FREQUENT
--- listeners to avoid taint cascades during combat
----------------------------------------------------------------------------
-local unitFrameUpdateTicker = nil
-local UNITFRAME_UPDATE_INTERVAL = 0.1  -- 100ms = 10 updates/sec (smooth but not excessive)
-
-local function StartUnitFramesUpdateTicker()
-    if unitFrameUpdateTicker then return end
-    unitFrameUpdateTicker = C_Timer.NewTicker(UNITFRAME_UPDATE_INTERVAL, function()
-        -- Update all unit frames that are visible
-        for unitKey, frame in pairs(SUI_UF.frames) do
-            if frame and frame.unit and frame:IsShown() then
-                -- Skip preview mode frames
-                if not SUI_UF.previewMode[unitKey] then
-                    -- Update health, power, and text without triggering events
-                    if UnitExists(frame.unit) then
-                        UpdateHealth(frame)
-                        UpdateAbsorbs(frame)
-                        UpdatePower(frame)
-                        UpdatePowerText(frame)
-                        UpdateName(frame)
-                    end
-                end
-            end
-        end
-        
-        -- Also update boss frames
-        for bossKey, frame in pairs(SUI_UF.bossFrames or {}) do
-            if frame and frame.unit and frame:IsShown() then
-                if not SUI_UF.previewMode[bossKey] then
-                    if UnitExists(frame.unit) then
-                        UpdateHealth(frame)
-                        UpdateAbsorbs(frame)
-                        UpdatePower(frame)
-                        UpdatePowerText(frame)
-                        UpdateName(frame)
-                    end
-                end
-            end
-        end
-    end)
-end
-
-local function StopUnitFramesUpdateTicker()
-    if unitFrameUpdateTicker then
-        unitFrameUpdateTicker:Cancel()
-        unitFrameUpdateTicker = nil
-    end
-end
-
--- Start ticker when addon loads
-C_Timer.After(0, function()
-    StartUnitFramesUpdateTicker()
-end)
