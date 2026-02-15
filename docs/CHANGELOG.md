@@ -1,6 +1,6 @@
 # SuaviUI Changelog
 
-## [v0.2.8](https://github.com/alesys/SuaviUI/tree/v0.2.8) (2026-02-14)
+## [v0.2.8](https://github.com/alesys/SuaviUI/tree/v0.2.8) (2026-02-14 5:18 PM)
 
 ### 📦 Library Refresh - All Libraries Updated to Latest Pristine Versions
 
@@ -50,9 +50,16 @@ This is a **tester feedback release** to validate:
 - See `docs/LIBRARY_AUDIT.md` for complete library inventory
 - See `libs/LibOpenRaid/SUAVIUI_PATCHES.md` for historical patch documentation
 
+### ⚠️ Known Issues - v0.2.8
+
+- **Taint Errors:** 771+ "hasTotem secret value tainted by 'SuaviUI'" errors expected (from pristine LibOpenRaid v175)
+  - These are cosmetic errors that appear in BugGrabber but should not affect gameplay
+  - **Testers please report:** Error frequency, performance impact, whether they affect gameplay
+  - Each error is a failed lua operation on tainted data (not an addon crash)
+
 ---
 
-## [v0.2.7](https://github.com/alesys/SuaviUI/tree/v0.2.7) (2026-02-14)
+## [v0.2.7](https://github.com/alesys/SuaviUI/tree/v0.2.7) (2026-02-14 4:14 PM)
 
 ### 🔧 Critical Bug Fix - sui_key_tracker.lua Taint Source
 
@@ -100,7 +107,7 @@ ERROR: "hasTotem (a secret boolean value tainted by 'SuaviUI'"
 
 ---
 
-## [v0.2.6](https://github.com/alesys/SuaviUI/tree/v0.2.6) (2026-02-14)
+## [v0.2.6](https://github.com/alesys/SuaviUI/tree/v0.2.6) (2026-02-14 4:01 PM)
 
 ### 🔧 Critical Bug Fixes - HasPetSpells() Taint Elimination
 
@@ -147,7 +154,7 @@ GetTotemInfo() returns tainted hasTotem → RefreshTotemData() errors
 
 ---
 
-## [v0.2.5](https://github.com/alesys/SuaviUI/tree/v0.2.5) (2026-02-14)
+## [v0.2.5](https://github.com/alesys/SuaviUI/tree/v0.2.5) (2026-02-14 3:12 PM)
 
 ### 🔧 Bug Fixes - Continued Taint Protection
 
