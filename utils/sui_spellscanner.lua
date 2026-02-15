@@ -301,9 +301,17 @@ function SpellScanner.IsSpellActive(spellID)
     -- (handles cases where we missed the cast event)
     local data = GetScannedSpell(spellID)
     if data and data.buffSpellID and not InCombatLockdown() then
-        local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, data.buffSpellID)
-        if ok and aura and aura.expirationTime then
-            return true, aura.expirationTime, aura.duration
+        -- TAINT-FIX: Wrap both API call AND data access in pcall
+        -- Accessing aura.expirationTime comparison outside pcall introduces taint
+        local result = {}
+        pcall(function()
+            local aura = C_UnitAuras.GetPlayerAuraBySpellID(data.buffSpellID)
+            if aura and aura.expirationTime then
+                result = { isActive=true, expirationTime=aura.expirationTime, duration=aura.duration }
+            end
+        end)
+        if result.isActive then
+            return true, result.expirationTime, result.duration
         end
     end
 
