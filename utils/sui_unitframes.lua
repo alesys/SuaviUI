@@ -1372,65 +1372,70 @@ end
 local function UpdateFrame(frame)
     if not frame then return end
     
-    -- Always update health bar color (for dark mode toggle even when unit doesn't exist)
-    if frame.healthBar then
-        local general = GetGeneralSettings()
-        local settings = GetUnitSettings(frame.unitKey)
+    -- COMPREHENSIVE TAINT PROTECTION: Wrap entire update cycle
+    -- All unit API calls deep in the call chain are protected by this pcall.
+    -- This prevents secret values from cascading taint to Blizzard systems.
+    pcall(function()
+        -- Always update health bar color (for dark mode toggle even when unit doesn't exist)
+        if frame.healthBar then
+            local general = GetGeneralSettings()
+            local settings = GetUnitSettings(frame.unitKey)
 
-        if general and general.darkMode then
-            local c = general.darkModeHealthColor or { 0.15, 0.15, 0.15, 1 }
-            frame.healthBar:SetStatusBarColor(c[1], c[2], c[3], c[4] or 1)
-        else
-            -- Use unit-specific color settings (class color → hostility color → custom color)
-            local r, g, b, a = GetHealthBarColor(frame.unit, settings)
-            frame.healthBar:SetStatusBarColor(r, g, b, a)
+            if general and general.darkMode then
+                local c = general.darkModeHealthColor or { 0.15, 0.15, 0.15, 1 }
+                frame.healthBar:SetStatusBarColor(c[1], c[2], c[3], c[4] or 1)
+            else
+                -- Use unit-specific color settings (class color → hostility color → custom color)
+                local r, g, b, a = GetHealthBarColor(frame.unit, settings)
+                frame.healthBar:SetStatusBarColor(r, g, b, a)
+            end
+            
+            -- Apply rotation-based orientation (can change dynamically)
+            if settings then
+                local angle = GetRotationAngle(settings.orientation)
+                ApplyStatusBarRotation(frame.healthBar, angle)
+
+                if frame.powerBar then
+                    ApplyStatusBarRotation(frame.powerBar, angle)
+                end
+
+                if frame.absorbBar then
+                    ApplyStatusBarRotation(frame.absorbBar, angle)
+                end
+
+                if frame.absorbOverflowBar then
+                    ApplyStatusBarRotation(frame.absorbOverflowBar, angle)
+                end
+
+                if frame.healAbsorbBar then
+                    ApplyStatusBarRotation(frame.healAbsorbBar, angle)
+                end
+
+                ApplyFontRotation(frame.healthText, angle)
+                ApplyFontRotation(frame.powerText, angle)
+                ApplyFontRotation(frame.nameText, angle)
+            end
         end
-        
-        -- Apply rotation-based orientation (can change dynamically)
-        if settings then
-            local angle = GetRotationAngle(settings.orientation)
-            ApplyStatusBarRotation(frame.healthBar, angle)
 
-            if frame.powerBar then
-                ApplyStatusBarRotation(frame.powerBar, angle)
+        UpdateHealth(frame)
+        UpdateAbsorbs(frame)
+        UpdatePower(frame)
+        UpdatePowerText(frame)
+        UpdateName(frame)
+        UpdateHealthTextColor(frame)
+        UpdateIndicators(frame)
+        UpdateStance(frame)
+        UpdateTargetMarker(frame)
+        UpdateLeaderIcon(frame)
+
+        -- Update portrait texture (third param disables circular mask for square portrait)
+        if frame.portraitTexture and frame.portrait and frame.portrait:IsShown() then
+            if UnitExists(frame.unit) then
+                SetPortraitTexture(frame.portraitTexture, frame.unit, true)
+                frame.portraitTexture:SetTexCoord(0.15, 0.85, 0.15, 0.85)  -- Crop to focus on face
             end
-
-            if frame.absorbBar then
-                ApplyStatusBarRotation(frame.absorbBar, angle)
-            end
-
-            if frame.absorbOverflowBar then
-                ApplyStatusBarRotation(frame.absorbOverflowBar, angle)
-            end
-
-            if frame.healAbsorbBar then
-                ApplyStatusBarRotation(frame.healAbsorbBar, angle)
-            end
-
-            ApplyFontRotation(frame.healthText, angle)
-            ApplyFontRotation(frame.powerText, angle)
-            ApplyFontRotation(frame.nameText, angle)
         end
-    end
-
-    UpdateHealth(frame)
-    UpdateAbsorbs(frame)
-    UpdatePower(frame)
-    UpdatePowerText(frame)
-    UpdateName(frame)
-    UpdateHealthTextColor(frame)
-    UpdateIndicators(frame)
-    UpdateStance(frame)
-    UpdateTargetMarker(frame)
-    UpdateLeaderIcon(frame)
-
-    -- Update portrait texture (third param disables circular mask for square portrait)
-    if frame.portraitTexture and frame.portrait and frame.portrait:IsShown() then
-        if UnitExists(frame.unit) then
-            SetPortraitTexture(frame.portraitTexture, frame.unit, true)
-            frame.portraitTexture:SetTexCoord(0.15, 0.85, 0.15, 0.85)  -- Crop to focus on face
-        end
-    end
+    end)
 end
 
 ---------------------------------------------------------------------------
@@ -2110,21 +2115,18 @@ local function CreateUnitFrame(unit, unitKey)
         frame.leaderIcon = leaderIcon
     end
 
-    -- Event handling
+    -- Event handling - STATE EVENTS ONLY (not frequent value updates)
+    -- Value updates are handled by the shared ticker below instead
     frame:RegisterEvent("PLAYER_ENTERING_WORLD")
-    frame:RegisterEvent("UNIT_HEALTH")
-    frame:RegisterEvent("UNIT_MAXHEALTH")
-    frame:RegisterEvent("UNIT_ABSORB_AMOUNT_CHANGED")
-    frame:RegisterEvent("UNIT_HEAL_ABSORB_AMOUNT_CHANGED")
-    frame:RegisterEvent("UNIT_POWER_UPDATE")
-    frame:RegisterEvent("UNIT_POWER_FREQUENT")  -- Frequent updates for smoother power text sync
-    frame:RegisterEvent("UNIT_MAXPOWER")
-    frame:RegisterEvent("UNIT_NAME_UPDATE")
     frame:RegisterEvent("PLAYER_TARGET_CHANGED")
     frame:RegisterEvent("PLAYER_FOCUS_CHANGED")
     frame:RegisterEvent("UNIT_PET")
     frame:RegisterEvent("UNIT_TARGET")  -- For inline Target of Target updates
     frame:RegisterEvent("RAID_TARGET_UPDATE")  -- Target marker (skull, cross, etc.)
+    
+    -- Absorb changes still need events since they're state-dependent
+    frame:RegisterEvent("UNIT_ABSORB_AMOUNT_CHANGED")
+    frame:RegisterEvent("UNIT_HEAL_ABSORB_AMOUNT_CHANGED")
 
     -- Leader/Assistant icon events (player, target, focus only) - only register if feature enabled
     if settings.leaderIcon and settings.leaderIcon.enabled and (unitKey == "player" or unitKey == "target" or unitKey == "focus") then
@@ -2214,33 +2216,26 @@ local function CreateUnitFrame(unit, unitKey)
             -- Leader/Assistant status changed (player, target, focus only)
             UpdateLeaderIcon(self)
         elseif arg1 == self.unit then
-            if event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" then
-                UpdateHealth(self)
-                UpdateAbsorbs(self)
-                -- Force update ToT when target health changes
-                if self.unitKey == "target" then
-                    ForceUpdateToT()
-                end
-            elseif event == "UNIT_ABSORB_AMOUNT_CHANGED" or event == "UNIT_HEAL_ABSORB_AMOUNT_CHANGED" then
+            -- ABSORB-SPECIFIC EVENTS: These still need immediate handling as they affect bar appearance
+            if event == "UNIT_ABSORB_AMOUNT_CHANGED" or event == "UNIT_HEAL_ABSORB_AMOUNT_CHANGED" then
                 UpdateAbsorbs(self)
                 if self.unitKey == "target" then
                     ForceUpdateToT()
                 end
-            elseif event == "UNIT_POWER_UPDATE" or event == "UNIT_POWER_FREQUENT" or event == "UNIT_MAXPOWER" then
-                UpdatePower(self)
-                UpdatePowerText(self)
-                if self.unitKey == "target" then
-                    ForceUpdateToT()
-                end
-            elseif event == "UNIT_NAME_UPDATE" then
-                UpdateName(self)
             end
         end
     end)
     
     -- Initial update (player frame is always shown, others use state driver)
+    -- Note: Actual health/power values will be updated by the shared ticker
+    -- This just sets up the frame structure
     if UnitExists(unit) or unitKey == "player" then
-        UpdateFrame(frame)
+        UpdateName(frame)
+        UpdateTargetMarker(frame)
+        if unitKey == "player" then
+            UpdateIndicators(frame)
+            UpdateStance(frame)
+        end
     end
     -- Note: State driver handles visibility for target/focus/pet frames
     -- Player frame needs explicit show since it has no state driver
@@ -5255,3 +5250,60 @@ end
 
 
 
+
+---------------------------------------------------------------------------
+-- SHARED TICKER: Update all visible frames' health/power periodically
+-- This replaces event-based UNIT_HEALTH, UNIT_POWER_UPDATE, UNIT_POWER_FREQUENT
+-- listeners to avoid taint cascades during combat
+---------------------------------------------------------------------------
+local unitFrameUpdateTicker = nil
+local UNITFRAME_UPDATE_INTERVAL = 0.1  -- 100ms = 10 updates/sec (smooth but not excessive)
+
+local function StartUnitFramesUpdateTicker()
+    if unitFrameUpdateTicker then return end
+    unitFrameUpdateTicker = C_Timer.NewTicker(UNITFRAME_UPDATE_INTERVAL, function()
+        -- Update all unit frames that are visible
+        for unitKey, frame in pairs(SUI_UF.frames) do
+            if frame and frame.unit and frame:IsShown() then
+                -- Skip preview mode frames
+                if not SUI_UF.previewMode[unitKey] then
+                    -- Update health, power, and text without triggering events
+                    if UnitExists(frame.unit) then
+                        UpdateHealth(frame)
+                        UpdateAbsorbs(frame)
+                        UpdatePower(frame)
+                        UpdatePowerText(frame)
+                        UpdateName(frame)
+                    end
+                end
+            end
+        end
+        
+        -- Also update boss frames
+        for bossKey, frame in pairs(SUI_UF.bossFrames or {}) do
+            if frame and frame.unit and frame:IsShown() then
+                if not SUI_UF.previewMode[bossKey] then
+                    if UnitExists(frame.unit) then
+                        UpdateHealth(frame)
+                        UpdateAbsorbs(frame)
+                        UpdatePower(frame)
+                        UpdatePowerText(frame)
+                        UpdateName(frame)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function StopUnitFramesUpdateTicker()
+    if unitFrameUpdateTicker then
+        unitFrameUpdateTicker:Cancel()
+        unitFrameUpdateTicker = nil
+    end
+end
+
+-- Start ticker when addon loads
+C_Timer.After(0, function()
+    StartUnitFramesUpdateTicker()
+end)
