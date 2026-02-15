@@ -6,6 +6,12 @@
 
 local _, SUI = ...
 
+local noShowHookedFrames = setmetatable({}, { __mode = "k" })
+local viewerEffectsHooked = setmetatable({}, { __mode = "k" })
+local viewerEffectsPending = setmetatable({}, { __mode = "k" })
+local viewerEffectsShowHooked = setmetatable({}, { __mode = "k" })
+local lastGlowSuppressByButton = setmetatable({}, { __mode = "k" })
+
 -- Emergency stability mode: prioritize FPS by avoiding persistent/high-frequency hooks.
 local EMERGENCY_STABILITY_MODE = true
 
@@ -37,8 +43,8 @@ local function HideCooldownEffects(child)
             
             if not EMERGENCY_STABILITY_MODE then
                 -- Hook to keep it hidden
-                if not frame._SuaviUI_NoShow then
-                    frame._SuaviUI_NoShow = true
+                if not noShowHookedFrames[frame] then
+                    noShowHookedFrames[frame] = true
                     
                     -- Hook Show to prevent it from showing
                     -- Don't call Hide() in the hook — it can cause Show→Hide→Show infinite loops.
@@ -128,9 +134,6 @@ local function ProcessViewer(viewerName)
                 
                 -- Hide ALL glows (not just Epidemic)
                 pcall(HideAllGlows, child)
-                
-                -- Mark as processed (no OnUpdate hook needed - we handle glows via hooksecurefunc)
-                    child._SuaviUI_EffectsHidden = true
             end
         end
     end
@@ -139,24 +142,24 @@ local function ProcessViewer(viewerName)
     ProcessIcons()
     
     -- Hook Layout to reprocess when viewer updates
-    if (not EMERGENCY_STABILITY_MODE) and viewer.Layout and not viewer._SuaviUI_EffectsHooked then
-        viewer._SuaviUI_EffectsHooked = true
+    if (not EMERGENCY_STABILITY_MODE) and viewer.Layout and not viewerEffectsHooked[viewer] then
+        viewerEffectsHooked[viewer] = true
         hooksecurefunc(viewer, "Layout", function()
             -- LOW-LEVEL SAFETY: Debounce to prevent timer flooding.
             -- Without this, each Layout call queues a new C_Timer closure
             -- even when viewer has 0 children (all are no-ops but still allocate).
-            if viewer._SuaviUI_EffectsPending then return end
-            viewer._SuaviUI_EffectsPending = true
+            if viewerEffectsPending[viewer] then return end
+            viewerEffectsPending[viewer] = true
             C_Timer.After(0.15, function()
-                viewer._SuaviUI_EffectsPending = nil
+                viewerEffectsPending[viewer] = nil
                 ProcessIcons()
             end)
         end)
     end
     
     -- Hook OnShow
-    if (not EMERGENCY_STABILITY_MODE) and not viewer._SuaviUI_EffectsShowHooked then
-        viewer._SuaviUI_EffectsShowHooked = true
+    if (not EMERGENCY_STABILITY_MODE) and not viewerEffectsShowHooked[viewer] then
+        viewerEffectsShowHooked[viewer] = true
         viewer:HookScript("OnShow", function()
             C_Timer.After(0.15, ProcessIcons)  -- 150ms debounce for CPU efficiency
         end)
@@ -210,10 +213,10 @@ local function HookAllGlows()
 
             -- PERF: avoid timer flood and duplicate work within the same frame.
             local now = GetTime()
-            if button._SuaviUI_LastGlowSuppressTime == now then
+            if lastGlowSuppressByButton[button] == now then
                 return
             end
-            button._SuaviUI_LastGlowSuppressTime = now
+            lastGlowSuppressByButton[button] = now
 
             pcall(HideBlizzardGlows, button)
         end)

@@ -13,6 +13,9 @@ local IsSpellOverlayed = C_SpellActivationOverlay and C_SpellActivationOverlay.I
 
 -- Track which icons currently have active glows
 local activeGlowIcons = {}  -- [icon] = true
+local hookedGlowIcons = setmetatable({}, { __mode = "k" })
+local hookedGlowViewers = setmetatable({}, { __mode = "k" })
+local pendingViewerGlowScan = setmetatable({}, { __mode = "k" })
 
 -- Glow templates for proc effects
 local GlowTemplates = {
@@ -146,8 +149,7 @@ local function CustomizeBlizzardGlow(button, viewerSettings)
         startFlipbook:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
     end
     
-    -- Mark as customized
-    button._QUICustomGlowActive = true
+    -- Mark as active in side table (avoid mutating Blizzard icon userdata)
     activeGlowIcons[button] = true
     
     return true
@@ -197,7 +199,6 @@ local function ApplyLibCustomGlow(icon, viewerSettings)
     end
 
     -- Flag already set by StartGlow, just ensure it's there
-    icon._QUICustomGlowActive = true
     activeGlowIcons[icon] = true
 
     return true
@@ -210,7 +211,7 @@ local function StartGlow(icon)
     if not icon then return end
     
     -- Already has our glow? Skip
-    if icon._QUICustomGlowActive then return end
+    if activeGlowIcons[icon] then return end
     
     local viewerType = GetViewerType(icon)
     if not viewerType then return end
@@ -219,8 +220,7 @@ local function StartGlow(icon)
     if not viewerSettings then return end
     
     -- Always use LibCustomGlow since we hide Blizzard's SpellActivationAlert
-    -- Set the flag FIRST so cooldowneffects.lua doesn't interfere
-    icon._QUICustomGlowActive = true
+    -- Set active state first in side table so cooldowneffects.lua doesn't interfere
     activeGlowIcons[icon] = true
     
     ApplyLibCustomGlow(icon, viewerSettings)
@@ -236,7 +236,6 @@ function StopGlow(icon)
         pcall(LCG.AutoCastGlow_Stop, icon, "_QUICustomGlow")
     end
 
-    icon._QUICustomGlowActive = nil
     activeGlowIcons[icon] = nil
 end
 
@@ -249,7 +248,7 @@ end
 -- Hook individual CDM icon's glow methods
 local function HookCDMIcon(icon)
     if not icon then return end
-    if icon._QUIGlowHooked then return end
+    if hookedGlowIcons[icon] then return end
 
     local viewerType = GetViewerType(icon)
     if not viewerType then return end
@@ -332,7 +331,7 @@ local function HookCDMIcon(icon)
         end)
     end
 
-    icon._QUIGlowHooked = true
+    hookedGlowIcons[icon] = true
 end
 
 -- Hook all icons in a viewer
@@ -357,19 +356,19 @@ local function SetupViewerHooking(viewerName, trackerKey)
     HookViewerIcons(viewerName)
 
     -- Watch for new icons via layout changes
-    if not viewer._QUIGlowLayoutHooked then
+    if not hookedGlowViewers[viewer] then
         viewer:HookScript("OnSizeChanged", function()
             -- LOW-LEVEL SAFETY: Debounce to prevent timer flooding.
             -- Without this, rapid OnSizeChanged on empty viewers queues
             -- unbounded C_Timer closures (each a no-op but still allocation overhead).
-            if viewer._QUIGlowPending then return end
-            viewer._QUIGlowPending = true
+            if pendingViewerGlowScan[viewer] then return end
+            pendingViewerGlowScan[viewer] = true
             C_Timer.After(0.1, function()
-                viewer._QUIGlowPending = nil
+                pendingViewerGlowScan[viewer] = nil
                 HookViewerIcons(viewerName)
             end)
         end)
-        viewer._QUIGlowLayoutHooked = true
+        hookedGlowViewers[viewer] = true
     end
 end
 

@@ -3,6 +3,11 @@
 
 local _, SUI = ...
 
+local hookedCooldownIcons = setmetatable({}, { __mode = "k" })
+local cooldownOwnerByFrame = setmetatable({}, { __mode = "k" })
+local hookedLayoutViewers = setmetatable({}, { __mode = "k" })
+local pendingSwipeRescan = setmetatable({}, { __mode = "k" })
+
 -- Get settings from AceDB
 local function GetSettings()
     local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
@@ -31,21 +36,18 @@ end
 -- This runs on EVERY cooldown update, ensuring settings are always applied
 local function HookSetCooldown(icon)
     if not icon or not icon.Cooldown then return end
-    if icon._SUI_SetCooldownHooked then return end
-    icon._SUI_SetCooldownHooked = true
+    if hookedCooldownIcons[icon] then return end
+    hookedCooldownIcons[icon] = true
 
-    -- Store parent reference on Cooldown frame for hook access
-    icon.Cooldown._QUIParentIcon = icon
+    -- Keep cooldown->icon mapping in side table (avoid mutating Blizzard objects)
+    cooldownOwnerByFrame[icon.Cooldown] = icon
 
     hooksecurefunc(icon.Cooldown, "SetCooldown", function(self)
         -- Synchronous hook (like CDM reference addon). hooksecurefunc is designed
         -- to not taint the caller. C_Timer.After caused FPS drops from hundreds
         -- of closure allocations per second.
-        local parentIcon = self._QUIParentIcon
+        local parentIcon = cooldownOwnerByFrame[self]
         if not parentIcon then return end
-
-        -- Skip if we're the ones calling SetCooldown (recursion guard)
-        if parentIcon._SUI_BypassCDHook then return end
 
         local settings = GetSettings()
         local showSwipe
@@ -111,14 +113,14 @@ local function ApplyAllSettings()
         ProcessViewer(viewer)
 
         -- Hook Layout to catch new icons
-        if viewer and viewer.Layout and not viewer._SUI_LayoutHooked then
-            viewer._SUI_LayoutHooked = true
+        if viewer and viewer.Layout and not hookedLayoutViewers[viewer] then
+            hookedLayoutViewers[viewer] = true
             hooksecurefunc(viewer, "Layout", function()
                 -- LOW-LEVEL SAFETY: Debounce to prevent timer flooding on empty viewers.
-                if viewer._SUI_SwipePending then return end
-                viewer._SUI_SwipePending = true
+                if pendingSwipeRescan[viewer] then return end
+                pendingSwipeRescan[viewer] = true
                 C_Timer.After(0.15, function()
-                    viewer._SUI_SwipePending = nil
+                    pendingSwipeRescan[viewer] = nil
                     ProcessViewer(viewer)
                 end)
             end)
