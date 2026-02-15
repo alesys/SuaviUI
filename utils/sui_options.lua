@@ -11691,7 +11691,6 @@ local function CreateCreditsPage(parent)
         { name = "LibCustomGlow-1.0", desc = "Glow effects for cooldown tracking" },
         { name = "LibKeyBound-1.0", desc = "Keybind management" },
         { name = "LibDualSpec-1.0", desc = "Spec-based profile switching" },
-        { name = "LibOpenRaid", desc = "Raid utility functions" },
         { name = "LibEQOL", desc = "Edit Mode wrapper and settings UI framework" },
         { name = "LibStub", desc = "Library loader" },
         { name = "CallbackHandler-1.0", desc = "Callback registration helper" },
