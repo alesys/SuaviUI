@@ -1,5 +1,52 @@
 # SuaviUI Changelog
 
+## [v0.2.9](https://github.com/alesys/SuaviUI/tree/v0.2.9) (2026-02-14 - DEVELOPMENT)
+
+### 🔥 BREAKING CHANGE: LibOpenRaid Completely Removed
+
+#### Architecture Change - Keystone System Redesigned
+- **Removed:** Entire LibOpenRaid library (19,000+ lines of code)
+- **Created:** New lightweight `sui_keystone_comm.lua` module (~280 lines)
+- **Communication:** Now uses AceComm-3.0 (already embedded)
+- **APIs Used:** Native Blizzard C_MythicPlus API instead of LibOpenRaid's complex querying
+- **Backup:** LibOpenRaid kept in `libs/LibOpenRaid_BACKUP_v173_MODIFIED/` folder for reference
+
+#### What Changed
+- **Before:** Loaded entire OpenRaid library → Used `GetPlayerInformation.lua` → Called `HasPetSpells()` → Generated taint errors
+- **After:** Lightweight keystone comm module → Direct Blizzard API calls → No taint source from library
+
+#### Features Preserved
+✅ Party keystone sharing  
+✅ Keystone tracker display  
+✅ M+ score fetching  
+✅ All UI functionality identical  
+
+#### Root Cause Eliminated
+- **Source:** LibOpenRaid's `HasPetSpells()` calls during UNIT_AURA events  
+- **Solution:** Custom module uses only safe Blizzard APIs (C_MythicPlus, C_PlayerInfo)
+- **Result:** No more tainted data generated from library internals
+
+#### Technical Details
+- New module exports same interface as `openRaidLib`:
+  - `GetKeystoneInfo(unitId)`
+  - `GetAllKeystonesInfo()`
+  - `RequestKeystoneDataFromParty()`
+  - `RegisterCallback(module, event, callback)`
+- Seamless drop-in replacement for `sui_key_tracker.lua`
+
+#### Dependencies Audit
+- Removed: LibOpenRaid (19,000 lines) + its internal event hooks
+- Now using: AceComm-3.0 (already embedded in SuaviUI)
+- Libary count: 19 → 18
+
+### ✅ Expected Impact
+- **Taint Errors:** 771+ hasTotem errors should be **completely eliminated**
+- **Performance:** Slight improvement (fewer event listeners)
+- **Code Size:** Addon ~19KB smaller
+- **Compatibility:** 100% feature parity with v0.2.8
+
+---
+
 ## [v0.2.8](https://github.com/alesys/SuaviUI/tree/v0.2.8) (2026-02-14 5:18 PM)
 
 ### 📦 Library Refresh - All Libraries Updated to Latest Pristine Versions

@@ -49,6 +49,11 @@ git push origin vX.X.X
 - `.busted` - Busted test runner config
 - `spec/` - Test specs
 - `mocks/` - Test mocks
+- `*_BACKUP*` - Backup folders (e.g., `LibOpenRaid_BACKUP_v173_MODIFIED/`)
+- `package.ps1` - Build/packaging script
+- `ACE3_UPDATE_REPORT.txt` - Development report
+- `SUAVIUI_PATCHES.md` - Internal documentation
+- `DEBUG_*.lua` - Debugging scripts
 
 **Files INCLUDED in ZIP:**
 - All Lua files (`utils/`, `imports/`, `libs/`, `skinning/`)
@@ -58,12 +63,26 @@ git push origin vX.X.X
 - `SuaviUI.toc` (addon metadata)
 
 #### Step 5: Publish GitHub Release
+**IMPORTANT:** Run from the AddOns folder where the ZIP file is located!
+
 ```bash
-gh release create vX.X.X "..\SuaviUI-vX.X.X.zip" \
+cd "E:\Games\World of Warcraft\_retail_\Interface\AddOns"
+
+# Delete any existing release (to handle re-releases):
+gh release delete vX.X.X --repo alesys/SuaviUI --yes 2>/dev/null
+
+# Create new release with ZIP file attached:
+gh release create vX.X.X "SuaviUI-vX.X.X.zip" \
   --title "SuaviUI vX.X.X - [Edition Name]" \
   --notes "[Release notes markdown]" \
   --repo alesys/SuaviUI
 ```
+
+**Key Points:**
+- ✅ ZIP file MUST be specified as argument to upload it to the release
+- ✅ ZIP file path is RELATIVE to current directory (must be in AddOns folder)
+- ✅ Without the ZIP file path, only auto-generated source archives are created (NO addon package!)
+- ✅ `--clobber` optional flag if you need to replace an existing asset
 
 **Release Notes Template:**
 ```markdown
@@ -76,9 +95,15 @@ gh release create vX.X.X "..\SuaviUI-vX.X.X.zip" \
 ### 🔧 Fixes & Improvements
 - Fixed issue with [component]
 - Improved [functionality]
-- Added [enhancement]
+- Added [enhavisible in release assets (not just "Source code" auto-archives)
+- ✅ ZIP file size appropriate (~2-3 MB, without docs/ and backup folders)
+- ✅ Tag pushed to GitHub: `git tag --list | grep vX.X.X`
+- ✅ Commit pushed to master branch: `git log --oneline -1`
 
-### 📦 Package Notes
+**Common Issues:**
+- ❌ "Release has no assets" or only "Source code" archives → ZIP file path was wrong in Step 5
+- ❌ ZIP file too large (>5 MB) → Backup folders or docs/ were included
+- ❌ "release not found" error → Release was created as tag-only, not proper release
 - Excludes development documentation (docs/ folder)
 - Clean release with only runtime files
 - Compatible with The War Within (Interface 120000-120001)
@@ -156,9 +181,10 @@ if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
 
 # /E = recursive, /XD = exclude dirs, /XF = exclude files
 robocopy "SuaviUI" "$staging\SuaviUI" /E /NFL /NDL /NJH /NJS /NC /NS `
-    /XD docs .git .github .previews .claude spec mocks `
+    /XD docs .git .github .previews .claude spec mocks "*_BACKUP*" `
     /XF .gitignore .pkgmeta .wowup_ignore .copilot-instructions.md `
-        SuaviUI.code-workspace error.log .DS_Store DS_Store .busted
+        SuaviUI.code-workspace error.log .DS_Store DS_Store .busted `
+        package.ps1 ACE3_UPDATE_REPORT.txt SUAVIUI_PATCHES.md DEBUG_*.lua
 
 # Create ZIP from staging (SuaviUI/ is the root folder inside the archive)
 Compress-Archive -Path "$staging\SuaviUI" -DestinationPath "SuaviUI-vX.X.X.zip" -Force
@@ -207,11 +233,22 @@ When user requests a release:
 - Verify remote repository URL: `git remote -v`
 - Ensure network connectivity
 
-### Release Already Exists
-- Delete existing release on GitHub first
-- Or increment version number and retry
+### ❌ CRITICAL: Release has no addon ZIP file
+**Symptoms:** Release page shows only "Source code (zip)" and "Source code (tar.gz)", no `SuaviUI-vX.X.X.zip` asset
 
-## Future Enhancements
+**Cause:** ZIP file path was missing or wrong in Step 5 command
+
+**Solution:**
+```powershell
+cd "E:\Games\World of Warcraft\_retail_\Interface\AddOns"
+gh release delete vX.X.X --repo alesys/SuaviUI --yes
+gh release create vX.X.X "SuaviUI-vX.X.X.zip" --title "..." --notes "..." --repo alesys/SuaviUI
+```
+
+### Release Already Exists
+- Delete existing release first: `gh release delete vX.X.X --repo alesys/SuaviUI --yes`
+- Then create new release with Step 5 command
+- Or increment version number and retry
 - [ ] Automated changelog generation from git commits
 - [ ] CurseForge CLI integration
 - [ ] WowUp automatic upload

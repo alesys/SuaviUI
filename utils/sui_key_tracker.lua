@@ -3,12 +3,13 @@ local addonName, ns = ...
 ---------------------------------------------------------------------------
 -- SUI KEY TRACKER MODULE
 -- Shows party keystones on PVEFrame (Group Finder)
--- Requires LibOpenRaid for keystone sharing between party members
+-- Uses SuaviUI Keystone Comm system for inter-party sharing
 ---------------------------------------------------------------------------
 
-local openRaidLib = LibStub and LibStub:GetLibrary("LibOpenRaid-1.0", true)
-if not openRaidLib then
-    -- LibOpenRaid not available, module disabled
+-- Get reference to the keystone comm module (loaded via XML before this file)
+local KeystoneComm = _G.SuaviUIKeystoneComm
+if not KeystoneComm then
+    -- Keystone comm module not available, module disabled
     return
 end
 
@@ -400,11 +401,11 @@ local function UpdateAllKeystones()
         return
     end
 
-    local allKeystoneInfo = openRaidLib.GetAllKeystonesInfo()
+    local allKeystoneInfo = KeystoneComm.GetAllKeystonesInfo()
     local buttonIndex = 0
 
     -- Check player's key first
-    local myKeystoneInfo = openRaidLib.GetKeystoneInfo("player")
+    local myKeystoneInfo = KeystoneComm.GetKeystoneInfo("player")
     if myKeystoneInfo and myKeystoneInfo.level and myKeystoneInfo.level > 0 then
         local isLeader = UnitIsGroupLeader("player")
         UpdateButton(keystoneButtons[buttonIndex], myKeystoneInfo, UnitName("player"), "player", isLeader)
@@ -458,7 +459,7 @@ local requestTimer = nil
 
 local function RequestKeystones()
     if InCombatLockdown() then return end
-    openRaidLib.RequestKeystoneDataFromParty()
+    KeystoneComm.RequestKeystoneDataFromParty()
     if not requestTimer then
         requestTimer = C_Timer.NewTimer(GROUP_CHANGE_DELAY, function()
             if not InCombatLockdown() then
@@ -482,13 +483,13 @@ local function UpdateVisibility()
 
     -- Check if anyone has a key (player or party)
     local anyoneHasKey = false
-    local myKeystoneInfo = openRaidLib.GetKeystoneInfo("player")
+    local myKeystoneInfo = KeystoneComm.GetKeystoneInfo("player")
     if myKeystoneInfo and myKeystoneInfo.level and myKeystoneInfo.level > 0 then
         anyoneHasKey = true
     end
 
     if not anyoneHasKey and IsInGroup() then
-        local allKeystoneInfo = openRaidLib.GetAllKeystonesInfo()
+        local allKeystoneInfo = KeystoneComm.GetAllKeystonesInfo()
         for _, info in pairs(allKeystoneInfo) do
             if info and info.level and info.level > 0 then
                 anyoneHasKey = true
@@ -600,9 +601,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     end
 end)
 
--- LibOpenRaid callback (with combat lockdown check)
-if openRaidLib then
-    openRaidLib.RegisterCallback(addonName, "KeystoneUpdate", function()
+-- Keystone Comm callback (with combat lockdown check)
+if KeystoneComm then
+    KeystoneComm.RegisterCallback(addonName, "KeystoneUpdate", function()
         C_Timer.After(UPDATE_DELAY, function()
             if not InCombatLockdown() then
                 UpdateAll()
