@@ -126,10 +126,10 @@ local tocVersion = tonumber((select(4, GetBuildInfo()))) or 0
 local function GetHealthPct(unit, usePredicted)
     -- Manual calculation - most reliable across all versions
     if UnitHealth and UnitHealthMax then
-        local cur = UnitHealth(unit)
-        local max = UnitHealthMax(unit)
-        -- Use pcall for BOTH the comparison and calculation to handle secret values
+        -- TAINT-FIX: Protect UnitHealth/UnitHealthMax calls inside pcall
         local ok, pct = pcall(function() 
+            local cur = UnitHealth(unit)
+            local max = UnitHealthMax(unit)
             if max and max > 0 then
                 return (cur / max) * 100 
             end
@@ -177,8 +177,12 @@ local function GetPowerPct(unit, powerType, usePredicted)
         end
     end
     -- Manual calculation fallback (may fail with secret values)
-    local cur = UnitPower(unit, powerType)
-    local max = UnitPowerMax(unit, powerType)
+    -- TAINT-FIX: Protect UnitPower/UnitPowerMax calls
+    local cur, max = nil, nil
+    pcall(function()
+        cur = UnitPower(unit, powerType)
+        max = UnitPowerMax(unit, powerType)
+    end)
     local calcOk, result = pcall(function()
         if cur and max and max > 0 then
             return (cur / max) * 100
@@ -312,35 +316,42 @@ end
 -- HELPER: Get class color for a unit
 ---------------------------------------------------------------------------
 local function GetUnitClassColor(unit)
-    if not UnitExists(unit) then
-        return 0.5, 0.5, 0.5, 1
-    end
+    -- TAINT-FIX: Protect all unit API calls in color calculation
+    -- These can cascade taint to Blizzard's totem system during frame updates in combat
+    local result = { r = 0.5, g = 0.5, b = 0.5, a = 1 }
+    
+    pcall(function()
+        if not UnitExists(unit) then
+            return
+        end
 
-    -- Only use class color for actual players
-    local isPlayer = UnitIsPlayer(unit)
-    if isPlayer then
-        local _, class = UnitClass(unit)
-        if class then
-            local color = RAID_CLASS_COLORS[class]
-            if color then
-                return color.r, color.g, color.b, 1
+        -- Only use class color for actual players
+        local isPlayer = UnitIsPlayer(unit)
+        if isPlayer then
+            local _, class = UnitClass(unit)
+            if class then
+                local color = RAID_CLASS_COLORS[class]
+                if color then
+                    result = { r = color.r, g = color.g, b = color.b, a = 1 }
+                    return
+                end
             end
         end
-    end
 
-    -- NPCs use reaction color
-    local reaction = UnitReaction(unit, "player")
-    if reaction then
-        if reaction >= 5 then
-            return 0.2, 0.8, 0.2, 1  -- Friendly (green)
-        elseif reaction == 4 then
-            return 1, 1, 0.2, 1      -- Neutral (yellow)
-        else
-            return 0.8, 0.2, 0.2, 1  -- Hostile (red)
+        -- NPCs use reaction color
+        local reaction = UnitReaction(unit, "player")
+        if reaction then
+            if reaction >= 5 then
+                result = { r = 0.2, g = 0.8, b = 0.2, a = 1 }  -- Friendly (green)
+            elseif reaction == 4 then
+                result = { r = 1, g = 1, b = 0.2, a = 1 }      -- Neutral (yellow)
+            else
+                result = { r = 0.8, g = 0.2, b = 0.2, a = 1 }  -- Hostile (red)
+            end
         end
-    end
-
-    return 0.5, 0.5, 0.5, 1
+    end)
+    
+    return result.r, result.g, result.b, result.a
 end
 
 ---------------------------------------------------------------------------
