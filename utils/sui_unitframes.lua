@@ -1656,43 +1656,23 @@ local function CreateBossFrame(unit, frameKey, bossIndex)
         frame.targetMarker = targetMarker
     end
 
-    -- Register events for updates
+    -- Register events for STATE-CHANGE updates only (not frequent value updates)
+    -- Health/power values update via shared ticker in Initialize() to avoid taint cascades
     frame:SetScript("OnEvent", function(self, event, ...)
-        if event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" then
-            local eventUnit = ...
-            if eventUnit == self.unit then
-                UpdateHealth(self)
-                UpdateAbsorbs(self)
-            end
-        elseif event == "UNIT_ABSORB_AMOUNT_CHANGED" or event == "UNIT_HEAL_ABSORB_AMOUNT_CHANGED" then
-            local eventUnit = ...
+        local eventUnit = ...
+        -- Only absorb changes and target marker need event handlers (state-dependent)
+        if event == "UNIT_ABSORB_AMOUNT_CHANGED" or event == "UNIT_HEAL_ABSORB_AMOUNT_CHANGED" then
             if eventUnit == self.unit then
                 UpdateAbsorbs(self)
-            end
-        elseif event == "UNIT_POWER_UPDATE" or event == "UNIT_POWER_FREQUENT" or event == "UNIT_MAXPOWER" then
-            local eventUnit = ...
-            if eventUnit == self.unit then
-                UpdatePower(self)
-                UpdatePowerText(self)
-            end
-        elseif event == "UNIT_NAME_UPDATE" then
-            local eventUnit = ...
-            if eventUnit == self.unit then
-                UpdateName(self)
             end
         elseif event == "RAID_TARGET_UPDATE" then
             UpdateTargetMarker(self)
         end
     end)
 
-    frame:RegisterUnitEvent("UNIT_HEALTH", unit)
-    frame:RegisterUnitEvent("UNIT_MAXHEALTH", unit)
+    -- Only register state-change events - frequent value updates handled by shared ticker
     frame:RegisterUnitEvent("UNIT_ABSORB_AMOUNT_CHANGED", unit)
     frame:RegisterUnitEvent("UNIT_HEAL_ABSORB_AMOUNT_CHANGED", unit)
-    frame:RegisterUnitEvent("UNIT_POWER_UPDATE", unit)
-    frame:RegisterUnitEvent("UNIT_POWER_FREQUENT", unit)  -- Frequent updates for smoother power text sync
-    frame:RegisterUnitEvent("UNIT_MAXPOWER", unit)
-    frame:RegisterUnitEvent("UNIT_NAME_UPDATE", unit)
     frame:RegisterEvent("RAID_TARGET_UPDATE")  -- Target marker (skull, cross, etc.)
 
     -- Register with Clique if available
