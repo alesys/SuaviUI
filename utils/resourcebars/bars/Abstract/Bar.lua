@@ -1308,8 +1308,14 @@ function BarMixin:UpdateFragmentedPowerDisplay(layoutName, data, maxPower)
             end
         end
     elseif resource == "MAELSTROM_WEAPON" then
-        local auraData = C_UnitAuras.GetPlayerAuraBySpellID(344179)
-        local current = auraData and auraData.applications or 0
+        -- TAINT-FIX: Wrap unprotected secret value access in pcall
+        local current = 0
+        pcall(function()
+            local auraData = C_UnitAuras.GetPlayerAuraBySpellID(344179)
+            if auraData and auraData.applications then
+                current = auraData.applications
+            end
+        end)
         local above5MwColor = RB:GetOverrideResourceColor("MAELSTROM_WEAPON_ABOVE_5") or color
 
         local displayOrder = self._displayOrder

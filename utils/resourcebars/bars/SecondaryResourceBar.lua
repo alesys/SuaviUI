@@ -150,8 +150,14 @@ function SecondaryResourceBarMixin:GetResourceValue(resource)
     end
 
     if resource == "SOUL_FRAGMENTS" then
-        local auraData = C_UnitAuras.GetPlayerAuraBySpellID(1225789) or C_UnitAuras.GetPlayerAuraBySpellID(1227702) -- Soul Fragments / Collapsing Star
-        local current = auraData and auraData.applications or 0
+        -- TAINT-FIX: Wrap unprotected secret value access in pcall
+        local current = 0
+        pcall(function()
+            local auraData = C_UnitAuras.GetPlayerAuraBySpellID(1225789) or C_UnitAuras.GetPlayerAuraBySpellID(1227702) -- Soul Fragments / Collapsing Star
+            if auraData and auraData.applications then
+                current = auraData.applications
+            end
+        end)
         local max = C_SpellBook.IsSpellKnown(1247534) and 35 or 50 -- Soul Glutton
 
         -- For performance, only update the foreground when current is below 1
@@ -192,8 +198,14 @@ function SecondaryResourceBarMixin:GetResourceValue(resource)
     end
 
     if resource == "MAELSTROM_WEAPON" then
-        local auraData = C_UnitAuras.GetPlayerAuraBySpellID(344179) -- Maelstrom Weapon
-        local current = auraData and auraData.applications or 0
+        -- TAINT-FIX: Wrap unprotected secret value access in pcall
+        local current = 0
+        pcall(function()
+            local auraData = C_UnitAuras.GetPlayerAuraBySpellID(344179) -- Maelstrom Weapon
+            if auraData and auraData.applications then
+                current = auraData.applications
+            end
+        end)
         local max = 10
 
         return max / 2, current
