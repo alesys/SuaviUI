@@ -8463,7 +8463,7 @@ local function CreateUnitFramesPage(parent)
             RefreshNewUF()
             -- Refresh aura preview if active (re-render with new settings)
             local SUI_UF = ns.SUI_UnitFrames
-            if SUI_UF and sui_UF.auraPreviewMode then
+            if SUI_UF and SUI_UF.auraPreviewMode then
                 if SUI_UF.auraPreviewMode[unitKey .. "_debuff"] then
                     _G.SuaviUI_ShowAuraPreview(unitKey, "debuff")
                 end

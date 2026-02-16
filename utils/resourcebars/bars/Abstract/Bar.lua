@@ -460,16 +460,11 @@ function BarMixin:HideBlizzardPlayerContainer(layoutName, data)
     data = data or self:GetData(layoutName)
     if not data then return end
 
-    if data.hideBlizzardPlayerContainerUi == nil or InCombatLockdown() then return end
+    if data.hideBlizzardPlayerContainerUi == nil or InCombatLockdown() or LEM:IsInEditMode() then return end
 
     if PlayerFrame then
         if data.hideBlizzardPlayerContainerUi == true then
-            if LEM:IsInEditMode() then
-                -- Wrap Show() in pcall to prevent taint from Blizzard's heal prediction updates
-                pcall(function() PlayerFrame:Show() end)
-            else
-                pcall(function() PlayerFrame:Hide() end)
-            end
+            pcall(function() PlayerFrame:Hide() end)
         else
             pcall(function() PlayerFrame:Show() end)
         end
@@ -480,7 +475,7 @@ function BarMixin:HideBlizzardSecondaryResource(layoutName, data)
     data = data or self:GetData(layoutName)
     if not data then return end
 
-    if data.hideBlizzardSecondaryResourceUi == nil or InCombatLockdown() then return end
+    if data.hideBlizzardSecondaryResourceUi == nil or InCombatLockdown() or LEM:IsInEditMode() then return end
 
     local playerClass = select(2, UnitClass("player"))
     local blizzardResourceFrames = {

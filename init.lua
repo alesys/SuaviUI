@@ -389,7 +389,6 @@ SlashCmdList["SUAVIUI_EM"] = function()
             EditModeManagerFrame:Hide()
         else
             EditModeManagerFrame:Show()
-            EditModeManagerFrame:OnEditModeEnter()
         end
     else
         print("|cff34D399SuaviUI:|r Edit Mode not available.")

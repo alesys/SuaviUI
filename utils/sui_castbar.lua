@@ -1734,9 +1734,6 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
         
         -- Cast end events
         UNIT_SPELLCAST_STOP = function(self, spellID, castGUID)
-            if castGUID and self.activeCastGUID and castGUID ~= self.activeCastGUID then
-                return
-            end
             if UnitCastingInfo(self.unit) or UnitChannelInfo(self.unit) then
                 self:Cast(spellID, false)
                 return
@@ -1752,9 +1749,6 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
             end
         end,
         UNIT_SPELLCAST_CHANNEL_STOP = function(self, spellID, castGUID)
-            if castGUID and self.activeCastGUID and castGUID ~= self.activeCastGUID then
-                return
-            end
             if UnitCastingInfo(self.unit) or UnitChannelInfo(self.unit) then
                 self:Cast(spellID, false)
                 return
@@ -1769,9 +1763,6 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
             end
         end,
         UNIT_SPELLCAST_FAILED = function(self, spellID, castGUID)
-            if castGUID and self.activeCastGUID and castGUID ~= self.activeCastGUID then
-                return
-            end
             if UnitCastingInfo(self.unit) or UnitChannelInfo(self.unit) then
                 self:Cast(spellID, false)
                 return
@@ -1805,9 +1796,6 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
             end
         end,
         UNIT_SPELLCAST_INTERRUPTED = function(self, spellID, castGUID)
-            if castGUID and self.activeCastGUID and castGUID ~= self.activeCastGUID then
-                return
-            end
             if UnitCastingInfo(self.unit) or UnitChannelInfo(self.unit) then
                 self:Cast(spellID, false)
                 return
@@ -1861,9 +1849,6 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
             self:Cast(spellID, true, castGUID)
         end
         eventHandlers.UNIT_SPELLCAST_EMPOWER_STOP = function(self, spellID, castGUID)
-            if castGUID and self.activeCastGUID and castGUID ~= self.activeCastGUID then
-                return
-            end
             local name = UnitCastingInfo(self.unit)
             local channelName = UnitChannelInfo(self.unit)
             if name or channelName then

@@ -1,5 +1,19 @@
 # SuaviUI Changelog
 
+## [v0.3.2](https://github.com/alesys/SuaviUI/tree/v0.3.2) (2026-02-16)
+
+### 🛠️ Edit Mode + Stability Fixes
+
+#### Fixed
+- Fixed `/em` slash handling to avoid calling deprecated Edit Mode enter paths that could trigger protected-call/taint cascades.
+- Fixed Skyriding Vigor Bar Edit Mode drag persistence (position now saves reliably after exiting Edit Mode).
+- Fixed castbar secret-value taint caused by direct `castGUID` equality comparisons in cast-end handlers.
+- Fixed aura refresh typo in Unit Frames options (`sui_UF` → `SUI_UF`) causing nil-index errors in settings UI.
+- Reduced Blizzard UnitFrame taint risk by avoiding Player/secondary resource frame show/hide mutations while in Edit Mode.
+
+#### Notes
+- This release targets post-0.3.1 regressions found during Edit Mode and BugSack session triage (sessions 4691-4700).
+
 ## [v0.3.1](https://github.com/alesys/SuaviUI/tree/v0.3.1) (2026-02-15)
 
 ### 🎯 Castbar Queue/Spam Stability

@@ -985,25 +985,39 @@ local function HookEditModeGetScaledSelectionSides()
     if EditModeSystemMixin and EditModeSystemMixin.GetScaledSelectionSides then
         local originalGetScaledSelectionSides = EditModeSystemMixin.GetScaledSelectionSides
         EditModeSystemMixin.GetScaledSelectionSides = function(self)
-            local left, bottom, width, height = self:GetScaledRect()
-            -- If GetScaledRect returns nil (during drag when anchors are cleared),
-            -- calculate from dimensions instead of crashing
-            if not left then
-                local w = self:GetWidth() or 200
-                local h = self:GetHeight() or 50
-                local cx, cy = self:GetCenter()
-                if cx and cy then
-                    left = cx - w/2
-                    bottom = cy - h/2
-                    width = w
-                    height = h
-                else
-                    -- Absolute fallback
-                    left, bottom, width, height = 0, 0, w, h
+            local ok, left, bottom, width, height = pcall(function()
+                if self.Selection and self.Selection.GetRect then
+                    return self.Selection:GetRect()
                 end
+                return nil, nil, nil, nil
+            end)
+
+            -- Use Blizzard's original implementation when rect is valid
+            if ok and left and bottom and width and height then
+                return originalGetScaledSelectionSides(self)
             end
+
+            -- Fallback for drag-time nil rects (Edit Mode race)
+            local w = (self.Selection and self.Selection:GetWidth()) or self:GetWidth() or 200
+            local h = (self.Selection and self.Selection:GetHeight()) or self:GetHeight() or 50
+
+            local cx, cy = nil, nil
+            if self.Selection and self.Selection.GetCenter then
+                cx, cy = self.Selection:GetCenter()
+            end
+            if not cx or not cy then
+                cx, cy = self:GetCenter()
+            end
+
             local scale = self:GetScale() or 1
-            return left * scale, bottom * scale, (left + width) * scale, (bottom + height) * scale
+            if cx and cy then
+                local fallbackLeft = cx - (w / 2)
+                local fallbackBottom = cy - (h / 2)
+                return fallbackLeft * scale, (fallbackLeft + w) * scale, fallbackBottom * scale, (fallbackBottom + h) * scale
+            end
+
+            -- Absolute safe fallback
+            return 0, w * scale, 0, h * scale
         end
     end
 end

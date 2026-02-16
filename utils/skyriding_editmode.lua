@@ -65,21 +65,39 @@ end
 -- POSITION CHANGE CALLBACK
 ---------------------------------------------------------------------------
 local function OnPositionChanged(frame, layoutName, point, x, y)
-    -- Handle both callback signatures LEM might use
-    if type(layoutName) == "number" then
-        x = layoutName
-        y = point
-        point = x
-        layoutName = nil
-    end
-    
     if not frame then return end
     
     local settings = GetSkyridingSettings()
     if not settings then return end
-    
-    settings.offsetX = tonumber(x) or 0
-    settings.offsetY = tonumber(y) or 0
+
+    -- Prefer actual frame center to avoid callback signature mismatches
+    -- (LibEQOL can invoke with either 4 or 5 positional arguments).
+    local cx, cy = frame:GetCenter()
+    local ux, uy = UIParent:GetCenter()
+    if cx and cy and ux and uy then
+        settings.offsetX = math.floor((cx - ux) + 0.5)
+        settings.offsetY = math.floor((cy - uy) + 0.5)
+    else
+        -- Fallback: normalize commonly observed callback layouts.
+        local nx, ny = tonumber(x), tonumber(y)
+
+        -- 4-arg form mapped into this 5-arg signature:
+        -- (frame, point, x, y) -> layoutName=point, point=x, x=y, y=nil
+        if (nx == nil or ny == nil) and tonumber(point) and tonumber(x) and y == nil then
+            nx = tonumber(point)
+            ny = tonumber(x)
+        end
+
+        -- Alternate shifted form:
+        -- (frame, x, y, point) -> layoutName=x, point=y, x=point, y=nil
+        if (nx == nil or ny == nil) and tonumber(layoutName) and tonumber(point) then
+            nx = tonumber(layoutName)
+            ny = tonumber(point)
+        end
+
+        settings.offsetX = nx or 0
+        settings.offsetY = ny or -150
+    end
     
     -- Refresh the settings panel to show updated values
     if LEM.RefreshFrameSettings then
