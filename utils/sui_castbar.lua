@@ -1589,7 +1589,11 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
     castbar.castbarOnUpdate = CastBar_OnUpdate
     
     -- Unified Cast function
-    function castbar:Cast(spellID, isEmpowerEvent)
+    function castbar:Cast(spellID, isEmpowerEvent, eventCastGUID)
+        if eventCastGUID then
+            self.activeCastGUID = eventCastGUID
+        end
+
         -- In Edit Mode without an actual cast, create a preview
         local castInfo, channelInfo = UnitCastingInfo(self.unit), UnitChannelInfo(self.unit)
         
@@ -1723,33 +1727,59 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
         UNIT_TARGET = function(self) self:Cast() end,
         
         -- Cast start events
-        UNIT_SPELLCAST_START = function(self, spellID) self:Cast(spellID, false) end,
-        UNIT_SPELLCAST_CHANNEL_START = function(self, spellID) self:Cast(spellID, false) end,
+        UNIT_SPELLCAST_START = function(self, spellID, castGUID) self:Cast(spellID, false, castGUID) end,
+        UNIT_SPELLCAST_CHANNEL_START = function(self, spellID, castGUID) self:Cast(spellID, false, castGUID) end,
+        UNIT_SPELLCAST_DELAYED = function(self, spellID, castGUID) self:Cast(spellID, false, castGUID) end,
+        UNIT_SPELLCAST_CHANNEL_UPDATE = function(self, spellID, castGUID) self:Cast(spellID, false, castGUID) end,
         
-        -- Cast end events - hide immediately without re-querying APIs (unless in edit mode)
-        UNIT_SPELLCAST_STOP = function(self, spellID)
+        -- Cast end events
+        UNIT_SPELLCAST_STOP = function(self, spellID, castGUID)
+            if castGUID and self.activeCastGUID and castGUID ~= self.activeCastGUID then
+                return
+            end
+            if UnitCastingInfo(self.unit) or UnitChannelInfo(self.unit) then
+                self:Cast(spellID, false)
+                return
+            end
             if isPlayer then ClearEmpoweredState(self) end
             self.timerDriven = false
             self.durationObj = nil
+            self.activeCastGUID = nil
             self:SetScript("OnUpdate", nil)
             -- Don't hide castbars when in Edit Mode - they need to stay visible for positioning
             if not IsEditModeActive() then
                 self:Hide()
             end
         end,
-        UNIT_SPELLCAST_CHANNEL_STOP = function(self, spellID)
+        UNIT_SPELLCAST_CHANNEL_STOP = function(self, spellID, castGUID)
+            if castGUID and self.activeCastGUID and castGUID ~= self.activeCastGUID then
+                return
+            end
+            if UnitCastingInfo(self.unit) or UnitChannelInfo(self.unit) then
+                self:Cast(spellID, false)
+                return
+            end
             if isPlayer then ClearEmpoweredState(self) end
             self.timerDriven = false
             self.durationObj = nil
+            self.activeCastGUID = nil
             self:SetScript("OnUpdate", nil)
             if not IsEditModeActive() then
                 self:Hide()
             end
         end,
-        UNIT_SPELLCAST_FAILED = function(self, spellID)
+        UNIT_SPELLCAST_FAILED = function(self, spellID, castGUID)
+            if castGUID and self.activeCastGUID and castGUID ~= self.activeCastGUID then
+                return
+            end
+            if UnitCastingInfo(self.unit) or UnitChannelInfo(self.unit) then
+                self:Cast(spellID, false)
+                return
+            end
             if isPlayer then ClearEmpoweredState(self) end
             self.timerDriven = false
             self.durationObj = nil
+            self.activeCastGUID = nil
             
             -- Check if preview mode is enabled
             local settings = GetUnitSettings(self.unitKey)
@@ -1774,10 +1804,18 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
                 self:Hide()
             end
         end,
-        UNIT_SPELLCAST_INTERRUPTED = function(self, spellID)
+        UNIT_SPELLCAST_INTERRUPTED = function(self, spellID, castGUID)
+            if castGUID and self.activeCastGUID and castGUID ~= self.activeCastGUID then
+                return
+            end
+            if UnitCastingInfo(self.unit) or UnitChannelInfo(self.unit) then
+                self:Cast(spellID, false)
+                return
+            end
             if isPlayer then ClearEmpoweredState(self) end
             self.timerDriven = false
             self.durationObj = nil
+            self.activeCastGUID = nil
             
             -- Check if preview mode is enabled
             local settings = GetUnitSettings(self.unitKey)
@@ -1816,21 +1854,26 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
     
     -- Player-only empowered cast handlers
     if isPlayer then
-        eventHandlers.UNIT_SPELLCAST_EMPOWER_START = function(self, spellID)
-            self:Cast(spellID, true)
+        eventHandlers.UNIT_SPELLCAST_EMPOWER_START = function(self, spellID, castGUID)
+            self:Cast(spellID, true, castGUID)
         end
-        eventHandlers.UNIT_SPELLCAST_EMPOWER_UPDATE = function(self, spellID)
-            self:Cast(spellID, true)
+        eventHandlers.UNIT_SPELLCAST_EMPOWER_UPDATE = function(self, spellID, castGUID)
+            self:Cast(spellID, true, castGUID)
         end
-        eventHandlers.UNIT_SPELLCAST_EMPOWER_STOP = function(self, spellID)
+        eventHandlers.UNIT_SPELLCAST_EMPOWER_STOP = function(self, spellID, castGUID)
+            if castGUID and self.activeCastGUID and castGUID ~= self.activeCastGUID then
+                return
+            end
             local name = UnitCastingInfo(self.unit)
-            if name then
+            local channelName = UnitChannelInfo(self.unit)
+            if name or channelName then
                 -- Another cast started, transition to it
                 ClearEmpoweredState(self)
                 self:Cast(spellID, false)
             else
                 -- Cast ended (cancelled, interrupted, or completed) - hide immediately (unless in edit mode)
                 ClearEmpoweredState(self)
+                self.activeCastGUID = nil
                 self:SetScript("OnUpdate", nil)
                 if not IsEditModeActive() then
                     self:Hide()
@@ -1845,6 +1888,8 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
     castbar:RegisterUnitEvent("UNIT_SPELLCAST_FAILED", unit)
     castbar:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTED", unit)
     castbar:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", unit)
+    castbar:RegisterUnitEvent("UNIT_SPELLCAST_DELAYED", unit)
+    castbar:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_UPDATE", unit)
     castbar:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", unit)
     castbar:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTIBLE", unit)
     castbar:RegisterUnitEvent("UNIT_SPELLCAST_NOT_INTERRUPTIBLE", unit)
@@ -1870,7 +1915,7 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
     castbar:SetScript("OnEvent", function(self, event, eventUnit, castGUID, spellID)
         local handler = eventHandlers[event]
         if handler then
-            handler(self, spellID)
+            handler(self, spellID, castGUID)
         end
     end)
 end

@@ -1,5 +1,25 @@
 # SuaviUI Changelog
 
+## [v0.3.1](https://github.com/alesys/SuaviUI/tree/v0.3.1) (2026-02-15)
+
+### 🎯 Castbar Queue/Spam Stability
+
+#### Issue
+- While spamming abilities (especially Single-Button Assistant), castbars could appear late or disappear mid-cast even when the cast completed successfully.
+
+#### Root Cause
+- Cast end events from a previous cast could arrive while a queued next cast was already active.
+- Event handling lacked cast-level identity checks, allowing stale STOP/FAILED/INTERRUPTED events to hide the active bar.
+
+#### Fix
+- Added active cast GUID tracking in castbar runtime.
+- Added stale-event guards for cast end events (`STOP`, `CHANNEL_STOP`, `FAILED`, `INTERRUPTED`, `EMPOWER_STOP`).
+- Added pre-hide revalidation (`UnitCastingInfo` / `UnitChannelInfo`) to refresh instead of hiding when a new cast is already active.
+- Added support for `UNIT_SPELLCAST_DELAYED` and `UNIT_SPELLCAST_CHANNEL_UPDATE` for better timing updates under queue pressure.
+
+#### Result
+- Castbar remains stable during normal spell queue behavior and high-frequency input spam.
+
 ## [v0.3.0](https://github.com/alesys/SuaviUI/tree/v0.3.0) (2026-02-15)
 
 ### 🔥 Critical Taint Resolution - CooldownViewer hasTotem
