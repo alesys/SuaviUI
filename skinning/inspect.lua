@@ -8,7 +8,9 @@ local SUICore = ns.Addon
 
 -- Module reference
 local InspectSkinning = {}
-SUICore.InspectSkinning = InspectSkinning
+if SUICore then
+    SUICore.InspectSkinning = InspectSkinning
+end
 
 -- Configuration constants
 local CONFIG = {

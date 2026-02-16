@@ -1,5 +1,6 @@
 local addonName, ns = ...
 local SUICore = ns.Addon
+if not SUICore then return end
 
 ---------------------------------------------------------------------------
 -- CHARACTER FRAME SKINNING

@@ -4,6 +4,7 @@
 
 local ADDON_NAME, ns = ...
 local SUICore = ns.Addon
+if not SUICore then return end
 local LSM = LibStub("LibSharedMedia-3.0")
 
 local tinsert, tremove = tinsert, tremove

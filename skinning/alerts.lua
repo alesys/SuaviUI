@@ -3,6 +3,7 @@
 
 local ADDON_NAME, ns = ...
 local SUICore = ns.Addon
+if not SUICore then return end
 
 -- Module reference
 local Alerts = {}
