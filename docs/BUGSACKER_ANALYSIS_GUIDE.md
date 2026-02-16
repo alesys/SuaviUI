@@ -69,3 +69,107 @@ The 61-error session 4612 is actually **EXCELLENT** because:
 ---
 
 **Remember:** Counter increments = time passing + game activity. It's NOT a measure of total occurrences.
+
+---
+
+## Audit Matrix (One-Group Isolation)
+
+Use this matrix to enable only one feature group at a time from [utils/utils.xml](utils/utils.xml), then run a short combat scenario and inspect the newest BugSack session.
+
+### Group 0: Baseline Core (always on)
+- `media.lua`
+- `constants.lua`
+- `sui_debug.lua`
+- `backwards.lua`
+
+### Group 1: Cooldown/CDM Surface (highest taint risk)
+- `cooldown_coordinator.lua`
+- `cooldownmanager.lua`
+- `cooldown_editmode.lua`
+- `cooldown_icons.lua`
+- `cooldown_fonts.lua`
+- `cooldown_advanced.lua`
+- `customglows.lua`
+- `cooldowneffects.lua`
+- `cooldownswipe.lua`
+- `sui_ncdm.lua`
+- `sui_spellscanner.lua`
+
+### Group 2: UnitFrames/Castbars
+- `buffborders.lua`
+- `CastbarMixin.lua`
+- `sui_castbar.lua`
+- `sui_unitframes.lua`
+- `unitframes_editmode.lua`
+- `castbar_editmode.lua`
+
+### Group 3: Resource Bars
+- `resourcebars/resourcebars.xml` include
+
+### Group 4: Actionbars/Minimap/EditMode Utilities
+- `uihider.lua`
+- `suicore_main.lua`
+- `perfectpixel.lua`
+- `sui_actionbars.lua`
+- `actionbars_editmode.lua`
+- `suicore_minimap.lua`
+- `minimap_editmode.lua`
+- `suicore_nudge.lua`
+- `keybinds.lua`
+
+### Group 5: UI Data/Options Layer
+- `sui_dungeon_data.lua`
+- `sui_datatexts.lua`
+- `sui_datapanels.lua`
+- `sui_gui.lua`
+- `sui_welcome.lua`
+- `sui_options.lua`
+- `sui_blizzard_options.lua`
+
+### Group 6: Gameplay Helpers
+- `sui_rotationassist.lua`
+- `sui_character.lua`
+- `sui_inspect.lua`
+- `sui_customtrackers.lua`
+- `sui_reticle.lua`
+- `sui_combattext.lua`
+- `sui_combattimer.lua`
+- `sui_qol.lua`
+- `sui_quicksalvage.lua`
+- `sui_crosshair.lua`
+- `sui_skyriding.lua`
+- `skyriding_editmode.lua`
+- `sui_chat.lua`
+- `sui_tooltips.lua`
+
+### Group 7: Mythic+/Keystone/Group Tracking
+- `sui_keystone.lua`
+- `sui_mplus_timer.lua`
+- `sui_dungeon_teleport.lua`
+- `sui_keystone_comm.lua`
+- `sui_key_tracker.lua`
+- `sui_raidbuffs.lua`
+- `sui_buffbar.lua`
+
+---
+
+## Isolation Procedure
+
+1. Keep Group 0 enabled.
+2. Enable only one additional group.
+3. Reload UI, enter combat for a reproducible window (same test route each run).
+4. Capture newest BugSack session ID.
+5. Compare only:
+   - unique error type(s)
+   - source file(s)
+   - stack top function(s)
+6. If errors appear, bisect within that group by halving enabled files.
+7. If no errors appear, mark group as clean and move to next group.
+
+### Log Template (per run)
+- Session ID:
+- Enabled groups:
+- Unique error types:
+- Top stack source:
+- Verdict: `clean` / `tainted`
+

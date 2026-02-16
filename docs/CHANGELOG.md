@@ -1,5 +1,28 @@
 # SuaviUI Changelog
 
+## [v0.3.0](https://github.com/alesys/SuaviUI/tree/v0.3.0) (2026-02-15)
+
+### 🔥 Critical Taint Resolution - CooldownViewer hasTotem
+
+#### What Happened
+- In combat, Blizzard CooldownViewer raised repeated `hasTotem` secret-value taint errors (`CooldownViewerItemData.lua:419`), attributed to SuaviUI execution context.
+- During audit isolation, the issue reproduced in the CDM runtime subset and disappeared when a specific SuaviUI relayout path was removed.
+
+#### Root Cause
+- SuaviUI had a divergence from upstream CMC behavior in `cooldownmanager.lua`: when centered styling was disabled, `CooldownManager.ForceRefresh` called Blizzard viewer `RefreshLayout()` directly.
+- That relayout invocation placed SuaviUI into a protected CooldownViewer update chain where secret-value taint could propagate (`hasTotem`).
+
+#### Fix Applied
+- Removed direct Blizzard `RefreshLayout` fallback from `CooldownManager.ForceRefresh`.
+- Preserved CDM centering behavior while making centered-styling-off path a safe no-op in the CMC layer.
+- Restored normal `utils.xml` load order after audit to avoid dependency-order regressions.
+
+#### Validation
+- Clean in single-file isolation (`cooldownmanager.lua` only).
+- Clean in Group 1A1 (`cooldownmanager + cooldown_coordinator`).
+- Clean in full Group 1 cooldown surface.
+- Clean with full addon loadout enabled.
+
 ## [v0.2.9](https://github.com/alesys/SuaviUI/tree/v0.2.9) (2026-02-14 - DEVELOPMENT)
 
 ### 🔥 BREAKING CHANGE: LibOpenRaid Completely Removed
@@ -40,6 +63,13 @@
 - Libary count: 19 → 18
 
 #### Post-v0.2.9 Hotfixes: Critical Taint Source Elimination
+
+#### CooldownViewer hasTotem Taint (Audit Matrix Resolution)
+- **Symptom:** Repeated `CooldownViewerItemData.lua:419` (`hasTotem` secret boolean tainted by SuaviUI)
+- **Isolation Result:** Reproduced in Group 1A1; disappeared when removing CDM `RefreshLayout` fallback invocation
+- **Root Cause:** SuaviUI-only relayout path in `cooldownmanager.lua` (`v:RefreshLayout()` when centered styling is disabled), not present in upstream CMC flow
+- **Fix:** Removed direct Blizzard `RefreshLayout` fallback from `CooldownManager.ForceRefresh`; module now no-ops when centered styling is off
+- **Validation:** Clean in Group 1A1 (`cooldownmanager + coordinator`) and promoted to Group 1 full-surface retest
 
 **ROOT CAUSE IDENTIFIED:**
 1. **Reload/Crash Taint** - unprotected arithmetic/comparisons with secret-valued aura data ✅ FIXED

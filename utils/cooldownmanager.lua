@@ -131,6 +131,13 @@ local StateTracker = {}
 local ViewerAdapters = {}
 local EventHandler = {}
 
+local HookState = {
+    buffIconHooked = setmetatable({}, { __mode = "k" }),
+    buffBarHooked = setmetatable({}, { __mode = "k" }),
+    viewerRefreshHooked = setmetatable({}, { __mode = "k" }),
+    viewerRefreshPending = setmetatable({}, { __mode = "k" }),
+}
+
 local function DebugPrintSquare(...)
     print("[SuaviUI SquareIcons]", ...)
 end
@@ -176,6 +183,53 @@ end
 
 local viewers = {}
 -- Populated by RefreshViewerRefs() (pcall-safe for WoW 12.0.5 forbidden tables)
+
+local DeferredRefresh = {
+    icons = false,
+    bars = false,
+    essential = false,
+    utility = false,
+}
+
+local function IsInCombat()
+    return InCombatLockdown and InCombatLockdown()
+end
+
+local function MergeRefreshParts(target, parts)
+    if not parts then
+        target.icons = true
+        target.bars = true
+        target.essential = true
+        target.utility = true
+        return
+    end
+    if parts.icons then target.icons = true end
+    if parts.bars then target.bars = true end
+    if parts.essential then target.essential = true end
+    if parts.utility then target.utility = true end
+end
+
+local function QueueDeferredRefresh(parts)
+    MergeRefreshParts(DeferredRefresh, parts)
+end
+
+local function ConsumeDeferredRefresh()
+    local parts = {
+        icons = DeferredRefresh.icons,
+        bars = DeferredRefresh.bars,
+        essential = DeferredRefresh.essential,
+        utility = DeferredRefresh.utility,
+    }
+    DeferredRefresh.icons = false
+    DeferredRefresh.bars = false
+    DeferredRefresh.essential = false
+    DeferredRefresh.utility = false
+    return parts
+end
+
+local function HasAnyRefreshPart(parts)
+    return parts and (parts.icons or parts.bars or parts.essential or parts.utility)
+end
 
 local function RefreshViewerRefs()
     -- WoW 12.0.5: viewer globals may be forbidden. pcall each access.
@@ -357,8 +411,8 @@ function ViewerAdapters.GetBuffIconFrames()
             if child:IsShown() then
                 visible[#visible + 1] = child
             end
-            if not child._wt_isHooked then
-                child._wt_isHooked = true
+            if not HookState.buffIconHooked[child] then
+                HookState.buffIconHooked[child] = true
                 -- Synchronous hook - hooksecurefunc doesn't taint the caller.
                 pcall(hooksecurefunc, child, "OnActiveStateChanged", StateTracker.MarkBuffIconsDirty)
             end
@@ -404,8 +458,8 @@ function ViewerAdapters.GetBuffBarFrames()
         if frame:IsShown() and frame:IsVisible() then
             active[#active + 1] = frame
         end
-        if not frame._wt_isHooked and (frame.icon or frame.Icon or frame.bar or frame.Bar) then
-            frame._wt_isHooked = true
+        if not HookState.buffBarHooked[frame] and (frame.icon or frame.Icon or frame.bar or frame.Bar) then
+            HookState.buffBarHooked[frame] = true
             -- Synchronous hook - hooksecurefunc doesn't taint the caller.
             pcall(hooksecurefunc, frame, "OnActiveStateChanged", StateTracker.MarkBuffBarsDirty)
         end
@@ -563,35 +617,13 @@ function ViewerAdapters.CollectViewerChildren(viewer)
     local all = {}
     local ok, viewerName = pcall(function() return viewer:GetName() end)
     if not ok then return all end
-    local toDim = viewerName == "UtilityCooldownViewer" and GetSetting("cooldownManager_utility_dimWhenNotOnCD", false)
-    local toDimOpacity = GetSetting("cooldownManager_utility_dimOpacity", 0.3)
     local okc, children = pcall(function() return { viewer:GetChildren() } end)
     if not okc or not children then return all end
     for _, child in ipairs(children) do
         pcall(function()
             if child and child:IsShown() and child.Icon then
                 all[#all + 1] = child
-
-                if child.cooldownID and toDim and ns.CooldownTracker then
-                    local info = C_CooldownViewer.GetCooldownViewerCooldownInfo(child.cooldownID)
-                    if not C_Spell.GetSpellCooldown(info.spellID).isOnGCD then
-                        local cd = nil
-                        if not issecretvalue(child.cooldownChargesShown) and child.cooldownChargesShown then
-                            cd = ns.CooldownTracker:getChargeCD(info.spellID)
-                        else
-                            cd = ns.CooldownTracker:getSpellCD(info.spellID)
-                        end
-
-                        local curve = C_CurveUtil.CreateCurve()
-                        curve:AddPoint(0.0, toDimOpacity)
-                        curve:AddPoint(0.1, 1)
-                        local EvaluateDuration = cd.EvaluateRemainingDuration and cd:EvaluateRemainingDuration(curve)
-
-                        child:SetAlpha(EvaluateDuration)
-                    end
-                else
-                    child:SetAlpha(1)
-                end
+                child:SetAlpha(1)
             end
         end)
     end
@@ -802,18 +834,13 @@ end
 
 function CooldownManager.ForceRefresh(parts)
     parts = parts or { icons = true, bars = true, essential = true, utility = true }
+    if IsInCombat() then
+        QueueDeferredRefresh(parts)
+        return
+    end
     if FORCE_DISABLE_CDM_LAYOUT() then
-        -- Centering is OFF: tell Blizzard to re-layout so positions reset to default
-        for _, name in ipairs({ "EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer", "BuffBarCooldownViewer" }) do
-            local v = viewers[name]
-            if v then
-                pcall(function()
-                    if v.RefreshLayout then
-                        v:RefreshLayout()
-                    end
-                end)
-            end
-        end
+        -- Centering is OFF: do nothing in CMC layer.
+        -- Avoid direct Blizzard RefreshLayout invocation from addon code.
         return
     end
     if parts.icons then
@@ -843,7 +870,7 @@ EventHandler.frame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 EventHandler.frame:RegisterEvent("TRAIT_CONFIG_UPDATED")
 EventHandler.frame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
 EventHandler.frame:RegisterEvent("PLAYER_REGEN_DISABLED")
-EventHandler.frame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+EventHandler.frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 EventHandler.frame:RegisterEvent("CINEMATIC_STOP")
 EventHandler.frame:RegisterEvent("ADDON_LOADED")
 
@@ -853,7 +880,26 @@ EventHandler.EventRefreshMap = {
     CINEMATIC_STOP = { essential = true, utility = true },
 }
 
-EventHandler._lastSpellCooldownRefreshAt = 0
+function EventHandler.RequestOrDefer(parts)
+    if IsInCombat() then
+        QueueDeferredRefresh(parts)
+        return
+    end
+    if not RequestCoordinatedRefresh(parts, "cmc", { delay = 0 }) then
+        CooldownManager.ForceRefresh(parts)
+    end
+end
+
+function EventHandler.FlushDeferredIfSafe()
+    if IsInCombat() then
+        return
+    end
+    local deferredParts = ConsumeDeferredRefresh()
+    if not HasAnyRefreshPart(deferredParts) then
+        return
+    end
+    EventHandler.RequestOrDefer(deferredParts)
+end
 
 EventHandler.frame:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" and arg1 == "Blizzard_CooldownManager" then
@@ -862,74 +908,42 @@ EventHandler.frame:SetScript("OnEvent", function(_, event, arg1)
             CooldownManager.HookViewerRefreshLayout()
         end
         C_Timer.After(0, function()
-            if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
-                CooldownManager.ForceRefreshAll()
-            end
+            EventHandler.RequestOrDefer({ icons = true, bars = true, essential = true, utility = true })
         end)
+        return
+    end
+    if event == "PLAYER_REGEN_ENABLED" then
+        EventHandler.FlushDeferredIfSafe()
         return
     end
     local parts = EventHandler.EventRefreshMap[event]
     if event == "PLAYER_REGEN_DISABLED" then
-        C_Timer.After(0, function()
-            if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
-                CooldownManager.ForceRefreshAll()
-            end
-        end)
-        return
-    end
-    -- SPELL_UPDATE_COOLDOWN fires very frequently; never fall through to full refresh.
-    -- Only refresh utility when dimWhenNotOnCD is enabled, and throttle updates.
-    if event == "SPELL_UPDATE_COOLDOWN" then
-        if not GetSetting("cooldownManager_utility_dimWhenNotOnCD", false) then
-            return
-        end
-        local now = GetTime() or 0
-        if (now - (EventHandler._lastSpellCooldownRefreshAt or 0)) < 0.05 then
-            return
-        end
-        EventHandler._lastSpellCooldownRefreshAt = now
-        C_Timer.After(0, function()
-            if not RequestCoordinatedRefresh({ utility = true }, "cmc", { delay = 0 }) then
-                CooldownManager.ForceRefresh({ utility = true })
-            end
-        end)
+        QueueDeferredRefresh({ icons = true, bars = true, essential = true, utility = true })
         return
     end
     if parts then
-        if not RequestCoordinatedRefresh(parts, "cmc", { delay = 0 }) then
-            CooldownManager.ForceRefresh(parts)
-        end
+        EventHandler.RequestOrDefer(parts)
     else
-        if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
-            CooldownManager.ForceRefreshAll()
-        end
+        EventHandler.RequestOrDefer({ icons = true, bars = true, essential = true, utility = true })
     end
 end)
 
 if EventRegistry then
     EventRegistry:RegisterCallback("CooldownViewerSettings.OnDataChanged", function()
         PrintDebug("CooldownViewerSettings.OnDataChanged triggered refresh")
-        if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
-            CooldownManager.ForceRefreshAll("CooldownViewerSettings.OnDataChanged")
-        end
+        EventHandler.RequestOrDefer({ icons = true, bars = true, essential = true, utility = true })
     end)
     EventRegistry:RegisterCallback("CooldownViewerSettings.OnShow", function()
         PrintDebug("CooldownViewerSettings.OnShow triggered refresh")
-        if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
-            CooldownManager.ForceRefreshAll("CooldownViewerSettings.OnShow")
-        end
+        EventHandler.RequestOrDefer({ icons = true, bars = true, essential = true, utility = true })
     end)
     EventRegistry:RegisterCallback("CooldownViewerSettings.OnHide", function()
         PrintDebug("CooldownViewerSettings.OnHide triggered refresh")
-        if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
-            CooldownManager.ForceRefreshAll("CooldownViewerSettings.OnHide")
-        end
+        EventHandler.RequestOrDefer({ icons = true, bars = true, essential = true, utility = true })
     end)
 
     EventRegistry:RegisterCallback("EditMode.Exit", function()
-        if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then
-            CooldownManager.ForceRefreshAll()
-        end
+        EventHandler.RequestOrDefer({ icons = true, bars = true, essential = true, utility = true })
     end)
 end
 
@@ -941,35 +955,9 @@ local viewerReasonPartsMap = {
 }
 
 function CooldownManager.HookViewerRefreshLayout()
-    for n, v in pairs(viewers) do
-        -- WoW 12.0.5: viewer internals may be forbidden to addon access.
-        -- Wrap every property read in pcall to avoid "attempted to index a forbidden table".
-        local ok, hasRL, isHooked = pcall(function()
-            return v and v.RefreshLayout, v and v.__suiCMCRefreshHooked
-        end)
-        if ok and hasRL and not isHooked then
-            pcall(function() v.__suiCMCRefreshHooked = true end)
-            -- TAINT-FIX: Defer ALL work from RefreshLayout hook to avoid
-            -- tainting Blizzard's execution context. The hook body must be
-            -- empty of any reads/writes to Blizzard frames.
-            local hookOk = pcall(hooksecurefunc, v, "RefreshLayout", function()
-                -- LOW-LEVEL SAFETY: Debounce to prevent timer flooding on empty viewers.
-                if v.__suiCMCRefreshPending then return end
-                v.__suiCMCRefreshPending = true
-                C_Timer.After(0, function()
-                    v.__suiCMCRefreshPending = nil
-                    if IsCoordinatorInProgress() then
-                        return
-                    end
-                    pcall(function()
-                        if not RequestCoordinatedRefresh(viewerReasonPartsMap[n], "cmc", { delay = 0 }) then
-                            CooldownManager.ForceRefresh(viewerReasonPartsMap[n])
-                        end
-                    end)
-                end)
-            end)
-        end
-    end
+    -- Intentionally disabled for taint safety.
+    -- Avoid hooking Blizzard CooldownViewer RefreshLayout execution paths.
+    return
 end
 
 function CooldownManager.Initialize()

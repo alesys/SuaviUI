@@ -43,7 +43,6 @@
     <Script file="sui_options.lua"/>
     <Script file="sui_blizzard_options.lua"/>
     <Script file="sui_ncdm.lua"/>
-    <Script file="sui_buffbar.lua"/>
     <Script file="sui_spellscanner.lua"/>
     <Script file="sui_customtrackers.lua"/>
     <Script file="sui_reticle.lua"/>
@@ -62,4 +61,5 @@
     <Script file="sui_keystone_comm.lua"/>
     <Script file="sui_key_tracker.lua"/>
     <Script file="sui_raidbuffs.lua"/>
+    <Script file="sui_buffbar.lua"/>
 </Ui>
