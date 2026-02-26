@@ -1085,13 +1085,18 @@ eventFrame:SetScript("OnEvent", function(self, event)
     ThrottledUpdate()
 end)
 
+-- TAINT-FIX: Track hooked viewers in a module-level table instead of writing to the Blizzard
+-- frame directly. Writing viewer._SUI_KeybindHooked = true taints the frame table, causing
+-- all Blizzard reads of that frame's fields to return "secret values tainted by SuaviUI".
+local hookedViewers = {}
+
 -- Hook into viewer layout updates
 local function HookViewerLayout(viewerName)
     local viewer = _G[viewerName]
     if not viewer then return end
 
-    if viewer.Layout and not viewer._SUI_KeybindHooked then
-        viewer._SUI_KeybindHooked = true
+    if viewer.Layout and not hookedViewers[viewerName] then
+        hookedViewers[viewerName] = true
         hooksecurefunc(viewer, "Layout", function()
             -- PERFORMANCE: Skip if no keybind features are enabled
             if not IsAnyKeybindFeatureEnabled() then return end

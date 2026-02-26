@@ -90,6 +90,14 @@ local styleConfig = {
     },
 }
 
+-- TAINT-FIX: Store SuaviUI state in module-level tables rather than as fields on Blizzard's
+-- CooldownViewer item frames. Writing any field to a Blizzard frame from addon context taints
+-- the frame's entire table, causing all subsequent field reads in Blizzard secure code to come
+-- back as "secret values tainted by SuaviUI".
+local styledButtons = {}       -- [button] = true when square-styled
+local buttonBorders = {}       -- [button] = border Frame
+local viewerRefreshPending = {} -- [viewerFrame] = true when a deferred refresh is queued
+
 local function ApplySquareStyle(button, viewerSettingName)
     local profile = GetProfile()
     local config = styleConfig[viewerSettingName]
@@ -165,27 +173,27 @@ local function ApplySquareStyle(button, viewerSettingName)
     end
 
     -- Create/update inset black border
-    if not button.suiSquareBorder then
-        button.suiSquareBorder = CreateFrame("Frame", nil, button, "BackdropTemplate")
-        button.suiSquareBorder:SetFrameLevel(button:GetFrameLevel() + 1)
+    if not buttonBorders[button] then
+        buttonBorders[button] = CreateFrame("Frame", nil, button, "BackdropTemplate")
+        buttonBorders[button]:SetFrameLevel(button:GetFrameLevel() + 1)
     end
-    button.suiSquareBorder:ClearAllPoints()
-    button.suiSquareBorder:SetPoint("TOPLEFT", button, "TOPLEFT", -config.paddingFixup / 2, config.paddingFixup / 2)
-    button.suiSquareBorder:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", config.paddingFixup / 2, -config.paddingFixup / 2)
-    button.suiSquareBorder:SetBackdrop({
+    buttonBorders[button]:ClearAllPoints()
+    buttonBorders[button]:SetPoint("TOPLEFT", button, "TOPLEFT", -config.paddingFixup / 2, config.paddingFixup / 2)
+    buttonBorders[button]:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", config.paddingFixup / 2, -config.paddingFixup / 2)
+    buttonBorders[button]:SetBackdrop({
         edgeFile = "Interface\\Buttons\\WHITE8x8",
         edgeSize = borderThickness,
     })
-    button.suiSquareBorder:SetBackdropBorderColor(0, 0, 0, 1)
-    button.suiSquareBorder:Show()
+    buttonBorders[button]:SetBackdropBorderColor(0, 0, 0, 1)
+    buttonBorders[button]:Show()
 
-    button.suiSquareStyled = true
+    styledButtons[button] = true
 end
 
 local function RestoreOriginalStyle(button, viewerSettingName)
     -- Only restore if button was previously styled by us
     -- DO NOT restore Blizzard's default state - that causes unwanted modifications
-    if not button.suiSquareStyled then
+    if not styledButtons[button] then
         return
     end
 
@@ -270,12 +278,12 @@ local function RestoreOriginalStyle(button, viewerSettingName)
     end
 
     -- Hide square border
-    if button.suiSquareBorder then
-        button.suiSquareBorder:Hide()
-        button.suiSquareBorder:SetBackdrop(nil)  -- Clear backdrop completely
+    if buttonBorders[button] then
+        buttonBorders[button]:Hide()
+        buttonBorders[button]:SetBackdrop(nil)  -- Clear backdrop completely
     end
 
-    button.suiSquareStyled = false
+    styledButtons[button] = nil
     
     -- Also restore NCDM styling if available (clears NCDM's styling flags)
     if ns.NCDM and ns.NCDM.RestoreIcon then
@@ -354,7 +362,7 @@ function StyledIcons.UpdateIconStyle(icon, viewerSettingName)
         return
     end
     if FORCE_DISABLE_CDM_STYLING then
-        if icon.suiSquareStyled then
+        if styledButtons[icon] then
             RestoreOriginalStyle(icon, viewerSettingName)
         end
         return
@@ -365,7 +373,7 @@ function StyledIcons.UpdateIconStyle(icon, viewerSettingName)
         ApplySquareStyle(icon, viewerSettingName)
     else
         -- Only restore if this icon was previously styled by us
-        if icon.suiSquareStyled then
+        if styledButtons[icon] then
             RestoreOriginalStyle(icon, viewerSettingName)
         end
     end
@@ -426,7 +434,7 @@ local function ApplyNormalizedSizeToButton(button, viewerSettingName)
     end)
 
     if not (issecretvalue and issecretvalue(button)) and button.Icon and not (issecretvalue and issecretvalue(button.Icon)) then
-        local padding = button.suiSquareStyled and 4 or 0
+        local padding = styledButtons[button] and 4 or 0
         button.Icon:SetSize(config.width - padding, config.height - padding)
     end
 end
@@ -456,7 +464,7 @@ local function RestoreOriginalSizeToButton(button, viewerSettingName)
     end)
 
     if not (issecretvalue and issecretvalue(button)) and button.Icon and not (issecretvalue and issecretvalue(button.Icon)) then
-        local padding = button.suiSquareStyled and 4 or 0
+        local padding = styledButtons[button] and 4 or 0
         button.Icon:SetSize(config.width - padding, config.height - padding)
     end
 end
@@ -500,10 +508,10 @@ function StyledIcons:Enable()
                     -- Even reads of isModuleStyledEnabled (local) are safe, but all
                     -- Blizzard frame access must be deferred.
                     -- LOW-LEVEL SAFETY: Debounce to prevent timer flooding on empty viewers.
-                    if viewerFrame.__suiStyledRefreshPending then return end
-                    viewerFrame.__suiStyledRefreshPending = true
+                    if viewerRefreshPending[viewerFrame] then return end
+                    viewerRefreshPending[viewerFrame] = true
                     C_Timer.After(0, function()
-                        viewerFrame.__suiStyledRefreshPending = nil
+                        viewerRefreshPending[viewerFrame] = nil
                         if not isModuleStyledEnabled then
                             return
                         end

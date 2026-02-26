@@ -1258,6 +1258,235 @@ local function CreateGeneralQoLPage(parent)
 
         y = y - 10
 
+        -- Bags Section
+        local bagsHeader = GUI:CreateSectionHeader(tabContent, "Bags & Items")
+        bagsHeader:SetPoint("TOPLEFT", PADDING, y)
+        y = y - bagsHeader.gap
+
+        -- Square icon skin toggle
+        if db.general.skinBagIcons == nil then db.general.skinBagIcons = false end
+        local skinBagIconsCheck = GUI:CreateFormCheckbox(tabContent, "Square Icon Skin", "skinBagIcons", db.general, function()
+            if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
+                _G.SuaviUI_BagItemLevel.Update()
+            end
+        end)
+        skinBagIconsCheck:SetPoint("TOPLEFT", PADDING, y)
+        skinBagIconsCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        local skinBagIconsDesc = GUI:CreateLabel(tabContent,
+            "Apply a square icon skin to bag and bank item buttons: black background, cropped icon, and quality-colored border.",
+            11, C.textMuted)
+        skinBagIconsDesc:SetPoint("TOPLEFT", PADDING, y)
+        skinBagIconsDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        skinBagIconsDesc:SetJustifyH("LEFT")
+        skinBagIconsDesc:SetWordWrap(true)
+        skinBagIconsDesc:SetHeight(20)
+        y = y - 30
+
+        -- Border thickness slider
+        if db.general.bagIconBorderThickness == nil then db.general.bagIconBorderThickness = 1 end
+        local bagBorderThicknessSlider = GUI:CreateFormSlider(tabContent, "Icon Border Thickness", 1, 5, 1, "bagIconBorderThickness", db.general, function()
+            if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
+                _G.SuaviUI_BagItemLevel.Update()
+            end
+        end)
+        bagBorderThicknessSlider:SetPoint("TOPLEFT", PADDING, y)
+        bagBorderThicknessSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        -- Quality border color toggle
+        if db.general.bagIconUseQualityBorderColor == nil then db.general.bagIconUseQualityBorderColor = true end
+        local bagUseQualityBorderCheck = GUI:CreateFormCheckbox(tabContent, "Use Quality Color for Border", "bagIconUseQualityBorderColor", db.general, function()
+            if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
+                _G.SuaviUI_BagItemLevel.Update()
+            end
+        end)
+        bagUseQualityBorderCheck:SetPoint("TOPLEFT", PADDING, y)
+        bagUseQualityBorderCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        -- Custom border color picker
+        if db.general.bagIconBorderColor == nil then db.general.bagIconBorderColor = { 0.25, 0.25, 0.25, 0.8 } end
+        local bagBorderColorPicker = GUI:CreateFormColorPicker(tabContent, "Custom Border Color", "bagIconBorderColor", db.general, function()
+            if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
+                _G.SuaviUI_BagItemLevel.Update()
+            end
+        end)
+        bagBorderColorPicker:SetPoint("TOPLEFT", PADDING, y)
+        bagBorderColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        if bagBorderColorPicker.SetEnabled then
+            bagBorderColorPicker:SetEnabled(not db.general.bagIconUseQualityBorderColor)
+        end
+        bagUseQualityBorderCheck.track:HookScript("OnClick", function()
+            if bagBorderColorPicker and bagBorderColorPicker.SetEnabled then
+                bagBorderColorPicker:SetEnabled(not db.general.bagIconUseQualityBorderColor)
+            end
+        end)
+        y = y - FORM_ROW
+
+        y = y - 5
+
+        if db.general.showBagItemLevel == nil then db.general.showBagItemLevel = false end
+        local bagItemLevelCheck = GUI:CreateFormCheckbox(tabContent, "Show Item Level on Bag Items", "showBagItemLevel", db.general, function()
+            if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
+                _G.SuaviUI_BagItemLevel.Update()
+            end
+        end)
+        bagItemLevelCheck:SetPoint("TOPLEFT", PADDING, y)
+        bagItemLevelCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        local bagItemLevelDesc = GUI:CreateLabel(tabContent,
+            "Display item level as an overlay on item buttons in your bags. Only shows on equippable items.",
+            11, C.textMuted)
+        bagItemLevelDesc:SetPoint("TOPLEFT", PADDING, y)
+        bagItemLevelDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        bagItemLevelDesc:SetJustifyH("LEFT")
+        bagItemLevelDesc:SetWordWrap(true)
+        bagItemLevelDesc:SetHeight(20)
+        y = y - 30
+
+        -- Ensure item level settings exist
+        if db.general.bagItemLevelFontSize == nil then db.general.bagItemLevelFontSize = 11 end
+        if db.general.bagItemLevelFont == nil then db.general.bagItemLevelFont = "Suavi" end
+        if db.general.bagItemLevelFontOutline == nil then db.general.bagItemLevelFontOutline = "OUTLINE" end
+
+        -- Font size slider
+        local bagFontSizeSlider = GUI:CreateFormSlider(tabContent, "Item Level Font Size", 8, 20, 1, "bagItemLevelFontSize", db.general, function()
+            if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
+                _G.SuaviUI_BagItemLevel.Update()
+            end
+        end)
+        bagFontSizeSlider:SetPoint("TOPLEFT", PADDING, y)
+        bagFontSizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        -- Font dropdown
+        local fontList = GetFontList()
+        local bagFontDropdown = GUI:CreateFormDropdown(tabContent, "Item Level Font", fontList, "bagItemLevelFont", db.general, function()
+            if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
+                _G.SuaviUI_BagItemLevel.Update()
+            end
+        end)
+        bagFontDropdown:SetPoint("TOPLEFT", PADDING, y)
+        bagFontDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        -- Outline style dropdown
+        local outlineOptions = {
+            {value = "", text = "None"},
+            {value = "OUTLINE", text = "Thin Outline"},
+            {value = "THICKOUTLINE", text = "Thick Outline"},
+        }
+        local bagOutlineDropdown = GUI:CreateFormDropdown(tabContent, "Item Level Outline", outlineOptions, "bagItemLevelFontOutline", db.general, function()
+            if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
+                _G.SuaviUI_BagItemLevel.Update()
+            end
+        end)
+        bagOutlineDropdown:SetPoint("TOPLEFT", PADDING, y)
+        bagOutlineDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        -- Use quality color toggle
+        if db.general.bagItemLevelUseQualityColor == nil then db.general.bagItemLevelUseQualityColor = true end
+        local useQualityColorCheck = GUI:CreateFormCheckbox(tabContent, "Use Item Quality Color", "bagItemLevelUseQualityColor", db.general, function()
+            if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
+                _G.SuaviUI_BagItemLevel.Update()
+            end
+        end)
+        useQualityColorCheck:SetPoint("TOPLEFT", PADDING, y)
+        useQualityColorCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        -- Custom text color picker
+        if db.general.bagItemLevelTextColor == nil then db.general.bagItemLevelTextColor = { 1.0, 1.0, 1.0, 1.0 } end
+        local bagTextColorPicker = GUI:CreateFormColorPicker(tabContent, "Custom Text Color", "bagItemLevelTextColor", db.general, function()
+            if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
+                _G.SuaviUI_BagItemLevel.Update()
+            end
+        end)
+        bagTextColorPicker:SetPoint("TOPLEFT", PADDING, y)
+        bagTextColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        -- Disable color picker if using quality color
+        if bagTextColorPicker.SetEnabled then
+            bagTextColorPicker:SetEnabled(not db.general.bagItemLevelUseQualityColor)
+        end
+        -- Update color picker state when toggle changes
+        useQualityColorCheck.track:HookScript("OnClick", function()
+            if bagTextColorPicker and bagTextColorPicker.SetEnabled then
+                bagTextColorPicker:SetEnabled(not db.general.bagItemLevelUseQualityColor)
+            end
+        end)
+        y = y - FORM_ROW
+
+        -- Glow sub-section
+        y = y - 5
+        local glowHeader = GUI:CreateLabel(tabContent, "Text Glow", 11, C.textBright)
+        glowHeader:SetPoint("TOPLEFT", PADDING, y)
+        y = y - 20
+
+        if db.general.showBagItemLevelGlow == nil then db.general.showBagItemLevelGlow = false end
+        local bagGlowCheck = GUI:CreateFormCheckbox(tabContent, "Enable Glow Effect", "showBagItemLevelGlow", db.general, function()
+            if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
+                _G.SuaviUI_BagItemLevel.Update()
+            end
+        end)
+        bagGlowCheck:SetPoint("TOPLEFT", PADDING, y)
+        bagGlowCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        if db.general.bagItemLevelGlowSize == nil then db.general.bagItemLevelGlowSize = 1 end
+        local bagGlowSizeSlider = GUI:CreateFormSlider(tabContent, "Glow Spread (px)", 1, 5, 1, "bagItemLevelGlowSize", db.general, function()
+            if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
+                _G.SuaviUI_BagItemLevel.Update()
+            end
+        end)
+        bagGlowSizeSlider:SetPoint("TOPLEFT", PADDING, y)
+        bagGlowSizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        if db.general.bagItemLevelGlowAlpha == nil then db.general.bagItemLevelGlowAlpha = 60 end
+        local bagGlowAlphaSlider = GUI:CreateFormSlider(tabContent, "Glow Opacity (%)", 10, 100, 5, "bagItemLevelGlowAlpha", db.general, function()
+                if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
+                    _G.SuaviUI_BagItemLevel.Update()
+                end
+            end
+        )
+        bagGlowAlphaSlider:SetPoint("TOPLEFT", PADDING, y)
+        bagGlowAlphaSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        if db.general.bagItemLevelGlowUseQualityColor == nil then db.general.bagItemLevelGlowUseQualityColor = true end
+        local bagGlowQualityCheck = GUI:CreateFormCheckbox(tabContent, "Match Glow Color to Item Quality", "bagItemLevelGlowUseQualityColor", db.general, function()
+            if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
+                _G.SuaviUI_BagItemLevel.Update()
+            end
+        end)
+        bagGlowQualityCheck:SetPoint("TOPLEFT", PADDING, y)
+        bagGlowQualityCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        if db.general.bagItemLevelGlowColor == nil then db.general.bagItemLevelGlowColor = { 1.0, 0.82, 0.0, 1.0 } end
+        local bagGlowColorPicker = GUI:CreateFormColorPicker(tabContent, "Custom Glow Color", "bagItemLevelGlowColor", db.general, function()
+            if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
+                _G.SuaviUI_BagItemLevel.Update()
+            end
+        end)
+        bagGlowColorPicker:SetPoint("TOPLEFT", PADDING, y)
+        bagGlowColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        if bagGlowColorPicker.SetEnabled then
+            bagGlowColorPicker:SetEnabled(not db.general.bagItemLevelGlowUseQualityColor)
+        end
+        bagGlowQualityCheck.track:HookScript("OnClick", function()
+            if bagGlowColorPicker and bagGlowColorPicker.SetEnabled then
+                bagGlowColorPicker:SetEnabled(not db.general.bagItemLevelGlowUseQualityColor)
+            end
+        end)
+        y = y - FORM_ROW
+
+        y = y - 10
+
         -- Others Section
         local othersHeader = GUI:CreateSectionHeader(tabContent, "Others")
         othersHeader:SetPoint("TOPLEFT", PADDING, y)

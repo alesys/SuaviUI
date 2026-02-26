@@ -209,6 +209,17 @@ local customBarPool = {}       -- All created bar frames (recycled via ._inUse)
 local activeCustomBars = {}    -- Currently visible custom bar frames
 local customBarNameCounter = 0
 
+-- TAINT-FIX: track hook/state flags as module-level variables instead of as fields on
+-- Blizzard's CooldownViewer frames. Writing _any_ field to a Blizzard frame from addon
+-- code taints it, causing all Blizzard reads of that frame's properties to be
+-- "secret values tainted by SuaviUI" which crashes Blizzard's secure functions.
+local iconViewerHooked    = false
+local iconViewerElapsed   = 0
+local barViewerHooked     = false
+local barViewerElapsed    = 0
+local iconAuraHook        = nil   -- event-frame for UNIT_AURA
+local iconRescanPending   = false
+
 local function EnsureCooldownViewerLoaded()
     if InCombatLockdown() then return end
     pcall(function()
@@ -2484,13 +2495,13 @@ local function Initialize()
     -- Legacy icon OnUpdate polling (only when not using custom icons)
     if not USE_CUSTOM_ICONS then
         pcall(function()
-            if BuffIconCooldownViewer and not BuffIconCooldownViewer.__quiOnUpdateHooked then
-                BuffIconCooldownViewer.__quiOnUpdateHooked = true
-                BuffIconCooldownViewer.__quiElapsed = 0
+            if BuffIconCooldownViewer and not iconViewerHooked then
+                iconViewerHooked = true
+                iconViewerElapsed = 0
                 BuffIconCooldownViewer:HookScript("OnUpdate", function(self, elapsed)
-                    self.__quiElapsed = (self.__quiElapsed or 0) + elapsed
-                    if self.__quiElapsed > 0.05 then
-                        self.__quiElapsed = 0
+                    iconViewerElapsed = iconViewerElapsed + elapsed
+                    if iconViewerElapsed > 0.05 then
+                        iconViewerElapsed = 0
                         if self:IsShown() then
                             CheckIconChanges()
                         end
@@ -2503,13 +2514,13 @@ local function Initialize()
     -- Legacy bar OnUpdate hook (only when not using custom bars)
     if not USE_CUSTOM_BARS then
         pcall(function()
-            if BuffBarCooldownViewer and not BuffBarCooldownViewer.__quiOnUpdateHooked then
-                BuffBarCooldownViewer.__quiOnUpdateHooked = true
-                BuffBarCooldownViewer.__quiElapsed = 0
+            if BuffBarCooldownViewer and not barViewerHooked then
+                barViewerHooked = true
+                barViewerElapsed = 0
                 BuffBarCooldownViewer:HookScript("OnUpdate", function(self, elapsed)
-                    self.__quiElapsed = (self.__quiElapsed or 0) + elapsed
-                    if self.__quiElapsed > 0.05 then
-                        self.__quiElapsed = 0
+                    barViewerElapsed = barViewerElapsed + elapsed
+                    if barViewerElapsed > 0.05 then
+                        barViewerElapsed = 0
                         if self:IsShown() then
                             CheckBarChanges()
                         end
@@ -2540,12 +2551,17 @@ local function Initialize()
                 end)
             end
 
-            -- Hook Layout - immediate call after Blizzard's layout completes
+            -- Hook Layout - deferred to avoid taint inside Blizzard's secure call chain
             if BuffIconCooldownViewer and BuffIconCooldownViewer.Layout then
                 hooksecurefunc(BuffIconCooldownViewer, "Layout", function()
                     if IsLayoutSuppressed() then return end
                     if isIconLayoutRunning then return end
-                    LayoutBuffIcons()
+                    -- TAINT-FIX: defer so we don't run inside Blizzard's secure Layout call stack
+                    C_Timer.After(0, function()
+                        if IsLayoutSuppressed() then return end
+                        if isIconLayoutRunning then return end
+                        LayoutBuffIcons()
+                    end)
                 end)
             end
         end)
@@ -2558,20 +2574,29 @@ local function Initialize()
                 hooksecurefunc(BuffBarCooldownViewer, "Layout", function()
                     if IsLayoutSuppressed() then return end
                     if isBarLayoutRunning then return end
-                    LayoutBuffBars()
+                    -- TAINT-FIX: defer so we don't run inside Blizzard's secure Layout call stack
+                    C_Timer.After(0, function()
+                        if IsLayoutSuppressed() then return end
+                        if isBarLayoutRunning then return end
+                        LayoutBuffBars()
+                    end)
                 end)
             end
 
             -- FEAT-007: Hook RefreshLayout to correct isHorizontal after Blizzard sets it
+            -- TAINT-FIX: defer ALL work so writes to Blizzard frame fields don't taint the
+            -- secure call stack (isHorizontal etc. would become "secret values tainted by SuaviUI")
             if BuffBarCooldownViewer and BuffBarCooldownViewer.RefreshLayout then
                 hooksecurefunc(BuffBarCooldownViewer, "RefreshLayout", function(self)
-                    pcall(function()
-                        local settings = GetTrackedBarSettings()
-                        if settings.enabled and settings.orientation == "vertical" then
-                            self.isHorizontal = false
-                            self.layoutFramesGoingRight = settings.growUp ~= false
-                            self.layoutFramesGoingUp = false
-                        end
+                    C_Timer.After(0, function()
+                        pcall(function()
+                            local settings = GetTrackedBarSettings()
+                            if settings and settings.enabled and settings.orientation == "vertical" then
+                                self.isHorizontal = false
+                                self.layoutFramesGoingRight = settings.growUp ~= false
+                                self.layoutFramesGoingUp = false
+                            end
+                        end)
                     end)
                 end)
             end
@@ -2586,15 +2611,15 @@ local function Initialize()
     -- Legacy icon UNIT_AURA hook (only when not using custom icons)
     if not USE_CUSTOM_ICONS then
         pcall(function()
-            if BuffIconCooldownViewer and not BuffIconCooldownViewer.__quiAuraHook then
-                BuffIconCooldownViewer.__quiAuraHook = CreateFrame("Frame")
-                BuffIconCooldownViewer.__quiAuraHook:RegisterEvent("UNIT_AURA")
-                BuffIconCooldownViewer.__quiAuraHook:SetScript("OnEvent", function(_, event, unit)
+            if BuffIconCooldownViewer and not iconAuraHook then
+                iconAuraHook = CreateFrame("Frame")
+                iconAuraHook:RegisterEvent("UNIT_AURA")
+                iconAuraHook:SetScript("OnEvent", function(_, event, unit)
                     if unit == "player" and BuffIconCooldownViewer:IsShown() then
-                        if not BuffIconCooldownViewer.__quiRescanPending then
-                            BuffIconCooldownViewer.__quiRescanPending = true
+                        if not iconRescanPending then
+                            iconRescanPending = true
                             C_Timer.After(0.1, function()
-                                BuffIconCooldownViewer.__quiRescanPending = nil
+                                iconRescanPending = false
                                 if BuffIconCooldownViewer:IsShown() then
                                     if isIconLayoutRunning then return end
                                     if IsLayoutSuppressed() then return end

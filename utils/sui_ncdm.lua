@@ -979,10 +979,14 @@ end
 local function HookEditModeGetScaledSelectionSides()
     -- Only hook once
     if NCDM.editModeHooked then return end
-    NCDM.editModeHooked = true
+    -- NOTE: Do NOT set editModeHooked = true here before the mixin check.
+    -- If EditModeSystemMixin isn't loaded yet (file-load time), the hook won't
+    -- apply, but the flag would block the PLAYER_LOGIN retry. Only mark done
+    -- after the hook is successfully installed.
     
     -- EditModeSystemMixin is the mixin used by all EditMode frames
     if EditModeSystemMixin and EditModeSystemMixin.GetScaledSelectionSides then
+        NCDM.editModeHooked = true
         local originalGetScaledSelectionSides = EditModeSystemMixin.GetScaledSelectionSides
         EditModeSystemMixin.GetScaledSelectionSides = function(self)
             local ok, left, bottom, width, height = pcall(function()
@@ -1020,26 +1024,36 @@ local function HookEditModeGetScaledSelectionSides()
             return 0, w * scale, 0, h * scale
         end
     end
+    -- EditModeSystemMixin not yet available; will retry at PLAYER_LOGIN
 end
 
 
 ---------------------------------------------------------------------------
 -- Apply GetScaledRect hook to a viewer frame (legacy, kept as backup)
+-- TAINT-FIX: Use module-level tables instead of writing _SUI_ fields directly
+-- onto the Blizzard viewer frame. Frame field writes taint the frame table,
+-- causing secure code to read "secret values tainted by SuaviUI".
 ---------------------------------------------------------------------------
+local scaledRectHookedViewers = setmetatable({}, { __mode = "k" })
+local viewerLastRect = setmetatable({}, { __mode = "k" })
+
 local function ApplyGetScaledRectHook(viewerName)
     local viewer = _G[viewerName]
-    if not viewer or viewer._SUI_GetScaledRectHooked then return end
-    
-    viewer._SUI_GetScaledRectHooked = true
+    if not viewer or scaledRectHookedViewers[viewer] then return end
+    scaledRectHookedViewers[viewer] = true
+
     local originalGetScaledRect = viewer.GetScaledRect
+    if not originalGetScaledRect then return end
+
     viewer.GetScaledRect = function(self)
         local left, bottom, width, height = originalGetScaledRect(self)
         if left then
-            self._SUI_lastRect = {left, bottom, width, height}
+            viewerLastRect[self] = {left, bottom, width, height}
             return left, bottom, width, height
         end
-        if self._SUI_lastRect then
-            return unpack(self._SUI_lastRect)
+        local cached = viewerLastRect[self]
+        if cached then
+            return unpack(cached)
         end
         local w = self.__cdmIconWidth or self:GetWidth() or 200
         local h = self.__cdmTotalHeight or self:GetHeight() or 50

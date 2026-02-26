@@ -14,6 +14,7 @@
 ### Implementation Guides
 Located in [`GUIDES/`](GUIDES/):
 - **TERTIARY_BAR_IMPLEMENTATION.md** - Strategy for implementing tertiary resource bars
+- **CROSS_PROJECT_KNOWLEDGE_PLAYBOOK.md** - Portable debugging, taint-safety, Edit Mode, and release practices for reuse in other addons
 
 ### Technical References
 Located in [`REFERENCES/`](REFERENCES/):
@@ -77,4 +78,5 @@ SuaviUI/
 - **"What's the code style?"** → [DEVELOPMENT_PRINCIPLES.md](DEVELOPMENT_PRINCIPLES.md)
 - **"How are libraries managed?"** → [LIBRARY_AUDIT.md](LIBRARY_AUDIT.md)
 - **"How does settings save work?"** → [SETTINGS_SAVE_SYSTEM.md](SETTINGS_SAVE_SYSTEM.md)
+- **"What should we copy to another addon repo?"** → [GUIDES/CROSS_PROJECT_KNOWLEDGE_PLAYBOOK.md](GUIDES/CROSS_PROJECT_KNOWLEDGE_PLAYBOOK.md)
 - **"What old features existed?"** → [ARCHIVE/](ARCHIVE/)

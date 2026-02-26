@@ -214,12 +214,21 @@ do
         for _, pair in ipairs(viewers) do RecoverViewer(pair[1], pair[2]) end
     end
 
+    -- Module-level hook-guard tables. Using frame fields (viewer._SUI_X = true) taints
+    -- the viewer frame table, causing Blizzard secure code to receive "secret values"
+    -- when reading any field on that frame. Store guards here instead.
+    local viewerRefreshDataHooked = {}
+    local viewerOnEventHooked = {}
+    local viewerItemEventsHooked = {}
+    local viewerOnUpdateHooked = {}
+
     -- Proactive sanitization: PRE-hook RefreshData to sanitize BEFORE Blizzard's code runs
     -- hooksecurefunc runs AFTER the original function, which is too late.
     -- We replace the method with a wrapper that sanitizes first.
     local function HookViewerRefreshData(viewer)
         if not viewer or not viewer.RefreshData then return end
-        if viewer._SUI_RefreshDataHooked then return end
+        if viewerRefreshDataHooked[viewer] then return end
+        viewerRefreshDataHooked[viewer] = true
         
         local originalRefreshData = viewer.RefreshData
         viewer.RefreshData = function(self, ...)
@@ -231,19 +240,18 @@ do
             end
             return originalRefreshData(self, ...)
         end
-        
-        viewer._SUI_RefreshDataHooked = true
     end
 
     -- Hook individual item OnEvent/OnUpdate to sanitize before Blizzard code runs
     -- CooldownViewer items share a mixin; their OnEvent calls RefreshData → crashes
     local function HookViewerItemEvents(viewer)
-        if not viewer or viewer._SUI_ItemEventsHooked then return end
+        if not viewer or viewerItemEventsHooked[viewer] then return end
         if not viewer.itemFramePool then return end
         
         -- Hook the OnEvent callback on the viewer to sanitize items beforehand
         -- The viewer's OnEvent dispatches SPELL_UPDATE_COOLDOWN to each item's RefreshData
-        if viewer.OnEvent and not viewer._SUI_OnEventHooked then
+        if viewer.OnEvent and not viewerOnEventHooked[viewer] then
+            viewerOnEventHooked[viewer] = true
             local origOnEvent = viewer.OnEvent
             viewer.OnEvent = function(self, event, ...)
                 -- Sanitize before any event processing
@@ -254,10 +262,9 @@ do
                 end
                 return origOnEvent(self, event, ...)
             end
-            viewer._SUI_OnEventHooked = true
         end
         
-        viewer._SUI_ItemEventsHooked = true
+        viewerItemEventsHooked[viewer] = true
     end
 
     -- Hook viewer OnUpdate to sanitize isActive before Blizzard's per-item loop
@@ -266,7 +273,8 @@ do
     -- SanitizeFrame) because the OnUpdate path only gates on that one field.
     local function HookViewerOnUpdate(viewer)
         if not viewer or not viewer.OnUpdate then return end
-        if viewer._SUI_OnUpdateHooked then return end
+        if viewerOnUpdateHooked[viewer] then return end
+        viewerOnUpdateHooked[viewer] = true
 
         local originalOnUpdate = viewer.OnUpdate
         viewer.OnUpdate = function(self, elapsed, ...)
@@ -279,8 +287,6 @@ do
             end
             return originalOnUpdate(self, elapsed, ...)
         end
-
-        viewer._SUI_OnUpdateHooked = true
     end
 
     -- Hook all CDM viewers on load
@@ -415,6 +421,14 @@ function SuaviUI:SlashCommandOpen(input)
     else
         print("|cFF56D1FFSuaviUI:|r GUI not loaded yet. Try again in a moment.")
     end
+end
+
+function SuaviUI:SafeReload()
+    if InCombatLockdown() then
+        print("|cFF56D1FFSuaviUI:|r Cannot reload during combat.")
+        return
+    end
+    ReloadUI()
 end
 
 function SuaviUI:SlashCommandReload()

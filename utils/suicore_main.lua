@@ -664,6 +664,23 @@ local defaults = {
             mplusTeleportEnabled = true,  -- Click-to-teleport on M+ tab icons
             keyTrackerEnabled = true,     -- Show party keys on M+ tab
             keyTrackerFontSize = 9,       -- Font size for key tracker (7-12)
+            -- Bag Items
+            showBagItemLevel = false,  -- Show item level overlay on bag items
+            bagItemLevelFontSize = 11,  -- Font size for item level (8-20)
+            bagItemLevelFont = "Suavi",  -- Font name
+            bagItemLevelFontOutline = "OUTLINE",  -- "", "OUTLINE", "THICKOUTLINE"
+            bagItemLevelTextColor = { 1.0, 1.0, 1.0, 1.0 },  -- Text color (default white), uses quality color if not overridden
+            bagItemLevelUseQualityColor = true,  -- Use item quality color instead of custom color
+            -- Bag Item Level Text Glow
+            showBagItemLevelGlow = false,  -- Enable text glow effect
+            bagItemLevelGlowUseQualityColor = true,  -- Match glow color to item quality
+            bagItemLevelGlowColor = { 1.0, 0.82, 0.0, 1.0 },  -- Custom glow color (golden default)
+            bagItemLevelGlowSize = 1,  -- Glow spread in pixels (1-5)
+            bagItemLevelGlowAlpha = 60,  -- Glow opacity as percent 10-100 (divided by 100 when used)
+            skinBagIcons = false,  -- Apply square icon skin (black bg + quality border) to bag & bank items
+            bagIconBorderThickness = 1,  -- Border thickness in pixels (1-4)
+            bagIconUseQualityBorderColor = true,  -- Sync border color to item quality
+            bagIconBorderColor = { 0.25, 0.25, 0.25, 0.8 },  -- Custom border color (used when quality color is off)
         },
 
         -- Alert & Toast Skinning Settings (enabled via general.skinAlerts)

@@ -6,6 +6,7 @@
 
 - 📖 **[Full Documentation](docs/README.md)** - Features, installation, and more
 - 📋 **[Documentation Index](docs/INDEX.md)** - Navigate all documentation
+- 📦 **[Cross-Project Knowledge Playbook](docs/GUIDES/CROSS_PROJECT_KNOWLEDGE_PLAYBOOK.md)** - Reusable patterns for new addon projects
 - 📝 **[Changelog](docs/CHANGELOG.md)** - Version history and updates
 - 🚀 **[Release Process](docs/RELEASE_PROCESS.md)** - How releases are managed
 

@@ -1,5 +1,30 @@
 # SuaviUI Changelog
 
+## [v0.3.3](https://github.com/alesys/SuaviUI/tree/v0.3.3) (2026-02-26)
+
+### 🛡️ Taint Elimination, EditMode Drag Fix & Bag Item Level
+
+#### ✨ New Features
+- **[sui_bag_itemlevel.lua]** New module: item level overlays on equippable bag and bank items.
+  - Displays scaled/upgraded item level using `GetDetailedItemLevelInfo` (accurate for crafted, upgraded, and mythic items).
+  - Filters to equippable slot types only (armor, weapons, trinkets, rings, cloaks) — cosmetics and consumables ignored.
+  - **Square icon skin**: removes icon masks, crops icons, adds black background texture and quality-colored border. Covers main bags, bank slots, and bank bag slots.
+  - **Border controls**: thickness slider (1–5 px), quality-color sync toggle, custom border color picker.
+  - **Text glow**: 8-direction halo using offset FontStrings at ARTWORK layer; supports size, opacity %, quality color sync, and custom color.
+  - Full enable/disable toggle with clean reversal.
+  - All options exposed under General → Bags & Items in the settings panel.
+
+#### Fixed
+- **[init.lua]** Hook guard flags (`_SUI_RefreshDataHooked`, `_SUI_OnEventHooked`, `_SUI_ItemEventsHooked`, `_SUI_OnUpdateHooked`) were written directly onto Blizzard's CooldownViewer frame tables. Any field write from addon context taints the entire frame table in WoW 12.x, causing Blizzard secure code to read all subsequent fields as "secret values tainted by SuaviUI". Replaced all four flags with module-level local tables.
+- **[sui_ncdm.lua]** Same problem in `ApplyGetScaledRectHook`: `_SUI_GetScaledRectHooked` and `_SUI_lastRect` written directly to viewer frames. Replaced with `scaledRectHookedViewers` and `viewerLastRect` weak-keyed module-level tables.
+- **[sui_ncdm.lua]** `NCDM.editModeHooked = true` was set before checking whether `EditModeSystemMixin` was available, silently blocking the PLAYER_LOGIN retry when the mixin wasn't loaded at file-load time. The hook then never installed, leaving the nil-rect crash path unprotected. Fixed by moving the flag assignment to inside the successful hook block.
+- **[cooldownmanager.lua]** `Runtime.isInEditMode` was tracked but never consulted by `Runtime:IsReady()`. This allowed `ClearAllPoints()` to fire on CooldownViewer children while a frame was being dragged in EditMode, causing `UtilityCooldownViewer.Selection:GetRect()` to return nil and crashing `EditModeSystemTemplates.lua:603` (`GetScaledSelectionSides`). Added `if Runtime.isInEditMode then return false end` as the first check in `IsReady()`.
+
+#### Session triage
+- Session 4731: 1 error (`EditModeSystemTemplates.lua:603` nil arithmetic during EditMode drag) — fixed by #3 and #4 above.
+- Sessions 4729, 4730, 4732: zero errors.
+- Sessions 4727–4728 taint regressions traced to hook guard writes on viewer frames — fixed by #1 and #2 above.
+
 ## [v0.3.2](https://github.com/alesys/SuaviUI/tree/v0.3.2) (2026-02-16)
 
 ### 🛠️ Edit Mode + Stability Fixes

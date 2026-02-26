@@ -62,4 +62,5 @@
     <Script file="sui_key_tracker.lua"/>
     <Script file="sui_raidbuffs.lua"/>
     <Script file="sui_buffbar.lua"/>
+    <Script file="sui_bag_itemlevel.lua"/>
 </Ui>

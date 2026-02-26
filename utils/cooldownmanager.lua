@@ -80,6 +80,14 @@ if EventRegistry then
 end
 
 function Runtime:IsReady(viewerNameOrFrame)
+    -- Never run layout operations during EditMode.
+    -- ClearAllPoints on viewer children while a frame is being dragged can
+    -- cause the viewer's Selection:GetRect() to return nil, crashing
+    -- Blizzard's GetScaledSelectionSides (EditModeSystemTemplates.lua:603).
+    if Runtime.isInEditMode then
+        return false
+    end
+
     local viewer = nil
     if type(viewerNameOrFrame) == "string" then
         viewer = _G[viewerNameOrFrame]
