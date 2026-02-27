@@ -2,7 +2,7 @@
 # Packages the addon and creates a zip file in the parent directory
 
 param(
-    [string]$Version = "v0.1.15-alpha",
+    [string]$Version,
     [string]$OutputDir = ".."
 )
 
@@ -12,6 +12,22 @@ $addonDir = Split-Path -Leaf (Get-Location)
 if ($addonDir -ne $addonName) {
     Write-Error "Error: Must run from SuaviUI directory"
     exit 1
+}
+
+# Read version from SuaviUI.toc if not provided
+if (-not $Version) {
+    $tocFile = Join-Path (Get-Location) "SuaviUI.toc"
+    if (Test-Path $tocFile) {
+        $tocContent = Get-Content $tocFile
+        $versionLine = $tocContent | Select-String "## Version:"
+        if ($versionLine) {
+            $Version = "v" + ($versionLine -replace "## Version: ", "").Trim()
+        }
+    }
+    if (-not $Version) {
+        Write-Error "Error: Could not determine version from SuaviUI.toc"
+        exit 1
+    }
 }
 
 $parentDir = Resolve-Path $OutputDir

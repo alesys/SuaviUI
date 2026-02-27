@@ -68,6 +68,68 @@ The 61-error session 4612 is actually **EXCELLENT** because:
 
 ---
 
+### Sessions 4761–4766 — Execution-Context Taint Regression
+
+**Observed (2026-02-26, sessions 4761–4766):**
+- `CooldownViewerItemData.lua:419` — `hasTotem` secret boolean tainted by SuaviUI
+- `CooldownViewer.lua:353` — `isActive` secret boolean tainted by SuaviUI
+- `CooldownViewer.lua:877` — `attempted to index a forbidden table`
+- `CooldownViewer.lua:880` — secret number comparison
+- `CooldownViewer.lua:968` — `previousCooldownChargesCount` secret number tainted
+- `CooldownViewer.lua:986` — `charges` secret number tainted
+
+**Root cause identified:**
+`sui_ncdm.lua: ApplyGetScaledRectHook` was replacing `viewer.GetScaledRect` with an addon-owned closure. Assigning any addon closure to a Blizzard frame method field taints that field. When Blizzard's layout machinery calls `viewer:GetScaledRect()`, it runs the addon closure in **tainted execution context**, which then calls `originalGetScaledRect(self)` (Blizzard secure code) from inside that tainted context — propagating execution taint through the entire `RefreshData → RefreshLayout` chain.
+
+**Fix applied (v0.3.4):**
+Removed the `viewer.GetScaledRect = function(self) ... end` method body from `ApplyGetScaledRectHook`. The nil-rect crash scenario this guarded was already eliminated in v0.3.3.
+
+---
+
+### Sessions 4767–4768 — BuffBarCooldownViewer item isActive taint
+
+**Observed (2026-02-26, sessions 4767–4768):**
+- `CooldownViewer.lua:353` — `isActive` secret boolean tainted by SuaviUI (counter 45+)
+- Stack: `SetIsActive ← RefreshActive ← RefreshData ← ClearCooldownID ← Pools.Release ← resetFunc ← CooldownViewer:OnShow`
+- Frame: `BuffBarCooldownViewer` item
+
+**Root cause identified:**
+`HookFrameForMouseover` wrote `frame._quiMouseoverHooked = true` directly onto `BuffBarCooldownViewer`, its item children (via `CollectIcons`), and the other viewer frames. Also `region.__SUI_OverlayShowHooked` and `texture.__quiAtlasBlocked` written to child textures. Any field write from addon context to a Blizzard CDM frame object taints that frame's table — subsequent reads of `frame.isActive` return a "secret boolean tainted by SuaviUI".
+
+**Fix applied (v0.3.4):**
+Replaced all three direct field writes with module-level weak tables: `mouseoverHookedFrames`, `overlayShowHookedRegions`, `atlasBlockedTextures`.
+
+**Expected next session:** Zero CooldownViewer taint errors from these two sources.
+
+---
+
+### Session 4772 — BuffBarCooldownViewer isActive persistent taint (second vector)
+
+**Observed (2026-02-26, session 4772):**
+- `CooldownViewer.lua:353` — `isActive` secret boolean tainted by SuaviUI (counter 61, same error)
+- Same stack: `SetIsActive ← RefreshActive ← RefreshData ← ClearCooldownID ← Pools.Release ← resetFunc ← CooldownViewer:OnShow`
+- Error persisted even after mouseoverHookedFrames fix — meaning a second taint source was independently writing to the `BuffBarCooldownViewer` object.
+
+**Root cause identified:**
+`USE_CUSTOM_BARS = false` in `sui_buffbar.lua`. The legacy path:
+1. Writes `BuffBarCooldownViewer.isHorizontal`, `.layoutFramesGoingRight`, `.layoutFramesGoingUp` directly from addon context (at startup and via `hooksecurefunc(BuffBarCooldownViewer, "RefreshLayout", ...)`)
+2. Calls `ApplyBarStyle()` on Blizzard's pool item frames (obtained via `BuffBarCooldownViewer:GetItemFrames()`)
+Both operations taint the `BuffBarCooldownViewer` frame table. When Blizzard's own `RefreshLayout → ReleaseAll → resetFunc → SetIsActive` chain subsequently runs, it executes in tainted context and every `frame.isActive = value` sets a "secret boolean".
+
+**Taint mechanism:**
+> Field-level taint: `frame.x = value` written from addon context marks `frame.x` as tainted.
+> Execution-context taint: calling a hooked function that was registered from addon context causes the entire callchain to run in tainted context, marking every `frame.field = value` write as tainted.
+> Both were at play here.
+
+**Fix applied (v0.3.4):**
+Changed `local USE_CUSTOM_BARS = false` → `true` in `sui_buffbar.lua`. The `USE_CUSTOM_BARS = true` path uses `SuaviBuffBar*` frames (owned by SuaviUI). Blizzard's viewer is hidden via `SetAlpha(0)` only — no Blizzard frame field writes, no taint. This mirrors the already-working `USE_CUSTOM_ICONS = true` path.
+
+**Note:** A full game restart (not just `/reload`) is required to clear pre-fix tainted field values from JIT memory. After the restart, if `isActive` errors no longer appear, the fix was successful.
+
+**Expected next session (post full restart):** Zero `isActive` taint errors on `BuffBarCooldownViewer` items.
+
+---
+
 **Remember:** Counter increments = time passing + game activity. It's NOT a measure of total occurrences.
 
 ---

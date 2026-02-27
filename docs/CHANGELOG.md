@@ -1,5 +1,33 @@
 # SuaviUI Changelog
 
+## [v0.3.5](https://github.com/alesys/SuaviUI/tree/v0.3.5) (2026-02-26)
+
+### 🛡️ Execution-Context Taint Fix — GetScaledRect & Mouseover Hook Guards
+
+#### Root Cause (sessions 4761–4766)
+- `sui_ncdm.lua: ApplyGetScaledRectHook` replaced `viewer.GetScaledRect` with an addon-owned closure (`viewer.GetScaledRect = function(self) ... originalGetScaledRect(self) ... end`).
+- Assigning an addon closure to a Blizzard frame method field taints that field. When Blizzard's EditMode/CDM layout machinery calls `viewer:GetScaledRect()` it executes the addon closure in **tainted execution context**. The closure then calls `originalGetScaledRect(self)` (Blizzard secure code) **from inside that tainted context**, which propagates execution taint into the full `CooldownViewer.RefreshData → RefreshLayout` chain.
+- This caused: `hasTotem`, `isActive`, `charges`, `previousCooldownChargesCount` secret values + `attempted to index a forbidden table` in sessions 4761–4766.
+
+#### Root Cause (sessions 4767–4768)
+- Three hook-guard flags were still written directly to Blizzard frame/texture objects:
+  - `frame._quiMouseoverHooked = true` — written to `BuffBarCooldownViewer`, `BuffIconCooldownViewer`, `EssentialCooldownViewer`, `UtilityCooldownViewer` and **all collected icon/item child frames** via `HookFrameForMouseover`.
+  - `region.__SUI_OverlayShowHooked = true` — written to overlay texture regions on CDM icon frames.
+  - `texture.__quiAtlasBlocked = true` — written to border textures on CDM icon frames.
+- Writing `_quiMouseoverHooked` directly to CDM item frames taints those frame tables. When Blizzard reads `frame.isActive` on a tainted item frame it gets "secret boolean tainted by SuaviUI" — session 4767–4768 `CooldownViewer.lua:353`.
+
+#### Fix
+- **[sui_ncdm.lua]** Removed the `viewer.GetScaledRect = function(self) ... end` method body from `ApplyGetScaledRectHook`. Now a no-op; the nil-rect crash it guarded was eliminated in v0.3.3 by the `Runtime.isInEditMode` guard in `IsReady()`.
+- **[sui_ncdm.lua]** Replaced all three direct frame/texture field writes with module-level weak tables: `mouseoverHookedFrames`, `overlayShowHookedRegions`, `atlasBlockedTextures` — declared at the top of the file alongside `scaledRectHookedViewers`.
+- **[sui_buffbar.lua]** Set `USE_CUSTOM_BARS = true`. The legacy `false` path wrote `BuffBarCooldownViewer.isHorizontal` / `.layoutFramesGoingRight` / `.layoutFramesGoingUp` directly to the Blizzard viewer frame, and called `ApplyBarStyle` on Blizzard's pool item frames from addon context. Writing those fields taints the viewer object; when Blizzard's `RefreshLayout → ReleaseAll → resetFunc → SetIsActive` subsequently runs, it executes in tainted context and `frame.isActive` becomes a "secret boolean tainted by SuaviUI" (session 4772). Custom bars (`SuaviBuffBar*`) are owned by SuaviUI — no Blizzard frame field writes. Blizzard's viewer is hidden via `SetAlpha(0)` only.
+
+#### Session triage
+- Sessions 4761, 4765, 4766: GetScaledRect execution-context taint — fixed by method removal above.
+- Sessions 4767–4768: `isActive` secret boolean on `BuffBarCooldownViewer` items (first vector) — fixed by `mouseoverHookedFrames` table above.
+- Session 4772: `isActive` secret boolean on `BuffBarCooldownViewer` items (second, persistent vector) — fixed by `USE_CUSTOM_BARS = true` above.
+- Sessions 4740, 4749: `RegisterCallback` errors in `sui_bag_itemlevel.lua` — fixed in a prior edit.
+- Session 4766 `ADDON_ACTION_BLOCKED` on `SUI_extraActionButtonHolder:Hide()` — fixed in `sui_actionbars.lua` via `C_Timer.After(0, …)` deferral.
+
 ## [v0.3.3](https://github.com/alesys/SuaviUI/tree/v0.3.3) (2026-02-26)
 
 ### 🛡️ Taint Elimination, EditMode Drag Fix & Bag Item Level

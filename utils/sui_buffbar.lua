@@ -216,7 +216,14 @@ end
 -- by the viewer's alpha (which we set to 0 to hide Blizzard's children).
 ---------------------------------------------------------------------------
 
-local USE_CUSTOM_BARS = false  -- Use Blizzard bars + SUI styling (custom bars disabled)
+local USE_CUSTOM_BARS = true   -- TAINT-FIX (sessions 4772+): Legacy path writes
+-- BuffBarCooldownViewer.isHorizontal / layoutFramesGoingRight / layoutFramesGoingUp
+-- directly to the Blizzard viewer frame, and calls ApplyBarStyle on Blizzard's pool
+-- item frames. Both taint those frame objects, causing Blizzard's RefreshLayout →
+-- ReleaseAll → resetFunc → SetIsActive chain to run in tainted execution context,
+-- making frame.isActive a "secret boolean tainted by SuaviUI". Custom bars use
+-- SuaviBuffBar* frames (owned by us) and set BuffBarCooldownViewer alpha=0 — no
+-- Blizzard frame field writes, no taint. Mirrors the working USE_CUSTOM_ICONS=true path.
 local customContainer          -- Frame: SuaviBuffBarContainer (created lazily)
 local customBarPool = {}       -- All created bar frames (recycled via ._inUse)
 local activeCustomBars = {}    -- Currently visible custom bar frames

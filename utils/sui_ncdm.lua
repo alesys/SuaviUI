@@ -55,6 +55,17 @@ local ASPECT_RATIOS = {
 -- Forward declaration for mouseover hook (defined later in visibility section)
 local HookFrameForMouseover
 
+-- TAINT-FIX: Module-level weak tables for hook-guard flags that previously used
+-- direct frame/texture field writes (frame._quiMouseoverHooked, region.__SUI_OverlayShowHooked,
+-- texture.__quiAtlasBlocked).  Writing ANY field from addon context to a Blizzard
+-- CooldownViewer frame or its child objects taints that object's table.  When Blizzard's
+-- secure code subsequently reads fields like 'isActive' or 'charges' it sees
+-- "secret value tainted by SuaviUI" (sessions 4767–4768).  Weak tables are GC-friendly
+-- and never touch the Blizzard frame tables.
+local overlayShowHookedRegions = setmetatable({}, { __mode = "k" })
+local atlasBlockedTextures = setmetatable({}, { __mode = "k" })
+local mouseoverHookedFrames = setmetatable({}, { __mode = "k" })
+
 -- Migrate old 'shape' setting to 'aspectRatioCrop' for CDM rows
 local function MigrateRowAspect(rowData)
     if rowData and rowData.aspectRatioCrop == nil and rowData.shape then
@@ -179,8 +190,8 @@ local function StripBlizzardOverlay(icon)
                 -- TAINT-FIX: Use hooksecurefunc instead of method replacement.
                 -- Don't call Hide() in the hook — it can cause Show→Hide→Show infinite loops.
                 -- Just clear the texture and alpha so it's invisible without toggling visibility.
-                if not region.__SUI_OverlayShowHooked then
-                    region.__SUI_OverlayShowHooked = true
+                if not overlayShowHookedRegions[region] then
+                    overlayShowHookedRegions[region] = true
                     hooksecurefunc(region, "Show", function(self)
                         self:SetTexture("")
                         self:SetAlpha(0)
@@ -195,8 +206,8 @@ end
 -- HELPER: Proactively block atlas borders (CPU attribution shifts to Blizzard)
 ---------------------------------------------------------------------------
 local function PreventAtlasBorder(texture)
-    if not texture or texture.__quiAtlasBlocked then return end
-    texture.__quiAtlasBlocked = true
+    if not texture or atlasBlockedTextures[texture] then return end
+    atlasBlockedTextures[texture] = true
 
     -- Hook future SetAtlas calls to block border re-application
     if texture.SetAtlas then
@@ -1029,40 +1040,31 @@ end
 
 
 ---------------------------------------------------------------------------
--- Apply GetScaledRect hook to a viewer frame (legacy, kept as backup)
--- TAINT-FIX: Use module-level tables instead of writing _SUI_ fields directly
--- onto the Blizzard viewer frame. Frame field writes taint the frame table,
--- causing secure code to read "secret values tainted by SuaviUI".
+-- Apply GetScaledRect hook to a viewer frame (no-op since v0.3.3)
+-- TAINT-FIX (sessions 4761–4766): The previous implementation replaced
+-- viewer.GetScaledRect with an addon-owned closure:
+--   viewer.GetScaledRect = function(self) ... originalGetScaledRect(self) ... end
+-- That assignment taints the method field on the Blizzard frame. When Blizzard's
+-- EditMode layout machinery subsequently calls viewer:GetScaledRect(), it executes
+-- the addon closure in tainted execution context, which then calls Blizzard's
+-- originalGetScaledRect() from inside tainted context. This propagates execution
+-- taint into the full CooldownViewer RefreshData → RefreshLayout chain, producing
+-- "attempt to compare field 'isActive' (secret boolean tainted by SuaviUI)",
+-- "attempt to compare local 'charges' (secret number tainted by SuaviUI)",
+-- "attempted to index a forbidden table" etc. in sessions 4761–4766.
+-- Root cause: viewer.GetScaledRect = <addon-closure> was the taint entry point.
+-- Fix: remove the method body entirely. The nil-rect crash scenario this
+-- guarded was eliminated in v0.3.3 by the Runtime.isInEditMode guard in
+-- IsReady() (#4) and the editModeHooked early-flag fix (#3).
 ---------------------------------------------------------------------------
 local scaledRectHookedViewers = setmetatable({}, { __mode = "k" })
-local viewerLastRect = setmetatable({}, { __mode = "k" })
 
 local function ApplyGetScaledRectHook(viewerName)
+    -- No-op: method replacement removed to prevent execution-context taint.
+    -- Guard table retained so call sites remain safe if the function is called.
     local viewer = _G[viewerName]
     if not viewer or scaledRectHookedViewers[viewer] then return end
     scaledRectHookedViewers[viewer] = true
-
-    local originalGetScaledRect = viewer.GetScaledRect
-    if not originalGetScaledRect then return end
-
-    viewer.GetScaledRect = function(self)
-        local left, bottom, width, height = originalGetScaledRect(self)
-        if left then
-            viewerLastRect[self] = {left, bottom, width, height}
-            return left, bottom, width, height
-        end
-        local cached = viewerLastRect[self]
-        if cached then
-            return unpack(cached)
-        end
-        local w = self.__cdmIconWidth or self:GetWidth() or 200
-        local h = self.__cdmTotalHeight or self:GetHeight() or 50
-        local cx, cy = self:GetCenter()
-        if cx and cy then
-            return cx - w/2, cy - h/2, w, h
-        end
-        return 0, 0, w, h
-    end
 end
 
 
@@ -1676,9 +1678,9 @@ end
 
 -- Helper: Hook a single frame for mouseover detection
 HookFrameForMouseover = function(frame)
-    if not frame or frame._quiMouseoverHooked then return end
+    if not frame or mouseoverHookedFrames[frame] then return end
 
-    frame._quiMouseoverHooked = true
+    mouseoverHookedFrames[frame] = true
 
     frame:HookScript("OnEnter", function()
         local vis = GetCDMVisibilitySettings()
@@ -1964,8 +1966,8 @@ local function SetupUnitframesMouseoverDetector()
     local hoverCount = 0
 
     for _, frame in ipairs(ufFrames) do
-        if frame and not frame._quiMouseoverHooked then
-            frame._quiMouseoverHooked = true
+        if frame and not mouseoverHookedFrames[frame] then
+            mouseoverHookedFrames[frame] = true
 
             -- Hook OnEnter
             frame:HookScript("OnEnter", function()
