@@ -47,6 +47,19 @@ local function SafeViewerSet(viewer, prop, val)
 end
 
 ---------------------------------------------------------------------------
+-- TAINT-SAFE SIDE TABLES
+-- WoW 12.x (Midnight): writing ANY field to a Blizzard frame from addon
+-- context taints that frame table. Blizzard secure code reading ANY other
+-- field on the same frame then errors with "secret value tainted by SuaviUI".
+-- Solution: store all per-frame metadata in addon-owned weak-keyed tables
+-- instead of writing directly onto Blizzard frame objects.
+---------------------------------------------------------------------------
+local SUI_trackedBg         = setmetatable({}, {__mode = "k"})  -- [frame]  → Texture
+local SUI_trackedBorderCont = setmetatable({}, {__mode = "k"})  -- [frame]  → Frame
+local SUI_trackedBarStyled  = setmetatable({}, {__mode = "k"})  -- [frame]  → bool
+local SUI_overlayHooked     = setmetatable({}, {__mode = "k"})  -- [region] → bool
+
+---------------------------------------------------------------------------
 -- HELPER: Get font from general settings
 ---------------------------------------------------------------------------
 local function GetGeneralFont()
@@ -293,7 +306,7 @@ local function CreateCustomBarFrame()
 
     -- Marker for identification
     frame._isCustomBar = true
-    frame._trackedBarStyled = false
+    SUI_trackedBarStyled[frame] = false
 
     frame:Hide()
     return frame
@@ -815,8 +828,8 @@ local function StripBlizzardOverlay(icon)
                     region:Hide()
                     -- TAINT-FIX: hooksecurefunc preserves the original C Show as secure.
                     -- Don't call Hide() — causes Show→Hide→Show infinite loop.
-                    if not region.__SUI_OverlayShowHooked then
-                        region.__SUI_OverlayShowHooked = true
+                    if not SUI_overlayHooked[region] then
+                        SUI_overlayHooked[region] = true
                         hooksecurefunc(region, "Show", function(self)
                             self:SetTexture("")
                             self:SetAlpha(0)
@@ -1384,23 +1397,23 @@ local function ApplyBarStyle(frame, settings)
 
     -- 6. Apply clean backdrop (solid background BEHIND the statusBar fill)
     -- Create on the frame itself, positioned behind statusBar
-    if not frame._trackedBg then
-        frame._trackedBg = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
+    if not SUI_trackedBg[frame] then
+        SUI_trackedBg[frame] = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
     end
     -- Apply background color from settings
     local bgR, bgG, bgB = bgColor[1] or 0, bgColor[2] or 0, bgColor[3] or 0
-    frame._trackedBg:SetColorTexture(bgR, bgG, bgB, 1)
+    SUI_trackedBg[frame]:SetColorTexture(bgR, bgG, bgB, 1)
     if statusBar then
-        frame._trackedBg:ClearAllPoints()
-        frame._trackedBg:SetAllPoints(statusBar)
+        SUI_trackedBg[frame]:ClearAllPoints()
+        SUI_trackedBg[frame]:SetAllPoints(statusBar)
     end
-    frame._trackedBg:SetAlpha(bgOpacity)
-    frame._trackedBg:Show()
+    SUI_trackedBg[frame]:SetAlpha(bgOpacity)
+    SUI_trackedBg[frame]:Show()
 
     -- 7. Apply crisp border using 4-edge technique
     -- Parent to the bar frame itself (not viewer) so it hides when bar hides
     if borderSize > 0 then
-        if not frame._trackedBorderContainer then
+        if not SUI_trackedBorderCont[frame] then
             local container = CreateFrame("Frame", nil, frame)
             container:SetFrameLevel((frame.GetFrameLevel and frame:GetFrameLevel() or 1) + 5)
 
@@ -1414,10 +1427,10 @@ local function ApplyBarStyle(frame, settings)
             container._right = container:CreateTexture(nil, "OVERLAY", nil, 7)
             container._right:SetColorTexture(0, 0, 0, 1)
 
-            frame._trackedBorderContainer = container
+            SUI_trackedBorderCont[frame] = container
         end
 
-        local container = frame._trackedBorderContainer
+        local container = SUI_trackedBorderCont[frame]
         -- Position container to wrap around the bar (extends OUTSIDE by borderSize)
         container:ClearAllPoints()
         container:SetPoint("TOPLEFT", frame, "TOPLEFT", -borderSize, borderSize)
@@ -1449,8 +1462,8 @@ local function ApplyBarStyle(frame, settings)
 
         container:Show()
     else
-        if frame._trackedBorderContainer then
-            frame._trackedBorderContainer:Hide()
+        if SUI_trackedBorderCont[frame] then
+            SUI_trackedBorderCont[frame]:Hide()
         end
     end
 
@@ -1478,7 +1491,7 @@ local function ApplyBarStyle(frame, settings)
         end
     end
 
-    frame._trackedBarStyled = true
+    SUI_trackedBarStyled[frame] = true
 end
 
 ---------------------------------------------------------------------------

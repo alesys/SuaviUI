@@ -614,8 +614,16 @@ local function ApplyExtraButtonSettings(buttonType)
         blizzFrame:HookScript("OnHide", function()
             local s = GetExtraButtonDB(buttonType)
             if holder and not (s and (s._editModeActive or s.alwaysShow)) then
-                holder:Hide()
-                holder:EnableMouse(false)
+                -- TAINT-FIX: defer Hide() out of any secure call chain (e.g. CinematicFrame
+                -- → ShowUIPanel → SetAttribute) to avoid ADDON_ACTION_BLOCKED on named frame.
+                C_Timer.After(0, function()
+                    if holder and not holder:IsShown() then return end  -- already hidden, skip
+                    local ss = GetExtraButtonDB(buttonType)
+                    if not (ss and (ss._editModeActive or ss.alwaysShow)) then
+                        holder:Hide()
+                        holder:EnableMouse(false)
+                    end
+                end)
             end
         end)
     end
