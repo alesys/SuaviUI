@@ -308,19 +308,15 @@ local function ProcessViewer(viewer, viewerSettingName, applyStyle)
         return
     end
 
-    -- BUG-FIX (v0.3.9): Sweep all known styled buttons and hide borders for any that are
-    -- no longer visible.  After Edit Mode exit, Blizzard hides/recycles CDM item frames;
-    -- because buttonBorders are parented to UIParent they don't inherit visibility and
-    -- stay floating as empty black squares.  This pre-pass clears them; ApplySquareStyle
-    -- will re-show the border only if the button is currently shown.
-    for button, _ in pairs(styledButtons) do
-        -- Only process buttons owned by this viewer (skip other viewers' buttons)
-        local ok = pcall(function()
-            if not button:IsShown() and buttonBorders[button] then
-                buttonBorders[button]:Hide()
-            end
-        end)
-        _ = ok  -- suppress unused warning
+    -- Pre-pass: hide borders for any styled button that is no longer shown.
+    -- Complements the 1.5s cleanup ticker; runs on every ProcessViewer call for
+    -- faster cleanup when RefreshAll is triggered by SPELL_UPDATE_COOLDOWN / UNIT_AURA.
+    for button in pairs(styledButtons) do
+        local shown = false
+        pcall(function() shown = button:IsShown() end)
+        if not shown and buttonBorders[button] then
+            buttonBorders[button]:Hide()
+        end
     end
 
     local children = {}
@@ -475,31 +471,45 @@ function StyledIcons:Enable()
     if not areHooksInitialized then
         areHooksInitialized = true
 
-        for viewerName, _ in pairs(viewersSettingKey) do
-            local viewerFrame = _G[viewerName]
-            if viewerFrame then
-                pcall(hooksecurefunc, viewerFrame, "RefreshLayout", function()
-                    -- TAINT-FIX: Defer ALL work to avoid tainting execution context.
-                    -- Even reads of isModuleStyledEnabled (local) are safe, but all
-                    -- Blizzard frame access must be deferred.
-                    -- LOW-LEVEL SAFETY: Debounce to prevent timer flooding on empty viewers.
-                    if viewerRefreshPending[viewerFrame] then return end
-                    viewerRefreshPending[viewerFrame] = true
-                    C_Timer.After(0, function()
-                        viewerRefreshPending[viewerFrame] = nil
-                        if not isModuleStyledEnabled then
-                            return
-                        end
-                        pcall(function()
-                            StyledIcons:RefreshViewer(viewerName)
-                            if viewerName == "UtilityCooldownViewer" then
-                                StyledIcons:ApplyNormalizedSize()
-                            end
-                        end)
-                    end)
+        -- ROOT-CAUSE FIX (v0.3.10): hooksecurefunc(viewerFrame, "RefreshLayout", ...)
+        -- silently fails when CDM viewer frames are forbidden tables in WoW 12.x.
+        -- pcall catches the error, sets areHooksInitialized=true, but installs no hook.
+        -- Without a working hook, ProcessViewer/ApplySquareStyle never re-runs after
+        -- CDM item pool changes (enter/exit combat, spell CD changes), leaving orphaned
+        -- border frames floating on screen as black squares.
+        --
+        -- Fix: replace viewer hooks with SPELL_UPDATE_COOLDOWN + UNIT_AURA game events
+        -- for re-styling, plus a periodic cleanup ticker for border orphan removal.
+        local refreshEventFrame = CreateFrame("Frame")
+        refreshEventFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+        refreshEventFrame:RegisterEvent("UNIT_AURA")
+        refreshEventFrame:SetScript("OnEvent", function(_, event, unit)
+            if event == "SPELL_UPDATE_COOLDOWN"
+            or (event == "UNIT_AURA" and (unit == "player" or unit == "target")) then
+                if viewerRefreshPending._global then return end
+                viewerRefreshPending._global = true
+                C_Timer.After(0.15, function()
+                    viewerRefreshPending._global = nil
+                    if not isModuleStyledEnabled then return end
+                    pcall(function() StyledIcons:RefreshAll() end)
                 end)
             end
-        end
+        end)
+
+        -- BORDER CLEANUP TICKER: sweep styledButtons every 1.5s and hide any border
+        -- whose CDM item button is no longer shown (pooled/hidden by Blizzard).
+        -- This is the primary safety net — event triggers cover cooldown transitions,
+        -- the ticker covers Edit Mode exit and other non-event-driven pool changes.
+        C_Timer.NewTicker(1.5, function()
+            if not isModuleStyledEnabled then return end
+            for button, _ in pairs(styledButtons) do
+                local shown = false
+                pcall(function() shown = button:IsShown() end)
+                if not shown and buttonBorders[button] then
+                    buttonBorders[button]:Hide()
+                end
+            end
+        end)
     end
 
     self:RefreshAll()

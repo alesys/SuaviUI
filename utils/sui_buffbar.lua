@@ -358,15 +358,20 @@ end
 -- (viewer:GetCooldownIDs() is a Lua mixin method on a forbidden table — fails in 12.0.5)
 local function GetViewerCooldownIDs()
     local ok, ids = pcall(function()
+        -- Try C API first: direct, no timing dependency on the settings data provider.
+        if C_CooldownViewer and C_CooldownViewer.GetCooldownIDsForCategory then
+            local result = C_CooldownViewer.GetCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBar)
+            if type(result) == "table" and #result > 0 then
+                return result
+            end
+        end
+        -- Fallback: settings data provider (may return empty before CheckBuildDisplayData runs).
         local settings = CooldownViewerSettings
         if settings and settings.GetDataProvider then
             local provider = settings:GetDataProvider()
             if provider and provider.GetOrderedCooldownIDsForCategory then
                 return provider:GetOrderedCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBar, true)
             end
-        end
-        if C_CooldownViewer and C_CooldownViewer.GetCooldownIDsForCategory then
-            return C_CooldownViewer.GetCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBar)
         end
         return nil
     end)
@@ -376,41 +381,18 @@ end
 
 -- Fetch active aura data using clean C APIs only (no Blizzard frame reads)
 local function FetchBuffBarData()
-    -- PRIMARY: Use BuffBarCooldownViewer.itemFramePool as authoritative active-spell source.
-    -- The viewer is still running (SetAlpha(0) hides it visually but keeps its logic alive),
-    -- so itemFramePool:EnumerateActive() gives exactly the frames Blizzard considers active.
-    -- This sidesteps GetViewerCooldownIDs() which can silently return {} if the settings
-    -- data provider hasn't built its display data yet (CheckBuildDisplayData() timing issue).
+    -- ROOT-CAUSE FIX (v0.3.10): Removed direct CDM item frame field reads.
+    -- The previous PRIMARY path iterated viewer.itemFramePool:EnumerateActive() and
+    -- read frame.cooldownID, frame.isActive, frame.layoutIndex from insecure pcall context.
+    -- Reading Lua fields that were SET by Blizzard's secure code from insecure context
+    -- TAINTS those fields at the C level.  Subsequent secure-code comparisons like
+    -- "self.isActive ~= active" then throw "secret boolean value tainted by SuaviUI"
+    -- across the ENTIRE CooldownViewer system (sessions 4796, 4809, 4810, 4811, 4824, 4833).
+    -- Use ONLY the C API; never read .cooldownID / .isActive / .layoutIndex from pool frames.
     local srcFrames = nil
-    local viewer = SafeGetViewer("BuffBarCooldownViewer")
-    if viewer then
-        local poolFrames = {}
-        pcall(function()
-            local pool = viewer.itemFramePool
-            if not (pool and pool.EnumerateActive) then return end
-            for frame in pool:EnumerateActive() do
-                if not frame then return end
-                local cdID, active, layoutIdx
-                pcall(function()
-                    cdID      = frame.cooldownID
-                    active    = frame.isActive
-                    layoutIdx = frame.layoutIndex
-                end)
-                if cdID and active then
-                    poolFrames[#poolFrames + 1] = {
-                        cooldownID  = cdID,
-                        layoutIndex = layoutIdx or 0,
-                    }
-                end
-            end
-        end)
-        if #poolFrames > 0 then
-            srcFrames = poolFrames
-        end
-    end
 
-    -- FALLBACK: data provider API.  GetViewerCooldownIDs() returns ALL configured spell IDs
-    -- (active or not), so aura data below acts as the active filter.
+    -- PRIMARY (was FALLBACK): data provider API.  GetViewerCooldownIDs() returns all
+    -- configured spell IDs; aura data below acts as the active filter.
     if not srcFrames then
         local cooldownIDs = GetViewerCooldownIDs()
         if #cooldownIDs == 0 then return {} end
