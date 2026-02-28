@@ -160,7 +160,12 @@ local function ApplySquareStyle(button, viewerSettingName)
 
             -- Safe texture comparison with issecretvalue guards
             if texture and not (issecretvalue and issecretvalue(texture)) and texture == 6707800 then
-                region:SetTexture(BASE_SQUARE_MASK)
+                -- TAINT-FIX (v0.3.8): Do NOT replace the region texture with BASE_SQUARE_MASK.
+                -- Without SetSize/SetPoint (removed to prevent taint), the region renders at
+                -- full button size and square_mask.tga appears as an opaque white overlay on
+                -- the icon, causing the "white square" visual bug (sessions 4823-4824 report).
+                -- Safe fix: just hide the circular edge region (SetAlpha is a texture-data op).
+                region:SetAlpha(0)
                 markedRegions[region] = true
             elseif atlas == "UI-HUD-CoolDownManager-IconOverlay" then
                 region:SetAlpha(0)
@@ -265,8 +270,8 @@ local function RestoreOriginalStyle(button, viewerSettingName)
     for _, region in next, { button:GetRegions() } do
         if region:IsObjectType("Texture") then
             local atlas = region:GetAtlas()
-            if markedRegions[region] or region:GetTexture() == BASE_SQUARE_MASK then
-                region:SetTexture(6707800)
+            if markedRegions[region] then
+                region:SetAlpha(1)  -- restore visibility (we now hide rather than replace texture)
                 markedRegions[region] = nil
             elseif atlas == "UI-HUD-CoolDownManager-IconOverlay" then
                 region:SetAlpha(1)

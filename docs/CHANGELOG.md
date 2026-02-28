@@ -1,5 +1,29 @@
 # SuaviUI Changelog
 
+## [v0.3.8](https://github.com/alesys/SuaviUI/tree/v0.3.8) (2026-03-01)
+
+### 🔧 Fix — Tracked Bars never visible + Essential CDM icons show as white squares
+
+#### Issue 1 — Tracked Bars never visible outside Edit Mode (USE_CUSTOM_BARS = true)
+
+**Root Cause:** `CheckBarChanges()` (which calls `UpdateCustomBarData()` then `LayoutBuffBars()`) had no update trigger when `USE_CUSTOM_BARS = true`. The `OnUpdate` hook and `UNIT_AURA` event that drive this function are both guarded by `if not USE_CUSTOM_BARS`, so after the initial login call they were never fired again. Auras appearing mid-session never caused a bar refresh.
+
+**Fix — [utils/sui_buffbar.lua]**
+- Added module-level locals: `barAuraHook = nil`, `barRescanPending = false` (mirrors the existing `iconAuraHook`/`iconRescanPending` pattern).
+- Added a `USE_CUSTOM_BARS` event hook inside `Initialize()` that registers `UNIT_AURA` + `SPELL_UPDATE_COOLDOWN`, debounces 150 ms, then calls `CheckBarChanges()` — giving live updates whenever an aura or cooldown state changes.
+- Changed the `C_Timer.After(0.3)` initial layout call from `LayoutBuffBars()` to `CheckBarChanges()` so `UpdateCustomBarData()` runs before the first paint.
+- Changed `PLAYER_ENTERING_WORLD` and `PLAYER_REGEN_ENABLED` deferred calls from `LayoutBuffBars()` to `CheckBarChanges()` for the same reason.
+
+#### Issue 2 — Essential CDM icons appear as empty white squares intermittently
+
+**Root Cause:** In `ApplySquareStyle`, the "circular edge" region of the CDM icon button (Blizzard texture ID 6707800) was replaced via `region:SetTexture(BASE_SQUARE_MASK)`. In the original CooldownManagerCentered port this worked because `SetSize`/`SetPoint` simultaneously constrained the region to match the icon. After v0.3.7 removed all layout methods (to prevent taint), the region rendered `square_mask.tga` at its default (full-button) size with no icon texture visible inside it — appearing as a solid white/opaque square on top of every icon.
+
+**Fix — [utils/cooldown_icons.lua]**
+- **`ApplySquareStyle`**: Changed `region:SetTexture(BASE_SQUARE_MASK)` → `region:SetAlpha(0)` for 6707800 regions. Hiding the circular edge is taint-safe (alpha is a texture-data op) and removes the white overlay without affecting the icon display. The swipe animation remains square via `SetSwipeTexture(BASE_SQUARE_MASK)` (unchanged).
+- **`RestoreOriginalStyle`**: Changed `markedRegions` restore from `region:SetTexture(6707800)` → `region:SetAlpha(1)` to match the new hide approach. Removed the `region:GetTexture() == BASE_SQUARE_MASK` fallback check (no longer needed since we no longer set that texture).
+
+---
+
 ## [v0.3.7](https://github.com/alesys/SuaviUI/tree/v0.3.7) (2026-02-28)
 
 ### 🔧 Fix — Remaining CDM Taint (Sessions 4823–4824): Layout Methods on Pool Frames
