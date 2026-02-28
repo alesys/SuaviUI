@@ -374,20 +374,87 @@ end
 
 -- Fetch active aura data using clean C APIs only (no Blizzard frame reads)
 local function FetchBuffBarData()
-    local cooldownIDs = GetViewerCooldownIDs()
-    if #cooldownIDs == 0 then return {} end
+    -- PRIMARY: Use BuffBarCooldownViewer.itemFramePool as authoritative active-spell source.
+    -- The viewer is still running (SetAlpha(0) hides it visually but keeps its logic alive),
+    -- so itemFramePool:EnumerateActive() gives exactly the frames Blizzard considers active.
+    -- This sidesteps GetViewerCooldownIDs() which can silently return {} if the settings
+    -- data provider hasn't built its display data yet (CheckBuildDisplayData() timing issue).
+    local srcFrames = nil
+    local viewer = SafeGetViewer("BuffBarCooldownViewer")
+    if viewer then
+        local poolFrames = {}
+        pcall(function()
+            local pool = viewer.itemFramePool
+            if not (pool and pool.EnumerateActive) then return end
+            for frame in pool:EnumerateActive() do
+                if not frame then return end
+                local cdID, active, layoutIdx
+                pcall(function()
+                    cdID      = frame.cooldownID
+                    active    = frame.isActive
+                    layoutIdx = frame.layoutIndex
+                end)
+                if cdID and active then
+                    poolFrames[#poolFrames + 1] = {
+                        cooldownID  = cdID,
+                        layoutIndex = layoutIdx or 0,
+                    }
+                end
+            end
+        end)
+        if #poolFrames > 0 then
+            srcFrames = poolFrames
+        end
+    end
+
+    -- FALLBACK: data provider API.  GetViewerCooldownIDs() returns ALL configured spell IDs
+    -- (active or not), so aura data below acts as the active filter.
+    if not srcFrames then
+        local cooldownIDs = GetViewerCooldownIDs()
+        if #cooldownIDs == 0 then return {} end
+        srcFrames = {}
+        for layoutIdx, cdID in ipairs(cooldownIDs) do
+            srcFrames[#srcFrames + 1] = {
+                cooldownID  = cdID,
+                layoutIndex = layoutIdx,
+            }
+        end
+    end
+
+    table.sort(srcFrames, function(a, b) return a.layoutIndex < b.layoutIndex end)
+
+    -- Pre-fetch target debuffs once for the whole batch.
+    -- BuffBarCooldownViewer tracks both player buffs (HoTs) AND target debuffs (DoTs).
+    local targetAuras = {}
+    pcall(function()
+        targetAuras = C_UnitAuras.GetUnitAuras("target", "HARMFUL|PLAYER") or {}
+    end)
 
     local results = {}
-    for layoutIdx, cdID in ipairs(cooldownIDs) do
-        local ok, info = pcall(C_CooldownViewer.GetCooldownInfoByCooldownID, cdID)
+    for _, src in ipairs(srcFrames) do
+        local ok, info = pcall(C_CooldownViewer.GetCooldownInfoByCooldownID, src.cooldownID)
         if ok and info then
             local spellID = info.overrideSpellID or info.spellID
+            -- linkedSpellID: the actual applied aura ID, which can differ from the cast spellID.
+            -- e.g. Moonfire cast=8921 but the DoT aura on target has spellId=164812.
+            local linkedSpellID
+            pcall(function() linkedSpellID = info.linkedSpellID end)
             if spellID then
-                -- TAINT-FIX: Wrap both API call AND data access in pcall
-                -- Comparing/accessing secret-valued auraData outside pcall introduces taint
                 local auraResult = {}
                 pcall(function()
+                    -- 1. Player aura (buffs/debuffs on the player)
                     local auraData = C_UnitAuras.GetPlayerAuraBySpellID(spellID)
+                    -- 2. Fallback: target debuffs cast by the player (DoTs, etc.).
+                    --    Match by cast spellID OR the linked DoT aura spellID.
+                    if not auraData then
+                        for _, aura in ipairs(targetAuras) do
+                            if aura.spellId == spellID
+                                or (linkedSpellID and aura.spellId == linkedSpellID) then
+                                auraData = aura
+                                break
+                            end
+                        end
+                    end
                     if auraData and auraData.duration and auraData.duration > 0 then
                         local texture = auraData.icon
                         if not texture then
@@ -395,9 +462,9 @@ local function FetchBuffBarData()
                             if texOk then texture = tex end
                         end
                         auraResult = {
-                            cooldownID     = cdID,
+                            cooldownID     = src.cooldownID,
                             spellID        = spellID,
-                            layoutIndex    = layoutIdx,
+                            layoutIndex    = src.layoutIndex,
                             name           = auraData.name or "",
                             texture        = texture,
                             duration       = auraData.duration,
@@ -412,7 +479,6 @@ local function FetchBuffBarData()
         end
     end
 
-    table.sort(results, function(a, b) return a.layoutIndex < b.layoutIndex end)
     return results
 end
 
@@ -599,20 +665,79 @@ end
 
 -- Fetch active aura data for icons
 local function FetchBuffIconData()
-    local cooldownIDs = GetIconViewerCooldownIDs()
-    if #cooldownIDs == 0 then return {} end
+    -- PRIMARY: Use BuffIconCooldownViewer.itemFramePool as authoritative active-spell source.
+    -- Same pattern as FetchBuffBarData: the viewer runs with alpha=0 so its pool is live.
+    local srcFrames = nil
+    local viewer = SafeGetViewer("BuffIconCooldownViewer")
+    if viewer then
+        local poolFrames = {}
+        pcall(function()
+            local pool = viewer.itemFramePool
+            if not (pool and pool.EnumerateActive) then return end
+            for frame in pool:EnumerateActive() do
+                if not frame then return end
+                local cdID, active, layoutIdx
+                pcall(function()
+                    cdID      = frame.cooldownID
+                    active    = frame.isActive
+                    layoutIdx = frame.layoutIndex
+                end)
+                if cdID and active then
+                    poolFrames[#poolFrames + 1] = {
+                        cooldownID  = cdID,
+                        layoutIndex = layoutIdx or 0,
+                    }
+                end
+            end
+        end)
+        if #poolFrames > 0 then
+            srcFrames = poolFrames
+        end
+    end
+
+    -- FALLBACK: data provider API.
+    if not srcFrames then
+        local cooldownIDs = GetIconViewerCooldownIDs()
+        if #cooldownIDs == 0 then return {} end
+        srcFrames = {}
+        for layoutIdx, cdID in ipairs(cooldownIDs) do
+            srcFrames[#srcFrames + 1] = {
+                cooldownID  = cdID,
+                layoutIndex = layoutIdx,
+            }
+        end
+    end
+
+    table.sort(srcFrames, function(a, b) return a.layoutIndex < b.layoutIndex end)
+
+    -- Pre-fetch target debuffs once for the whole batch.
+    local targetAuras = {}
+    pcall(function()
+        targetAuras = C_UnitAuras.GetUnitAuras("target", "HARMFUL|PLAYER") or {}
+    end)
 
     local results = {}
-    for layoutIdx, cdID in ipairs(cooldownIDs) do
-        local ok, info = pcall(C_CooldownViewer.GetCooldownInfoByCooldownID, cdID)
+    for _, src in ipairs(srcFrames) do
+        local ok, info = pcall(C_CooldownViewer.GetCooldownInfoByCooldownID, src.cooldownID)
         if ok and info then
             local spellID = info.overrideSpellID or info.spellID
+            local linkedSpellID
+            pcall(function() linkedSpellID = info.linkedSpellID end)
             if spellID then
-                -- TAINT-FIX: Wrap both API call AND data access in pcall
-                -- Accessing secret-valued auraData outside pcall introduces taint
                 local auraResult = {}
                 pcall(function()
+                    -- 1. Player aura first
                     local auraData = C_UnitAuras.GetPlayerAuraBySpellID(spellID)
+                    -- 2. Fallback: target debuffs (DoTs). Match cast spellID or linked aura ID.
+                    if not auraData then
+                        for _, aura in ipairs(targetAuras) do
+                            if aura.spellId == spellID
+                                or (linkedSpellID and aura.spellId == linkedSpellID) then
+                                auraData = aura
+                                break
+                            end
+                        end
+                    end
                     if auraData then
                         local texture = auraData.icon
                         if not texture then
@@ -620,9 +745,9 @@ local function FetchBuffIconData()
                             if texOk then texture = tex end
                         end
                         auraResult = {
-                            cooldownID     = cdID,
+                            cooldownID     = src.cooldownID,
                             spellID        = spellID,
-                            layoutIndex    = layoutIdx,
+                            layoutIndex    = src.layoutIndex,
                             name           = auraData.name or "",
                             texture        = texture,
                             duration       = auraData.duration or 0,
@@ -638,7 +763,6 @@ local function FetchBuffIconData()
         end
     end
 
-    table.sort(results, function(a, b) return a.layoutIndex < b.layoutIndex end)
     return results
 end
 
@@ -2398,11 +2522,13 @@ local function Initialize()
                 end
             end)
 
-            -- UNIT_AURA event: immediate data reconciliation on aura change
+            -- UNIT_AURA / target-change events: immediate data reconciliation on aura change.
+            -- Must watch both "player" (buffs on self) and "target" (DoTs on target).
             local auraFrame = CreateFrame("Frame")
             auraFrame:RegisterEvent("UNIT_AURA")
-            auraFrame:SetScript("OnEvent", function(_, _, unit)
-                if unit == "player" then
+            auraFrame:RegisterEvent("PLAYER_TARGET_CHANGED")  -- target swap clears/sets DoTs
+            auraFrame:SetScript("OnEvent", function(_, event, unit)
+                if event == "PLAYER_TARGET_CHANGED" or unit == "player" or unit == "target" then
                     if not container._rescanPending then
                         container._rescanPending = true
                         C_Timer.After(0.1, function()
@@ -2453,11 +2579,13 @@ local function Initialize()
                 end
             end)
 
-            -- UNIT_AURA: immediate data reconciliation on aura change
+            -- UNIT_AURA / target-change: immediate data reconciliation on aura change.
+            -- Watch both "player" (self-buffs) and "target" (target debuffs like tracked DoTs).
             local iconAuraFrame = CreateFrame("Frame")
             iconAuraFrame:RegisterEvent("UNIT_AURA")
-            iconAuraFrame:SetScript("OnEvent", function(_, _, unit)
-                if unit == "player" then
+            iconAuraFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+            iconAuraFrame:SetScript("OnEvent", function(_, event, unit)
+                if event == "PLAYER_TARGET_CHANGED" or unit == "player" or unit == "target" then
                     if not iconContainer._rescanPending then
                         iconContainer._rescanPending = true
                         C_Timer.After(0.1, function()

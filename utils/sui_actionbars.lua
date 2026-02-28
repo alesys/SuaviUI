@@ -596,17 +596,27 @@ local function ApplyExtraButtonSettings(buttonType)
                         end
                     end
                 end
+                -- TAINT-FIX: defer Show() out of any secure call chain (e.g.
+                -- ExtraAbilityContainer:AddFrame → SetShown → EditModeSystemTemplates:168)
+                -- to avoid ADDON_ACTION_BLOCKED on named frame.
                 if hasContent then
-                    holder:Show()
-                    holder:EnableMouse(true)
-                    blizzFrame:Show()
-                    blizzFrame:EnableMouse(true)
+                    C_Timer.After(0, function()
+                        local ss = GetExtraButtonDB(buttonType)
+                        if not (ss and (ss._editModeActive or ss.alwaysShow)) then
+                            holder:Show()
+                            holder:EnableMouse(true)
+                            blizzFrame:Show()
+                            blizzFrame:EnableMouse(true)
+                        end
+                    end)
                 else
                     -- No content - hide both holder and Blizzard frame to prevent mouse blocking
-                    holder:Hide()
-                    holder:EnableMouse(false)
-                    blizzFrame:Hide()
-                    blizzFrame:EnableMouse(false)
+                    C_Timer.After(0, function()
+                        holder:Hide()
+                        holder:EnableMouse(false)
+                        blizzFrame:Hide()
+                        blizzFrame:EnableMouse(false)
+                    end)
                 end
             end
         end)

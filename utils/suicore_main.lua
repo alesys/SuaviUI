@@ -17,6 +17,27 @@ SUI.SUICore = SUICore
 -- Expose SUICore to namespace for other files
 ns.Addon = SUICore
 
+-- TAINT-FIX (session 4796): All direct field writes to Blizzard CDM viewer/item frames
+-- replaced with module-level weak tables. Writing ANY field from addon context to a
+-- Blizzard frame taints that field; viewer.__cdmElapsed written every tick via
+-- HookScript("OnUpdate") caused wasOnGCDLookup=<forbidden table> (counter=202); icon
+-- field writes (__cdmSkinPending etc.) tainted item frames causing pandemicEndTime/
+-- pandemicStartTime secret-value errors. Fix mirrors previous sessions' __quiMouseoverHooked
+-- → mouseoverHookedFrames pattern.
+local hookedViewers          = setmetatable({}, { __mode = "k" })
+local viewerLayoutRunning    = setmetatable({}, { __mode = "k" })
+local viewerElapsed          = setmetatable({}, { __mode = "k" })
+local viewerIconCount        = setmetatable({}, { __mode = "k" })
+local viewerIconWidth        = setmetatable({}, { __mode = "k" })
+local viewerTotalHeight      = setmetatable({}, { __mode = "k" })
+local viewerLayoutDirection  = setmetatable({}, { __mode = "k" })
+local iconSkinned            = setmetatable({}, { __mode = "k" })
+local iconSkinPending        = setmetatable({}, { __mode = "k" })
+local iconSkinFailed         = setmetatable({}, { __mode = "k" })
+local iconSkinError          = setmetatable({}, { __mode = "k" })
+local pendingBackdropInfo    = setmetatable({}, { __mode = "k" })
+local pendingBackdropSettings = setmetatable({}, { __mode = "k" })
+
 -- Shared utility functions
 ns.Utils = {}
 
@@ -299,14 +320,12 @@ function SUICore:ResetProfileCompletely()
     
     for _, viewer in ipairs(viewersToClean) do
         if viewer then
-            -- Clear NCDM-specific properties
-            viewer.__cdmLayoutDirection = nil
-            viewer._ncdmInitialized = nil
-            viewer._ncdmHidden = nil
-            
-            -- Clear CMC-specific properties
-            viewer.__cmc_initialized = nil
-            viewer.__cmc_lastRefresh = nil
+            -- TAINT-FIX: clear weak table entries instead of writing nil to Blizzard frames
+            viewerLayoutDirection[viewer] = nil
+            viewerIconCount[viewer]       = nil
+            viewerIconWidth[viewer]       = nil
+            viewerTotalHeight[viewer]     = nil
+            hookedViewers[viewer]         = nil
         end
     end
     
@@ -651,6 +670,7 @@ local defaults = {
             autoAcceptQuest = false,
             autoTurnInQuest = false,
             questHoldShift = true,
+            questWindowDraggable = false,  -- Allow dragging QuestFrame + remember position
             fastAutoLoot = true,
             autoSelectGossip = false,  -- Auto-select single gossip options
             autoCombatLog = false,  -- Auto start/stop combat logging in M+ (opt-in)
@@ -4266,9 +4286,9 @@ function SUICore:SkinIcon(icon, settings)
     -- and mark icon as NOT skinned so we retry later
     if not sizeSet then
         iconTexture:SetTexCoord(0, 1, 0, 1)
-        icon.__cdmSkinFailed = true  -- Mark for retry
+        iconSkinFailed[icon] = true  -- Mark for retry
     else
-        icon.__cdmSkinFailed = nil
+        iconSkinFailed[icon] = nil
     end
 
     -- Cooldown glow
@@ -4362,7 +4382,7 @@ function SUICore:SkinIcon(icon, settings)
     -- Border (using BACKGROUND texture to avoid secret value errors during combat)
     -- BackdropTemplate causes "arithmetic on secret value" crashes when frame is resized during combat
     if icon.IsForbidden and icon:IsForbidden() then
-        icon.__cdmSkinned = true
+        iconSkinned[icon] = true
         return
     end
 
@@ -4387,10 +4407,10 @@ function SUICore:SkinIcon(icon, settings)
     end
 
     -- Only mark as fully skinned if size was successfully set
-    if not icon.__cdmSkinFailed then
-    icon.__cdmSkinned = true
+    if not iconSkinFailed[icon] then
+        iconSkinned[icon] = true
     end
-    icon.__cdmSkinPending = nil  -- Clear pending flag
+    iconSkinPending[icon] = nil  -- Clear pending flag
 end
 
 function SUICore:SkinAllIconsInViewer(viewer)
@@ -4407,7 +4427,7 @@ function SUICore:SkinAllIconsInViewer(viewer)
         if IsCooldownIconFrame(icon) and (icon.icon or icon.Icon) then
             local ok, err = pcall(self.SkinIcon, self, icon, settings)
             if not ok then
-                icon.__cdmSkinError = true
+                iconSkinError[icon] = true
                 print("|cffff4444[SUICore] SkinIcon error for", name, "icon:", err, "|r")
             end
         end
@@ -4569,10 +4589,10 @@ function SUICore:ApplyViewerLayout(viewer)
     local yOffset = 0
     if name == "UtilityCooldownViewer" and settings.anchorToEssential then
         local essentialViewer = _G.EssentialCooldownViewer
-        if essentialViewer and essentialViewer.__cdmTotalHeight then
+        if essentialViewer and viewerTotalHeight[essentialViewer] then
             local anchorGap = settings.anchorGap or 10
             -- Offset by Essential's total height plus gap
-            yOffset = -(essentialViewer.__cdmTotalHeight + anchorGap)
+            yOffset = -(viewerTotalHeight[essentialViewer] + anchorGap)
         end
     end
     
@@ -4583,9 +4603,9 @@ function SUICore:ApplyViewerLayout(viewer)
         local alignment = settings.rowAlignment or "CENTER"
         local rowSpacing = iconHeight + spacing
         
-        viewer.__cdmIconWidth = maxW
+        viewerIconWidth[viewer] = maxW
         -- Store total height for anchoring (number of rows * row height, minus last spacing)
-        viewer.__cdmTotalHeight = (#grid * iconHeight) + ((#grid - 1) * spacing)
+        viewerTotalHeight[viewer] = (#grid * iconHeight) + ((#grid - 1) * spacing)
         
         local y = yOffset
         for rowIdx, row in ipairs(grid) do
@@ -4615,8 +4635,8 @@ function SUICore:ApplyViewerLayout(viewer)
     elseif rowLimit <= 0 then
         -- Single row (original behavior)
         local totalWidth = count * iconWidth + (count - 1) * spacing
-        viewer.__cdmIconWidth = totalWidth
-        viewer.__cdmTotalHeight = iconHeight  -- Single row height
+        viewerIconWidth[viewer] = totalWidth
+        viewerTotalHeight[viewer] = iconHeight  -- Single row height
 
         local startX = -totalWidth / 2 + iconWidth / 2
 
@@ -4642,8 +4662,8 @@ function SUICore:ApplyViewerLayout(viewer)
             end
         end
         
-        viewer.__cdmIconWidth = maxRowWidth
-        viewer.__cdmTotalHeight = (numRows * iconHeight) + ((numRows - 1) * spacing)
+        viewerIconWidth[viewer] = maxRowWidth
+        viewerTotalHeight[viewer] = (numRows * iconHeight) + ((numRows - 1) * spacing)
         
         local growDirection = "down"
 
@@ -4686,18 +4706,18 @@ function SUICore:RescanViewer(viewer)
             table.insert(icons, child)
 
             -- Retry skinning if it failed before or hasn't been done
-            if not child.__cdmSkinned or child.__cdmSkinFailed then
+            if not iconSkinned[child] or iconSkinFailed[child] then
                 -- Mark as pending to avoid multiple attempts
-                if not child.__cdmSkinPending then
-                    child.__cdmSkinPending = true
-                    
+                if not iconSkinPending[child] then
+                    iconSkinPending[child] = true
+
                     if inCombat then
                         -- Defer skinning until out of combat
                         if not self.__cdmPendingIcons then
                             self.__cdmPendingIcons = {}
                         end
                         self.__cdmPendingIcons[child] = { icon = child, settings = settings, viewer = viewer }
-                        
+
                         -- Ensure we have an event frame for combat end
                         if not self.__cdmIconSkinEventFrame then
                             local eventFrame = CreateFrame("Frame")
@@ -4713,7 +4733,7 @@ function SUICore:RescanViewer(viewer)
                         -- Not in combat, try to skin immediately
                         local success = pcall(self.SkinIcon, self, child, settings)
                         if success then
-                            child.__cdmSkinPending = nil
+                            iconSkinPending[child] = nil
                         end
                     end
                     changed = true
@@ -4725,8 +4745,8 @@ function SUICore:RescanViewer(viewer)
     local count = #icons
 
     -- Check if icon count changed
-    if count ~= viewer.__cdmIconCount then
-        viewer.__cdmIconCount = count
+    if count ~= viewerIconCount[viewer] then
+        viewerIconCount[viewer] = count
         changed = true
     end
 
@@ -4768,10 +4788,10 @@ function SUICore:ProcessPendingIcons()
     
     local processed = {}
     for icon, data in pairs(self.__cdmPendingIcons) do
-        if icon and icon:IsShown() and not icon.__cdmSkinned then
+        if icon and icon:IsShown() and not iconSkinned[icon] then
             local success = pcall(self.SkinIcon, self, icon, data.settings)
             if success then
-                icon.__cdmSkinPending = nil
+                iconSkinPending[icon] = nil
                 processed[icon] = true
             end
         elseif not icon or not icon:IsShown() then
@@ -4794,8 +4814,10 @@ end
 function SUICore:HookViewers()
     for _, name in ipairs(self.viewers) do
         local viewer = _G[name]
-        if viewer and not viewer.__cdmHooked then
-            viewer.__cdmHooked = true
+        if viewer and not hookedViewers[viewer] then
+            -- TAINT-FIX: use weak table instead of viewer.__cdmHooked to avoid
+            -- tainting the Blizzard viewer frame's field table.
+            hookedViewers[viewer] = true
 
             viewer:HookScript("OnShow", function(f)
                 self:ApplyViewerSkin(f)
@@ -4803,46 +4825,57 @@ function SUICore:HookViewers()
 
             viewer:HookScript("OnSizeChanged", function(f)
                 -- LOW-LEVEL SAFETY: Prevent re-entrant layout calls.
-                -- If ApplyViewerLayout sets child sizes that cause the viewer
-                -- to auto-resize, this guard stops the infinite cascade.
-                if f.__cdmLayoutRunning then return end
-                f.__cdmLayoutRunning = true
+                -- TAINT-FIX: guard stored in weak table, not on viewer frame.
+                if viewerLayoutRunning[f] then return end
+                viewerLayoutRunning[f] = true
                 self:ApplyViewerLayout(f)
-                f.__cdmLayoutRunning = nil
-            end)
-
-            -- Reduced update rate - layout operations don't need high frequency
-            -- 1 FPS fallback polling (primary updates via events/hooks)
-            local updateInterval = 1.0
-
-            viewer:HookScript("OnUpdate", function(f, elapsed)
-                f.__cdmElapsed = (f.__cdmElapsed or 0) + elapsed
-                if f.__cdmElapsed > updateInterval then
-                    f.__cdmElapsed = 0
-                    if f:IsShown() then
-                        self:RescanViewer(f)
-                        -- Only process pending if there actually are pending items
-                        if not InCombatLockdown() then
-                            if self.__cdmPendingIcons then
-                            self:ProcessPendingIcons()
-                            end
-                            if self.__cdmPendingBackdrops then
-                                self:ProcessPendingBackdrops()
-                            end
-                        end
-                    end
-                end
+                viewerLayoutRunning[f] = nil
             end)
 
             self:ApplyViewerSkin(viewer)
         end
+    end
+
+    -- TAINT-FIX (session 4796): Use a standalone addon-owned update frame instead of
+    -- HookScript("OnUpdate") on each viewer. HookScript writes f.__cdmElapsed directly to
+    -- Blizzard viewer frames every tick, contaminating their execution context. This caused
+    -- C_Spell.GetSpellsOnGCDLookup() to return <forbidden table> (wasOnGCDLookup, counter=202)
+    -- in EssentialCooldownViewer's OnUpdate → TriggerAvailableAlert → RefreshData chain.
+    -- A separate CreateFrame("Frame") runs in addon context only, writing to module-level
+    -- viewerElapsed table — no Blizzard frame fields touched.
+    if not self.__cdmUpdateFrame then
+        local updateInterval = 1.0
+        local updateFrame = CreateFrame("Frame")
+        updateFrame:SetScript("OnUpdate", function(_, elapsed)
+            for _, vname in ipairs(self.viewers) do
+                local v = _G[vname]
+                if v and hookedViewers[v] then
+                    viewerElapsed[v] = (viewerElapsed[v] or 0) + elapsed
+                    if viewerElapsed[v] > updateInterval then
+                        viewerElapsed[v] = 0
+                        if v:IsShown() then
+                            self:RescanViewer(v)
+                            if not InCombatLockdown() then
+                                if self.__cdmPendingIcons then
+                                    self:ProcessPendingIcons()
+                                end
+                                if self.__cdmPendingBackdrops then
+                                    self:ProcessPendingBackdrops()
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        self.__cdmUpdateFrame = updateFrame
     end
 end
 
 function SUICore:ForceRefreshBuffIcons()
     local viewer = _G["BuffIconCooldownViewer"]
     if viewer and viewer:IsShown() then
-        viewer.__cdmIconCount = nil
+        viewerIconCount[viewer] = nil
         self:RescanViewer(viewer)
         -- Process any pending icons if not in combat
         if not InCombatLockdown() then
@@ -4860,14 +4893,14 @@ function SUICore:ForceReskinAllViewers()
                 local container = SafeGetViewerContainer(viewer)
                 local children = { container:GetChildren() }
                 for _, child in ipairs(children) do
-                    -- Clear skinned flag to force re-skinning
-                    child.__cdmSkinned = nil
-                    child.__cdmSkinPending = nil
-                    child.__cdmSkinFailed = nil
+                    -- Clear skinned flags to force re-skinning (weak tables, no frame writes)
+                    iconSkinned[child]    = nil
+                    iconSkinPending[child] = nil
+                    iconSkinFailed[child] = nil
                 end
             end)
-            -- Reset icon count to force layout refresh (write to forbidden table may fail)
-            pcall(function() viewer.__cdmIconCount = nil end)
+            -- Reset icon count to force layout refresh
+            viewerIconCount[viewer] = nil
             
             -- Note: We avoid calling viewer.Layout() directly as it can trigger
             -- Blizzard's internal code that accesses "secret" values and errors
@@ -4951,7 +4984,7 @@ function SUICore:HookEditMode()
                     if viewer then
                         local container = SafeGetViewerContainer(viewer)
                         for _, child in ipairs({ container:GetChildren() }) do
-                            if child.__cdmSkinFailed then
+                            if iconSkinFailed[child] then
                                 needsReskin = true
                                 break
                             end
@@ -4995,24 +5028,24 @@ function SUICore:ProcessPendingBackdrops()
             
             if ok and isValid then
                 -- Dimensions are valid, try to set backdrop
-                local pendingInfo = frame.__cdmBackdropPending
-                local pendingSettings = frame.__cdmBackdropSettings
-                
-                if pendingSettings then
-                    if pendingSettings.backdropInfo then
-                        local setOk = pcall(frame.SetBackdrop, frame, pendingSettings.backdropInfo)
-                        if setOk and pendingSettings.borderColor then
-                            pcall(frame.SetBackdropBorderColor, frame, unpack(pendingSettings.borderColor))
-end
+                local pendingInfo = pendingBackdropInfo[frame]
+                local pendingSettingsEntry = pendingBackdropSettings[frame]
+
+                if pendingSettingsEntry then
+                    if pendingSettingsEntry.backdropInfo then
+                        local setOk = pcall(frame.SetBackdrop, frame, pendingSettingsEntry.backdropInfo)
+                        if setOk and pendingSettingsEntry.borderColor then
+                            pcall(frame.SetBackdropBorderColor, frame, unpack(pendingSettingsEntry.borderColor))
+                        end
                     elseif pendingInfo then
                         pcall(frame.SetBackdrop, frame, pendingInfo)
                     end
                 elseif pendingInfo then
                     pcall(frame.SetBackdrop, frame, pendingInfo)
                 end
-                
-                frame.__cdmBackdropPending = nil
-                frame.__cdmBackdropSettings = nil
+
+                pendingBackdropInfo[frame]    = nil
+                pendingBackdropSettings[frame] = nil
                 table.insert(processed, frame)
                 end
             end

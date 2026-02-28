@@ -1,5 +1,66 @@
 # SuaviUI Changelog
 
+## [v0.3.6](https://github.com/alesys/SuaviUI/tree/v0.3.6) (2026-02-28)
+
+### ✨ Feature — Draggable Quest & Dialog Windows
+
+- **[utils/sui_qol.lua]** Quest windows (`QuestFrame`) and NPC dialog windows (`GossipFrame`) are now draggable and remember their last position. Enabled via **General & QoL → General → Quests → Draggable Quest Windows** (off by default).
+  - Left-drag repositions the window; position is saved per-profile under `general.questWindowPosition` / `general.gossipWindowPosition`.
+  - On each open, `C_Timer.After(0, ...)` restores the saved position after the UIPanel system finishes its own `SetPoint` calls, ensuring the saved position always wins.
+  - Both frames remain clamped to screen.
+- **[utils/suicore_main.lua]** Added `questWindowDraggable = false` AceDB default.
+- **[utils/sui_options.lua]** Added **"Quests"** section header in the General tab (visually groups Auto Accept / Auto Turn-In / Shift Pause / Draggable Quest Windows together). Added **"Draggable Quest Windows"** checkbox with description.
+
+### 🧹 Cleanup — Removed Redundant Lazy-Init Guards in Options
+
+- **[utils/sui_options.lua]** Removed 18 `if db.general.key == nil then ... end` guards that were duplicating AceDB default values already defined in `suicore_main.lua`. AceDB guarantees defaults are applied before the options page opens, so the guards were dead code. Affected keys: `quickSalvage`, `mplusTeleportEnabled`, `keyTrackerEnabled`, `keyTrackerFontSize`, `skinBagIcons`, `bagIconBorderThickness`, `bagIconUseQualityBorderColor`, `bagIconBorderColor`, `showBagItemLevel`, `bagItemLevelFontSize/Font/FontOutline`, `bagItemLevelUseQualityColor`, `bagItemLevelTextColor`, `showBagItemLevelGlow`, `bagItemLevelGlowSize/Alpha/UseQualityColor/Color`, `debugMode`.
+
+### 🔧 Fix — CDM Tracking Bars / Buff Icons Not Showing (USE_CUSTOM_BARS path)
+
+#### Root Cause
+- `USE_CUSTOM_BARS = true` (introduced v0.3.5) sets `BuffBarCooldownViewer:SetAlpha(0)` and drives bar display via a custom data pipeline: `UpdateCustomBarData() → FetchBuffBarData() → GetViewerCooldownIDs()`.
+- `GetViewerCooldownIDs()` calls `CooldownViewerSettings:GetDataProvider():GetOrderedCooldownIDsForCategory(TrackedBar, true)`. Internally, `GetOrderedCooldownIDsForCategory` calls `self:GetOrderedCooldownIDs()` which first runs `CheckBuildDisplayData()`. If that function hasn't yet populated `self.displayData` (timing issue at addon load, or if `GetOrderedCooldownIDs()` returns `nil` unexpectedly), `ipairs(nil)` throws; the surrounding `pcall` in `GetViewerCooldownIDs` catches it silently and returns `{}`. The early-exit guard `if #cooldownIDs == 0 then return {} end` then causes all bars to be suppressed every 0.5s tick with no visible error.
+- Secondary cause: even when IDs were returned, `FetchBuffBarData` only checked `C_UnitAuras.GetPlayerAuraBySpellID(spellID)` — missing all target debuffs (DoTs like Moonfire). The phase-2 partial fix (target aura check + `linkedSpellID`) was added but the ID-list root cause remained.
+
+#### Fix
+- **[utils/sui_buffbar.lua] `FetchBuffBarData()`**: Replaced `GetViewerCooldownIDs()` as primary source with `viewer.itemFramePool:EnumerateActive()`. `BuffBarCooldownViewer` still runs while invisible (only `SetAlpha(0)`, not `Hide()`), so its item pool is live and already reflects exactly what Blizzard considers active — including DoTs on target, linked spell IDs, cooldown-based tracking, etc. Only falls back to `GetViewerCooldownIDs()` if the pool is unavailable or returns zero entries.
+- **[utils/sui_buffbar.lua] `FetchBuffIconData()`**: Same fix for `BuffIconCooldownViewer` (TrackedBuff category / buff icon panel).
+- Both functions retain the target-debuff aura pre-fetch (`C_UnitAuras.GetUnitAuras("target", "HARMFUL|PLAYER")`) and `linkedSpellID` matching from the phase-2 fix, as those are still needed to retrieve aura display data (duration, name, texture) for spells where the applied aura ID differs from the cast ID.
+
+
+
+#### Root Cause (session 4796)
+- `cooldown_icons.lua: ApplySquareStyle` iterated over the `GetRegions()` list of each Blizzard CDM icon item frame (children of `EssentialCooldownViewer`, `BuffIconCooldownViewer`, etc.) and, whenever it replaced the circular mask texture with the addon's square mask, it wrote a tracking flag directly onto the Blizzard region object: `region.__sui_set6707800 = true`.
+- `RestoreOriginalStyle` read and cleared the same field: `if region.__sui_set6707800 then ... region.__sui_set6707800 = nil`.
+- Writing **any** field from addon context onto a Blizzard-owned frame/region object taints that object. The tainted region is a child of the CDM item frame. When Blizzard's secure `CooldownViewerMixin:OnUpdate → RefreshData → SetPandemicAlertTriggerTime` chain later iterates over children of that item frame, it executes in contaminated context, causing:
+  - `self.pandemicEndTime = pandemicEndTime` (CooldownViewer.lua:516) → field becomes a **secret number** on `BuffIconCooldownViewer` item frames (counter=1).
+  - `self.pandemicStartTime = pandemicStartTime` (CooldownViewer.lua:515) → same result.
+  - `wasOnGCDLookup[spellID]` (local `{}` table in CooldownViewer.lua:871) becomes a **forbidden table** in BugGrabber's error capture on `EssentialCooldownViewer` items (counter=202, fires every frame).
+- Errors appeared post-cinematic because `CinematicFrame:OnHide → HideUIPanel → viewers:Show() → OnShow → RefreshLayout` was the trigger that caused `ProcessViewer` / `ApplySquareStyle` to re-run on freshly shown CDM viewers.
+
+#### Fix
+- **[cooldown_icons.lua]** Replaced both `region.__sui_set6707800` field writes with entries in a new module-level weak table `markedRegions = setmetatable({}, { __mode = "k" })` declared alongside `styledButtons` / `buttonBorders`.
+  - `ApplySquareStyle`: `region.__sui_set6707800 = true` → `markedRegions[region] = true`
+  - `RestoreOriginalStyle`: `if region.__sui_set6707800 ...` → `if markedRegions[region] ...`; `region.__sui_set6707800 = nil` → `markedRegions[region] = nil`
+  - No Blizzard frame/region objects are written to; taint source eliminated.
+- **[sui_actionbars.lua]** `OnShow` hook on the Blizzard extra-action / zone-ability frame (`blizzFrame:HookScript("OnShow", ...)`) was calling `holder:Show()` and `blizzFrame:Show()` directly inside the hook. When the show event fires from a secure call chain (`ExtraAbilityContainer:AddFrame → UpdateShownState → EditModeSystemTemplates:SetShown`), any direct named-frame method call from addon context is blocked. Wrapped both the show-content and no-content branches in `C_Timer.After(0, ...)`, mirroring the existing `OnHide` deferral fix.
+
+#### Session triage
+- Session 4796: `pandemicEndTime` secret number on `BuffIconCooldownViewer` (counter=1) — fixed above.
+- Session 4796: `pandemicStartTime` secret number on `BuffIconCooldownViewer` (counter=1) — fixed above.
+- Session 4796: `wasOnGCDLookup = <forbidden table>` on `EssentialCooldownViewer` (counter=202) — fixed above.
+- Session 4797: `wasOnGCDLookup = <forbidden table>` on `EssentialCooldownViewer` (counter=204, triggered via `/toggleui`) — same root cause, fixed above.
+- Session 4797: `CooldownViewer.lua:706 EnableSpellRangeCheck bad argument` (nil rangeCheckSpellID on UtilityCooldownViewer) — Blizzard pool lifecycle edge case; no SuaviUI in stack; no fix needed.
+- Session 4803: `[ADDON_ACTION_BLOCKED] SUI_extraActionButtonHolder:Show()` (triggered by boss extra-action button appearing) — fixed above.
+- Session 4809: `allowAvailableAlert` secret boolean on `EssentialCooldownViewer` (Edit Mode slider, counter=1) — same region taint root cause, fixed above.
+- Session 4810: `[ADDON_ACTION_FORBIDDEN] TargetUnit()` and `CompactUnitFrame oldR/maxHealth` secret numbers (Edit Mode exit) — execution-context taint propagated from CDM icon region writes; fixed above.
+- Session 4811: `DamageMeterSessionWindow.lua:871 durationSeconds secret number` + `DamageMeterEntry.lua:86 text secret string` (counter=175) — `Blizzard_DamageMeter` reached by secondary taint; same root cause (`region.__sui_set6707800`), fixed above. Session was played before v0.3.6 deployed.
+- Session 4811: `CooldownViewerItemData.lua:122/200 spellID`, `TableUtil.lua:82 item`, `CooldownViewer.lua:415/986 spellID/charges`, `CooldownViewerItemData.lua:419 hasTotem` — new CDM code paths (totem cache, aura tracking, charge cache, linked spell lookup) contaminated by same taint source; fixed above.
+- Session 4796: `isActive` secret boolean on `BuffBarCooldownViewer` (counter=63) — residual counter, root cause eliminated in v0.3.5 (`USE_CUSTOM_BARS = true`); counter will reset on next log.
+- Sessions 4782/4783: `AutoTurnIn IsArtifactRelicItem` nil — third-party addon using removed API; not SuaviUI.
+- Sessions 4759: Baganator/Syndicator missing — third-party addon install issue; not SuaviUI.
+- Sessions 4805: QuestTools errors — third-party addon; not SuaviUI.
+
 ## [v0.3.5](https://github.com/alesys/SuaviUI/tree/v0.3.5) (2026-02-26)
 
 ### 🛡️ Execution-Context Taint Fix — GetScaledRect & Mouseover Hook Guards

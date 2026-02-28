@@ -1016,6 +1016,11 @@ local function CreateGeneralQoLPage(parent)
         inviteDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
+        y = y - 10
+        local questsHeader = GUI:CreateSectionHeader(tabContent, "Quests")
+        questsHeader:SetPoint("TOPLEFT", PADDING, y)
+        y = y - questsHeader.gap
+
         local autoAcceptQuestCheck = GUI:CreateFormCheckbox(tabContent, "Auto Accept Quests", "autoAcceptQuest", db.general, nil)
         autoAcceptQuestCheck:SetPoint("TOPLEFT", PADDING, y)
         autoAcceptQuestCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
@@ -1030,6 +1035,17 @@ local function CreateGeneralQoLPage(parent)
         questShiftCheck:SetPoint("TOPLEFT", PADDING, y)
         questShiftCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
+
+        local questDraggableCheck = GUI:CreateFormCheckbox(tabContent, "Draggable Quest Window", "questWindowDraggable", db.general, nil, {keywords = {"quest", "drag", "move", "position"}})
+        questDraggableCheck:SetPoint("TOPLEFT", PADDING, y)
+        questDraggableCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        local questDraggableDesc = GUI:CreateLabel(tabContent, "Left-drag the quest window or NPC dialog to reposition it. Position is saved and restored each time it opens.", 11, C.textMuted)
+        questDraggableDesc:SetPoint("TOPLEFT", PADDING, y + 4)
+        questDraggableDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        questDraggableDesc:SetJustifyH("LEFT")
+        y = y - 16
 
         local fastLootCheck = GUI:CreateFormCheckbox(tabContent, "Faster Auto Loot", "fastAutoLoot", db.general, function(enabled)
             if enabled then
@@ -1182,10 +1198,6 @@ local function CreateGeneralQoLPage(parent)
         quickSalvageDesc:SetHeight(20)
         y = y - 30
 
-        -- Ensure quickSalvage settings exist
-        if not db.general.quickSalvage then
-            db.general.quickSalvage = { enabled = false, modifier = "ALT" }
-        end
         local qsDB = db.general.quickSalvage
 
         local qsEnableCheck = GUI:CreateFormCheckbox(tabContent, "Enable Quick Salvage", "enabled", qsDB, function()
@@ -1234,19 +1246,16 @@ local function CreateGeneralQoLPage(parent)
         mplusDesc:SetHeight(20)
         y = y - 30
 
-        if db.general.mplusTeleportEnabled == nil then db.general.mplusTeleportEnabled = true end
         local teleportCheck = GUI:CreateFormCheckbox(tabContent, "Click-to-Teleport on M+ Tab", "mplusTeleportEnabled", db.general, nil)
         teleportCheck:SetPoint("TOPLEFT", PADDING, y)
         teleportCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        if db.general.keyTrackerEnabled == nil then db.general.keyTrackerEnabled = true end
         local keyTrackerCheck = GUI:CreateFormCheckbox(tabContent, "Show Party Keys on M+ Tab", "keyTrackerEnabled", db.general, nil)
         keyTrackerCheck:SetPoint("TOPLEFT", PADDING, y)
         keyTrackerCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        if db.general.keyTrackerFontSize == nil then db.general.keyTrackerFontSize = 9 end
         local fontSizeSlider = GUI:CreateFormSlider(tabContent, "Key Tracker Font Size", 7, 12, 1, "keyTrackerFontSize", db.general, function()
             if _G.SuaviUI_RefreshKeyTrackerFonts then
                 _G.SuaviUI_RefreshKeyTrackerFonts()
@@ -1264,7 +1273,6 @@ local function CreateGeneralQoLPage(parent)
         y = y - bagsHeader.gap
 
         -- Square icon skin toggle
-        if db.general.skinBagIcons == nil then db.general.skinBagIcons = false end
         local skinBagIconsCheck = GUI:CreateFormCheckbox(tabContent, "Square Icon Skin", "skinBagIcons", db.general, function()
             if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
                 _G.SuaviUI_BagItemLevel.Update()
@@ -1285,7 +1293,6 @@ local function CreateGeneralQoLPage(parent)
         y = y - 30
 
         -- Border thickness slider
-        if db.general.bagIconBorderThickness == nil then db.general.bagIconBorderThickness = 1 end
         local bagBorderThicknessSlider = GUI:CreateFormSlider(tabContent, "Icon Border Thickness", 1, 5, 1, "bagIconBorderThickness", db.general, function()
             if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
                 _G.SuaviUI_BagItemLevel.Update()
@@ -1296,7 +1303,6 @@ local function CreateGeneralQoLPage(parent)
         y = y - FORM_ROW
 
         -- Quality border color toggle
-        if db.general.bagIconUseQualityBorderColor == nil then db.general.bagIconUseQualityBorderColor = true end
         local bagUseQualityBorderCheck = GUI:CreateFormCheckbox(tabContent, "Use Quality Color for Border", "bagIconUseQualityBorderColor", db.general, function()
             if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
                 _G.SuaviUI_BagItemLevel.Update()
@@ -1307,7 +1313,6 @@ local function CreateGeneralQoLPage(parent)
         y = y - FORM_ROW
 
         -- Custom border color picker
-        if db.general.bagIconBorderColor == nil then db.general.bagIconBorderColor = { 0.25, 0.25, 0.25, 0.8 } end
         local bagBorderColorPicker = GUI:CreateFormColorPicker(tabContent, "Custom Border Color", "bagIconBorderColor", db.general, function()
             if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
                 _G.SuaviUI_BagItemLevel.Update()
@@ -1327,7 +1332,6 @@ local function CreateGeneralQoLPage(parent)
 
         y = y - 5
 
-        if db.general.showBagItemLevel == nil then db.general.showBagItemLevel = false end
         local bagItemLevelCheck = GUI:CreateFormCheckbox(tabContent, "Show Item Level on Bag Items", "showBagItemLevel", db.general, function()
             if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
                 _G.SuaviUI_BagItemLevel.Update()
@@ -1346,11 +1350,6 @@ local function CreateGeneralQoLPage(parent)
         bagItemLevelDesc:SetWordWrap(true)
         bagItemLevelDesc:SetHeight(20)
         y = y - 30
-
-        -- Ensure item level settings exist
-        if db.general.bagItemLevelFontSize == nil then db.general.bagItemLevelFontSize = 11 end
-        if db.general.bagItemLevelFont == nil then db.general.bagItemLevelFont = "Suavi" end
-        if db.general.bagItemLevelFontOutline == nil then db.general.bagItemLevelFontOutline = "OUTLINE" end
 
         -- Font size slider
         local bagFontSizeSlider = GUI:CreateFormSlider(tabContent, "Item Level Font Size", 8, 20, 1, "bagItemLevelFontSize", db.general, function()
@@ -1389,7 +1388,6 @@ local function CreateGeneralQoLPage(parent)
         y = y - FORM_ROW
 
         -- Use quality color toggle
-        if db.general.bagItemLevelUseQualityColor == nil then db.general.bagItemLevelUseQualityColor = true end
         local useQualityColorCheck = GUI:CreateFormCheckbox(tabContent, "Use Item Quality Color", "bagItemLevelUseQualityColor", db.general, function()
             if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
                 _G.SuaviUI_BagItemLevel.Update()
@@ -1400,7 +1398,6 @@ local function CreateGeneralQoLPage(parent)
         y = y - FORM_ROW
 
         -- Custom text color picker
-        if db.general.bagItemLevelTextColor == nil then db.general.bagItemLevelTextColor = { 1.0, 1.0, 1.0, 1.0 } end
         local bagTextColorPicker = GUI:CreateFormColorPicker(tabContent, "Custom Text Color", "bagItemLevelTextColor", db.general, function()
             if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
                 _G.SuaviUI_BagItemLevel.Update()
@@ -1426,7 +1423,6 @@ local function CreateGeneralQoLPage(parent)
         glowHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - 20
 
-        if db.general.showBagItemLevelGlow == nil then db.general.showBagItemLevelGlow = false end
         local bagGlowCheck = GUI:CreateFormCheckbox(tabContent, "Enable Glow Effect", "showBagItemLevelGlow", db.general, function()
             if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
                 _G.SuaviUI_BagItemLevel.Update()
@@ -1436,7 +1432,6 @@ local function CreateGeneralQoLPage(parent)
         bagGlowCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        if db.general.bagItemLevelGlowSize == nil then db.general.bagItemLevelGlowSize = 1 end
         local bagGlowSizeSlider = GUI:CreateFormSlider(tabContent, "Glow Spread (px)", 1, 5, 1, "bagItemLevelGlowSize", db.general, function()
             if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
                 _G.SuaviUI_BagItemLevel.Update()
@@ -1446,7 +1441,6 @@ local function CreateGeneralQoLPage(parent)
         bagGlowSizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        if db.general.bagItemLevelGlowAlpha == nil then db.general.bagItemLevelGlowAlpha = 60 end
         local bagGlowAlphaSlider = GUI:CreateFormSlider(tabContent, "Glow Opacity (%)", 10, 100, 5, "bagItemLevelGlowAlpha", db.general, function()
                 if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
                     _G.SuaviUI_BagItemLevel.Update()
@@ -1457,7 +1451,6 @@ local function CreateGeneralQoLPage(parent)
         bagGlowAlphaSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        if db.general.bagItemLevelGlowUseQualityColor == nil then db.general.bagItemLevelGlowUseQualityColor = true end
         local bagGlowQualityCheck = GUI:CreateFormCheckbox(tabContent, "Match Glow Color to Item Quality", "bagItemLevelGlowUseQualityColor", db.general, function()
             if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
                 _G.SuaviUI_BagItemLevel.Update()
@@ -1467,7 +1460,6 @@ local function CreateGeneralQoLPage(parent)
         bagGlowQualityCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        if db.general.bagItemLevelGlowColor == nil then db.general.bagItemLevelGlowColor = { 1.0, 0.82, 0.0, 1.0 } end
         local bagGlowColorPicker = GUI:CreateFormColorPicker(tabContent, "Custom Glow Color", "bagItemLevelGlowColor", db.general, function()
             if _G.SuaviUI_BagItemLevel and _G.SuaviUI_BagItemLevel.Update then
                 _G.SuaviUI_BagItemLevel.Update()
@@ -1550,7 +1542,6 @@ local function CreateGeneralQoLPage(parent)
         debugDesc:SetHeight(18)
         y = y - 24
 
-        if db.general.debugMode == nil then db.general.debugMode = false end
         local debugCheck = GUI:CreateFormCheckbox(tabContent, "Enable Debug Mode", "debugMode", db.general, function(val)
             if not val then
                 local debugWindow = _G.SUI_CastbarDebugWindow

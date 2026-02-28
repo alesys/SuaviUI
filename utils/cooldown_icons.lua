@@ -97,6 +97,12 @@ local styleConfig = {
 local styledButtons = {}       -- [button] = true when square-styled
 local buttonBorders = {}       -- [button] = border Frame
 local viewerRefreshPending = {} -- [viewerFrame] = true when a deferred refresh is queued
+-- TAINT-FIX: Track which regions we replaced with BASE_SQUARE_MASK in a module-level
+-- weak table instead of writing __sui_set6707800 directly onto Blizzard's texture objects.
+-- Writing ANY field onto a Blizzard-owned region taints it; tainted regions bleed taint
+-- into Blizzard's secure OnUpdate/RefreshData execution context, causing pandemicEndTime
+-- and wasOnGCDLookup to become secret/forbidden values (session 4796 root cause).
+local markedRegions = setmetatable({}, { __mode = "k" })  -- [region] = true
 
 local function ApplySquareStyle(button, viewerSettingName)
     local profile = GetProfile()
@@ -165,7 +171,7 @@ local function ApplySquareStyle(button, viewerSettingName)
             -- Safe texture comparison with issecretvalue guards
             if texture and not (issecretvalue and issecretvalue(texture)) and texture == 6707800 then
                 region:SetTexture(BASE_SQUARE_MASK)
-                region.__sui_set6707800 = true
+                markedRegions[region] = true
             elseif atlas == "UI-HUD-CoolDownManager-IconOverlay" then
                 region:SetAlpha(0)
             end
@@ -268,9 +274,9 @@ local function RestoreOriginalStyle(button, viewerSettingName)
     for _, region in next, { button:GetRegions() } do
         if region:IsObjectType("Texture") then
             local atlas = region:GetAtlas()
-            if region.__sui_set6707800 or region:GetTexture() == BASE_SQUARE_MASK then
+            if markedRegions[region] or region:GetTexture() == BASE_SQUARE_MASK then
                 region:SetTexture(6707800)
-                region.__sui_set6707800 = nil
+                markedRegions[region] = nil
             elseif atlas == "UI-HUD-CoolDownManager-IconOverlay" then
                 region:SetAlpha(1)
             end

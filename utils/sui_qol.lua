@@ -337,6 +337,79 @@ hooksecurefunc("StaticPopup_Show", function(which)
 end)
 
 ---------------------------------------------------------------------------
+-- QUEST / DIALOG WINDOWS: DRAGGABLE + POSITION MEMORY
+-- Covers QuestFrame (quest detail/reward) and GossipFrame (NPC dialog).
+---------------------------------------------------------------------------
+
+local questDialogSetupDone = false
+
+-- Save position into a named key under general settings.
+local function SaveFramePosition(frame, posKey)
+    local settings = GetSettings()
+    if not settings then return end
+    local point, _, relativePoint, x, y = frame:GetPoint()
+    settings[posKey] = {
+        point         = point,
+        relativePoint = relativePoint,
+        x             = x,
+        y             = y,
+    }
+end
+
+-- Restore from saved position; no-op when no position saved yet.
+local function RestoreFramePosition(frame, posKey)
+    local settings = GetSettings()
+    if not settings or not settings[posKey] then return end
+    local pos = settings[posKey]
+    frame:ClearAllPoints()
+    frame:SetPoint(pos.point, UIParent, pos.relativePoint, pos.x, pos.y)
+end
+
+-- Wire up drag + position-restore for a single frame.
+local function SetupDraggableFrame(frame, posKey)
+    frame:SetMovable(true)
+    frame:SetClampedToScreen(true)
+    frame:RegisterForDrag("LeftButton")
+
+    frame:HookScript("OnDragStart", function(self)
+        local settings = GetSettings()
+        if not settings or not settings.questWindowDraggable then return end
+        self:StartMoving()
+    end)
+
+    frame:HookScript("OnDragStop", function(self)
+        local settings = GetSettings()
+        if not settings or not settings.questWindowDraggable then return end
+        self:StopMovingOrSizing()
+        SaveFramePosition(self, posKey)
+    end)
+
+    -- Defer position restore: UIPanel repositions the frame during OnShow,
+    -- so C_Timer.After(0) executes after that and wins the final position.
+    frame:HookScript("OnShow", function(self)
+        local settings = GetSettings()
+        if not settings or not settings.questWindowDraggable then return end
+        C_Timer.After(0, function()
+            if self:IsShown() then
+                RestoreFramePosition(self, posKey)
+            end
+        end)
+    end)
+end
+
+-- Run once at login; hooks both QuestFrame and GossipFrame.
+local function SetupQuestDialogDragging()
+    if questDialogSetupDone then return end
+    local qf = _G.QuestFrame
+    local gf = _G.GossipFrame
+    if not qf and not gf then return end
+    questDialogSetupDone = true
+
+    if qf then SetupDraggableFrame(qf, "questWindowPosition") end
+    if gf then SetupDraggableFrame(gf, "gossipWindowPosition") end
+end
+
+---------------------------------------------------------------------------
 -- EVENT REGISTRATION
 ---------------------------------------------------------------------------
 
@@ -376,6 +449,7 @@ qolFrame:SetScript("OnEvent", function(self, event, ...)
         OnChallengeModeEnd()
     elseif event == "PLAYER_ENTERING_WORLD" then
         C_Timer.After(2, CheckResumeLogging)
+        SetupQuestDialogDragging()
     end
 end)
 

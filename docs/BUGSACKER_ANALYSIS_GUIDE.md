@@ -130,6 +130,82 @@ Changed `local USE_CUSTOM_BARS = false` → `true` in `sui_buffbar.lua`. The `US
 
 ---
 
+---
+
+### Session 4796 — pandemicEndTime/pandemicStartTime secret + wasOnGCDLookup forbidden (post-cinematic)
+
+**Observed (2026-02-27, session 4796, triggered after exiting a cinematic):**
+- `CooldownViewer.lua:515` — `pandemicStartTime` secret number tainted by SuaviUI (counter=1) — frame: `BuffIconCooldownViewer` item
+- `CooldownViewer.lua:516` — `pandemicEndTime` secret number tainted by SuaviUI (counter=1) — frame: `BuffIconCooldownViewer` item
+- `CooldownViewer.lua:877-878` — `wasOnGCDLookup = <forbidden table>` (counter=202, fires every frame) — frame: `EssentialCooldownViewer` item
+- `CooldownViewer.lua:353` — `isActive` secret boolean (counter=63) — residual counter from v0.3.5 pre-fix, root cause already eliminated
+
+**Trigger chain:**
+`CinematicFrame:OnHide → HideUIPanel → UIParentPanelManager → viewers:Show() → OnShow → RefreshLayout`
+→ `hooksecurefunc(viewerFrame, "RefreshLayout", hook)` in `cooldown_icons.lua` fires
+→ hook defers via `C_Timer.After(0, ...)` → timer fires → `StyledIcons:RefreshViewer` → `ProcessViewer` → `ApplySquareStyle`
+
+**Root cause identified:**
+`cooldown_icons.lua: ApplySquareStyle` wrote `region.__sui_set6707800 = true` directly onto a Blizzard texture region (a child of a CDM icon item frame). `RestoreOriginalStyle` read and cleared the same field. Writing ANY field from addon context onto a Blizzard-owned frame or region object taints it. When Blizzard's secure `CooldownViewerMixin:OnUpdate → RefreshData → SetPandemicAlertTriggerTime` chain later iterates the CDM item's children, it runs in contaminated execution context:
+- `self.pandemicStartTime = pandemicStartTime` (line 515) → secret number on item frame
+- `self.pandemicEndTime = pandemicEndTime` (line 516) → secret number on item frame
+- `wasOnGCDLookup[spellID]` (local `{}` at line 871) → `<forbidden table>` in error context (per-frame)
+
+**Fix applied (v0.3.6):**
+Replaced both `region.__sui_set6707800` field-on-frame writes with entries in a new module-level weak table `markedRegions = setmetatable({}, { __mode = "k" })`:
+- `ApplySquareStyle`: `region.__sui_set6707800 = true` → `markedRegions[region] = true`
+- `RestoreOriginalStyle`: `if region.__sui_set6707800 ...` → `if markedRegions[region] ...`; `region.__sui_set6707800 = nil` → `markedRegions[region] = nil`
+
+No Blizzard frame or region objects are written to. Taint source eliminated.
+
+**Expected next session:** Zero `pandemicEndTime`, `pandemicStartTime`, `wasOnGCDLookup` taint errors. `isActive` counter should also rest to 0 after full game restart (root cause was already fixed in v0.3.5).
+
+---
+
+### Session 4803 — SUI_extraActionButtonHolder:Show() ADDON_ACTION_BLOCKED
+
+**Observed (2026-02-27 20:57:59, session 4803):**
+- `[ADDON_ACTION_BLOCKED] SuaviUI tried to call SUI_extraActionButtonHolder:Show()` (counter=1)
+- Stack: `sui_actionbars.lua:600` ← `ExtraAbilityContainer:AddFrame → UpdateShownState → EditModeSystemTemplates:SetShown → ExtraActionBar_Update → ActionBarController:92`
+
+**Root cause identified:**
+The `OnShow` hook on the Blizzard extra-action / zone-ability button frame (`blizzFrame:HookScript("OnShow", ...)` in `sui_actionbars.lua`) called `holder:Show()` directly inside the hook callback. When the Blizzard `ExtraAbilityContainer:AddFrame` shows the frame from inside a secure call chain (`SetShown` in `EditModeSystemTemplates.lua:168`), the `OnShow` hook fires in that protected context. Any direct call to a named-frame method (`SUI_extraActionButtonHolder:Show()`) from within a secure/protected execution context is blocked as ADDON_ACTION_BLOCKED.
+
+The `OnHide` hook had already been wrapped with `C_Timer.After(0, ...)` for the same reason (session 4766 fix). The `OnShow` hook was missed.
+
+**Fix applied (v0.3.6):**
+Wrapped both the show-content and no-content branches inside the `OnShow` hook with `C_Timer.After(0, ...)`, mirroring the existing `OnHide` deferral. The timer fires one tick later, outside the secure call chain, where `holder:Show()` and `holder:Hide()` are permitted.
+
+**Expected next session:** Zero `SUI_extraActionButtonHolder:Show()` ADDON_ACTION_BLOCKED errors.
+
+---
+
+### Session 4811 — Taint spreads to Blizzard_DamageMeter; new CDM code paths tainted (pre-fix)
+
+**Observed (2026-02-28 02:11–02:13, session 4811 — played before v0.3.6 deployed):**
+- `DamageMeterSessionWindow.lua:871: durationSeconds secret number` (counter=1) — **NEW: DamageMeter affected**
+- `CooldownViewerItemData.lua:122: spellID secret number` (`UpdateLinkedSpell`, counter=3) — new function
+- `TableUtil.lua:82: item secret number` (`tContains → UpdateLinkedSpell`, counter=7)
+- `CooldownViewer.lua:415: spellID secret number` (`NeedsAddedAuraUpdate`, counter=48)
+- `DamageMeterEntry.lua:86: text secret string` (`UpdateName`, counter=175) — **NEW: DamageMeter entry tainted string**
+- `CooldownViewerItemData.lua:200: spellID secret number` (`SpellIDMatchesAnyAssociatedSpellIDs`, counter=440) — new function
+- `CooldownViewerItemData.lua:419: hasTotem secret boolean` (counter=745) — retriggered via `SetShown` secure chain
+- `CooldownViewer.lua:986: charges secret number` (`CacheChargeValues`, counter=31) — new function
+
+**Key observation — DamageMeter contamination:**
+The `Blizzard_DamageMeter` (Blizzard's built-in damage meter, introduced in The War Within) is now receiving secondary taint. The CDM viewers are poisoned from the `region.__sui_set6707800` field writes; when tainted CDM frames become visible and refresh, local variables assigned from tainted frame fields (`spellID`, `charges`, `durationSeconds`, `text`) inherit the taint and infect unrelated code paths that compare them — including the DamageMeter's `SetSessionDuration` and `UpdateName` functions.
+
+**Why new functions appear in 4811 vs 4796–4810:**
+Session 4811 hit different gameplay scenarios (totem usage, aura changes, DamageMeter session active) that exercised previously-untouched CDM code paths. All errors share identical root cause: `region.__sui_set6767800` field writes in `ApplySquareStyle`.
+
+**Root cause:** Same as sessions 4796–4810 — `region.__sui_set6767800` writes on Blizzard texture regions in `cooldown_icons.lua:ApplySquareStyle`.
+
+**Fix:** v0.3.6 `markedRegions` weak table in `cooldown_icons.lua` eliminates all field writes on Blizzard objects. Session 4811 was played before v0.3.6 was deployed.
+
+**Expected next session (post v0.3.6):** All taint errors eliminated — CDM, DamageMeter, CompactUnitFrame, TableUtil.
+
+---
+
 **Remember:** Counter increments = time passing + game activity. It's NOT a measure of total occurrences.
 
 ---

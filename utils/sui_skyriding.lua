@@ -839,9 +839,21 @@ local function UpdateVisibility()
         StartSkyridingFade(1)
 
     elseif visibility == "FLYING_ONLY" then
-        if canGlideNow then
+        -- "Only When Flying" means only while actively airborne/gliding,
+        -- NOT just being in a zone where gliding is possible (canGlideNow).
+        -- canGlideNow is true whenever you are in a skyriding-capable zone,
+        -- even while standing on the ground, so it cannot be used here.
+        if isGliding then
+            -- Actively gliding - show immediately (no fade-in lag)
+            fadeStart = 0  -- Cancel any ongoing fade
+            skyridingFrame:SetAlpha(1)
+            if abilityIcon then
+                abilityIcon:SetAlpha(1)
+                if abilityIconCooldown then
+                    abilityIconCooldown:SetAlpha(1)
+                end
+            end
             skyridingFrame:Show()
-            StartSkyridingFade(1)
         else
             StartSkyridingFade(0)
         end
