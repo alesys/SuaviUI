@@ -173,6 +173,15 @@ local function ApplySquareStyle(button, viewerSettingName)
         end
     end
 
+    -- BUG-FIX (v0.3.9): If the CDM item button is hidden (Blizzard pooled it back after
+    -- Edit Mode exit or when no cooldown is active), hide the border immediately.
+    -- The border is parented to UIParent so it does NOT inherit button visibility —
+    -- without this guard it remains floating as an empty black square on screen.
+    if not button:IsShown() then
+        if buttonBorders[button] then buttonBorders[button]:Hide() end
+        return
+    end
+
     -- Create/update inset black border.
     -- TAINT-FIX: Parent to UIParent, NOT to the CDM item frame.
     -- Adding an addon-created child to a Blizzard CDM pool frame taints the frame's
@@ -297,6 +306,21 @@ end
 local function ProcessViewer(viewer, viewerSettingName, applyStyle)
     if not viewer then
         return
+    end
+
+    -- BUG-FIX (v0.3.9): Sweep all known styled buttons and hide borders for any that are
+    -- no longer visible.  After Edit Mode exit, Blizzard hides/recycles CDM item frames;
+    -- because buttonBorders are parented to UIParent they don't inherit visibility and
+    -- stay floating as empty black squares.  This pre-pass clears them; ApplySquareStyle
+    -- will re-show the border only if the button is currently shown.
+    for button, _ in pairs(styledButtons) do
+        -- Only process buttons owned by this viewer (skip other viewers' buttons)
+        local ok = pcall(function()
+            if not button:IsShown() and buttonBorders[button] then
+                buttonBorders[button]:Hide()
+            end
+        end)
+        _ = ok  -- suppress unused warning
     end
 
     local children = {}

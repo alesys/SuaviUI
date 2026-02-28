@@ -2549,10 +2549,14 @@ local function Initialize()
             end, "SuaviBuffBarCustom")
 
             EventRegistry:RegisterCallback("EditMode.Exit", function()
-                SetViewerHidden(true)
+                -- BUG-FIX (v0.3.9): Defer SetViewerHidden(true) so it runs AFTER Blizzard's
+                -- EditMode.Exit processing.  Blizzard restores the viewer's alpha to 1 as
+                -- part of its own Exit handler; a synchronous SetAlpha(0) fires first and
+                -- gets overwritten, leaving the Blizzard viewer fully visible afterward.
+                C_Timer.After(0.15, function() SetViewerHidden(true) end)
                 if customContainer then customContainer:Show() end
                 -- Refresh after Edit Mode repositioning
-                C_Timer.After(0.2, function()
+                C_Timer.After(0.3, function()
                     UpdateCustomBarData()
                     LayoutBuffBars()
                 end)
@@ -2606,9 +2610,10 @@ local function Initialize()
             end, "SuaviBuffIconCustom")
 
             EventRegistry:RegisterCallback("EditMode.Exit", function()
-                SetIconViewerHidden(true)
+                -- BUG-FIX (v0.3.9): Defer so we run after Blizzard restores alpha to 1.
+                C_Timer.After(0.15, function() SetIconViewerHidden(true) end)
                 if customIconContainer then customIconContainer:Show() end
-                C_Timer.After(0.2, function()
+                C_Timer.After(0.3, function()
                     UpdateCustomIconData()
                     LayoutBuffIcons()
                 end)

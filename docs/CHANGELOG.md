@@ -1,5 +1,33 @@
 # SuaviUI Changelog
 
+## [v0.3.9](https://github.com/alesys/SuaviUI/tree/v0.3.9) (2026-02-28)
+
+### 🔧 Fix — Three issues triggered by exiting Edit Mode
+
+#### Issue 1 — Essential CDM icons show as empty black squares after Edit Mode exit
+
+**Root Cause:** `buttonBorders` (the square icon borders from `ApplySquareStyle`) are parented to `UIParent` for taint safety (not to the CDM item frame). When Blizzard's Edit Mode exit hides/recycles CDM item pool frames, the borders do not inherit their parent button's hidden state — they remain floating as visible black squares on screen.
+
+**Fix — [utils/cooldown_icons.lua]**
+- `ApplySquareStyle`: Added `if not button:IsShown()` guard — hides the border and returns immediately when the CDM item frame is hidden.
+- `ProcessViewer`: Added defensive pre-pass that iterates all `styledButtons` and hides borders for any button that is no longer visible, ensuring no orphaned borders survive after Blizzard pool recycling.
+
+#### Issue 2 — Vigor Bar remains visible after Edit Mode exit when Visibility Mode = "Only When Flying"
+
+**Root Cause:** `UpdateVisibility()` is gated by `SuaviUI_SkyridingEditMode_IsPreviewActive()`. This flag is cleared inside `LEM:RegisterCallback("exit")` in `skyriding_editmode.lua`. If the LEM library's exit callback does not fire (library version mismatch, delayed initialization, etc.), `previewActive` stays `true` permanently. Every 50 ms `UpdateVisibility()` short-circuits and force-shows the frame at alpha=1, ignoring the "Only When Flying" setting.
+
+**Fix — [utils/skyriding_editmode.lua]**
+- Added `EventRegistry:RegisterCallback("EditMode.Exit", ...)` as a redundant safety net in `SkyridingEditMode:Initialize()`. If `previewActive` is still `true` when the native Blizzard event fires, `StopPreview` (or the direct `previewActive = false` fallback) is called to clear the flag and trigger a visibility update.
+
+#### Issue 3 — Blizzard Tracked Bar viewer ("0" bar) visible after Edit Mode exit; custom bars hidden
+
+**Root Cause:** `EventRegistry:RegisterCallback("EditMode.Exit")` fires at the same time as Blizzard's internal EditMode.Exit processing. Blizzard's handler runs AFTER ours and resets `BuffBarCooldownViewer` alpha back to 1 (its "default" state), overwriting our synchronous `SetAlpha(0)` call. Similarly for `BuffIconCooldownViewer`. Both Blizzard viewers end up fully visible after exit with our custom SuaviBuffBar/SuaviBuffIcon containers also shown, causing overlap.
+
+**Fix — [utils/sui_buffbar.lua]**
+- Changed `EditMode.Exit` callbacks for both `"SuaviBuffBarCustom"` and `"SuaviBuffIconCustom"` to defer `SetViewerHidden(true)` / `SetIconViewerHidden(true)` by 150 ms (`C_Timer.After(0.15, ...)`) so they execute after Blizzard's alpha reset. Data refresh timers adjusted from 200 ms → 300 ms accordingly.
+
+---
+
 ## [v0.3.8](https://github.com/alesys/SuaviUI/tree/v0.3.8) (2026-03-01)
 
 ### 🔧 Fix — Tracked Bars never visible + Essential CDM icons show as white squares
