@@ -120,15 +120,18 @@ local function ApplySquareStyle(button, viewerSettingName)
     local borderKey = "cooldownManager_squareIconsBorder_" .. viewerSettingName
     local borderThickness = profile[borderKey] or 1
 
-    button:SetSize(width, width)
+    -- TAINT-FIX: Do NOT call button:SetSize(), iconTexture:SetPoint(), or any other
+    -- frame layout method on Blizzard CDM pool item frames from addon context.
+    -- Calling layout methods (SetSize, SetPoint, ClearAllPoints, SetScale) on a Blizzard
+    -- managed pool frame from insecure (addon) context taints that frame at the C++ level.
+    -- Blizzard's secureexecuterange then cannot read ANY Lua field on those frames without
+    -- throwing "secret value tainted by SuaviUI" or "attempted to index a forbidden table".
+    -- Safe operations: SetTexCoord, SetTexture, SetAlpha (texture data only, no layout).
+    -- Safe operations: SetSwipeTexture (changes visual texture, not frame geometry).
 
     local iconTexture = button.Icon or button.icon or button.texture or button.Texture
     if iconTexture and not (issecretvalue and issecretvalue(iconTexture)) then
-        iconTexture:ClearAllPoints()
-        iconTexture:SetPoint("TOPLEFT", button, "TOPLEFT", -config.paddingFixup / 2, config.paddingFixup / 2)
-        iconTexture:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", config.paddingFixup / 2, -config.paddingFixup / 2)
-
-        -- Calculate zoom-based texture coordinates
+        -- Calculate zoom-based texture coordinates (UV crop only — no layout change)
         local zoomKey = "cooldownManager_squareIconsZoom_" .. viewerSettingName
         local zoom = profile[zoomKey] or 0
         local crop = zoom * 0.5
@@ -137,27 +140,14 @@ local function ApplySquareStyle(button, viewerSettingName)
         end
     end
 
-    -- Update swipe texture for cooldown children (guard iterator)
+    -- Update swipe texture for cooldown children (SetSwipeTexture only — no SetPoint/SetSize)
     local children = {button:GetChildren()}
     for i = 1, #children do
         local texture = children[i]
         if texture and not (issecretvalue and issecretvalue(texture)) and texture.SetSwipeTexture then
             texture:SetSwipeTexture(BASE_SQUARE_MASK)
-            texture:ClearAllPoints()
-            texture:SetPoint(
-                "TOPLEFT",
-                button,
-                "TOPLEFT",
-                -config.paddingFixup / 2 + borderThickness,
-                config.paddingFixup / 2 - borderThickness
-            )
-            texture:SetPoint(
-                "BOTTOMRIGHT",
-                button,
-                "BOTTOMRIGHT",
-                config.paddingFixup / 2 - borderThickness,
-                -config.paddingFixup / 2 + borderThickness
-            )
+            -- NOTE: intentionally NOT calling ClearAllPoints/SetPoint on the swipe child
+            -- because those are layout operations that taint the parent CDM item frame.
         end
     end
 
@@ -178,9 +168,13 @@ local function ApplySquareStyle(button, viewerSettingName)
         end
     end
 
-    -- Create/update inset black border
+    -- Create/update inset black border.
+    -- TAINT-FIX: Parent to UIParent, NOT to the CDM item frame.
+    -- Adding an addon-created child to a Blizzard CDM pool frame taints the frame's
+    -- C++ child list; when secure code later iterates children or accesses frame fields,
+    -- it gets tainted results. SetPoint with the CDM button as ANCHOR (not parent) is safe.
     if not buttonBorders[button] then
-        buttonBorders[button] = CreateFrame("Frame", nil, button, "BackdropTemplate")
+        buttonBorders[button] = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
         buttonBorders[button]:SetFrameLevel(button:GetFrameLevel() + 1)
     end
     buttonBorders[button]:ClearAllPoints()
@@ -204,15 +198,13 @@ local function RestoreOriginalStyle(button, viewerSettingName)
     end
 
     local width, height = GetViewerIconSize(viewerSettingName)
-    button:SetSize(width, height)
+    -- TAINT-FIX: Do NOT call button:SetSize() — restoring frame dimensions is a layout op
+    -- that taints the CDM item frame at C++ level (same reasoning as in ApplySquareStyle).
 
     local iconTexture = button.Icon or button.icon or button.texture or button.Texture
     if iconTexture then
-        iconTexture:ClearAllPoints()
-        iconTexture:SetPoint("CENTER", button, "CENTER", 0, 0)
-        iconTexture:SetSize(width, height)
-
-        -- Fully reset texture coordinates to remove zoom
+        -- TAINT-FIX: Do NOT call ClearAllPoints/SetPoint/SetSize on iconTexture — those
+        -- are layout operations.  Only reset the UV coordinates (safe texture-data op).
         if iconTexture.SetTexCoord then
             iconTexture:SetTexCoord(0, 1, 0, 1)
         end
@@ -233,14 +225,13 @@ local function RestoreOriginalStyle(button, viewerSettingName)
         end
     end
 
-    -- Restore cooldown swipe to default circular texture
+    -- Restore cooldown swipe to default circular texture (SetSwipeTexture only — no layout)
     for i = 1, select("#", button:GetChildren()) do
         local child = select(i, button:GetChildren())
         if child and child.SetSwipeTexture then
             child:SetSwipeTexture(6707800)  -- Blizzard default
-            child:ClearAllPoints()
-            child:SetPoint("CENTER", button, "CENTER", 0, 0)
-            child:SetSize(width, height)
+            -- TAINT-FIX: Do NOT call ClearAllPoints/SetPoint/SetSize on the swipe Cooldown
+            -- child — those are layout operations that taint the parent CDM item frame.
             break
         end
     end
@@ -337,14 +328,10 @@ local function ProcessViewer(viewer, viewerSettingName, applyStyle)
                     end)
                 end
 
-                -- Scale debuff border (guard against tainted child)
-                if child.DebuffBorder and not (issecretvalue and issecretvalue(child.DebuffBorder)) then
-                    if applyStyle then
-                        child.DebuffBorder:SetScale(1.7)
-                    else
-                        child.DebuffBorder:SetScale(1.0)
-                    end
-                end
+                -- TAINT-FIX: Removed DebuffBorder:SetScale() calls.
+                -- SetScale is a layout operation on a Blizzard child frame; it taints the
+                -- parent CDM item frame at C++ level causing secret-value errors in
+                -- secureexecuterange contexts (sessions 4796–4824 root cause).
             end
         end
     end
@@ -416,63 +403,16 @@ local function IsNormalizedSizeEnabled()
 end
 
 local function ApplyNormalizedSizeToButton(button, viewerSettingName)
-    local config = normalizedSizeConfig[viewerSettingName]
-    if not config or not button or (issecretvalue and issecretvalue(button)) then
-        return
-    end
-
-    button:SetSize(config.width, config.height)
-
-    local ok = pcall(function()
-        local regions = {button:GetRegions()}
-        for i, texture in ipairs(regions) do
-            if texture and not (issecretvalue and issecretvalue(texture)) then
-                if texture.GetAtlas and pcall(texture.GetAtlas, texture) then
-                    local atlas = texture:GetAtlas()
-                    if atlas == "UI-HUD-CoolDownManager-IconOverlay" then
-                        texture:ClearAllPoints()
-                        texture:SetPoint("CENTER", button, "CENTER", 0, 0)
-                        texture:SetSize(config.width * 1.36, config.height * 1.36)
-                    end
-                end
-            end
-        end
-    end)
-
-    if not (issecretvalue and issecretvalue(button)) and button.Icon and not (issecretvalue and issecretvalue(button.Icon)) then
-        local padding = styledButtons[button] and 4 or 0
-        button.Icon:SetSize(config.width - padding, config.height - padding)
-    end
+    -- TAINT-FIX: Disabled all layout operations (SetSize, SetPoint, ClearAllPoints) on
+    -- Blizzard CDM pool frames.  These taint the frames at C++ level causing all subsequent
+    -- secure-context field reads to fail as "secret values tainted by SuaviUI".
+    -- The normalizeUtilitySize visual feature is suspended until a taint-safe approach exists.
+    _ = button  -- suppress unused-var warning
 end
 
 local function RestoreOriginalSizeToButton(button, viewerSettingName)
-    local config = originalSizesConfig[viewerSettingName]
-    if not config or not button or (issecretvalue and issecretvalue(button)) then
-        return
-    end
-
-    button:SetSize(config.width, config.height)
-    
-    local ok = pcall(function()
-        local regions = {button:GetRegions()}
-        for i, texture in ipairs(regions) do
-            if texture and not (issecretvalue and issecretvalue(texture)) then
-                if texture.GetAtlas and pcall(texture.GetAtlas, texture) then
-                    local atlas = texture:GetAtlas()
-                    if atlas == "UI-HUD-CoolDownManager-IconOverlay" then
-                        texture:ClearAllPoints()
-                        texture:SetPoint("CENTER", button, "CENTER", 0, 0)
-                        texture:SetSize(config.width * 1.36, config.height * 1.36)
-                    end
-                end
-            end
-        end
-    end)
-
-    if not (issecretvalue and issecretvalue(button)) and button.Icon and not (issecretvalue and issecretvalue(button.Icon)) then
-        local padding = styledButtons[button] and 4 or 0
-        button.Icon:SetSize(config.width - padding, config.height - padding)
-    end
+    -- TAINT-FIX: Disabled all layout operations — see ApplyNormalizedSizeToButton.
+    _ = button  -- suppress unused-var warning
 end
 
 function StyledIcons:Shutdown()

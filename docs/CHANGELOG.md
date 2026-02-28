@@ -1,5 +1,39 @@
 # SuaviUI Changelog
 
+## [v0.3.7](https://github.com/alesys/SuaviUI/tree/v0.3.7) (2026-02-28)
+
+### 🔧 Fix — Remaining CDM Taint (Sessions 4823–4824): Layout Methods on Pool Frames
+
+#### Root Cause
+- `cooldown_icons.lua: ApplySquareStyle` called `button:SetSize()`, `iconTexture:ClearAllPoints()` / `SetPoint()`, `swipeChild:ClearAllPoints()` / `SetPoint()` / `SetSize()`, and `child.DebuffBorder:SetScale()` on Blizzard CDM pool item frames from addon (insecure) context.
+- Calling **any C++ layout method** (`SetSize`, `SetPoint`, `ClearAllPoints`, `SetScale`) on a Blizzard frame from addon context marks that frame **tainted at the C++ engine level**. When `secureexecuterange` (EditMode close, CDM settings drag-reorder, CinematicFrame hide) later accesses those frames, all Lua field reads fail — causing `isActive`, `pandemicEndTime`, `allowAvailableAlert`, `previousCooldownChargesCount`, `charges`, `spellID` to throw "secret value tainted by SuaviUI", and the module-local `wasOnGCDLookup` table to become a **forbidden table** (counter=276 in session 4824).
+- Secondary issue: `buttonBorders[button] = CreateFrame("Frame", nil, button, ...)` created an addon-owned child frame inside the Blizzard CDM item frame's child list, also contaminating the frame's C++ child table.
+- `SUI_extraActionButtonHolder:Hide()` (session 4823) was blocked because the `OnHide` `C_Timer.After(0)` callback could fire after the player entered combat lockdown.
+
+#### Fix — [utils/cooldown_icons.lua]
+- **`ApplySquareStyle`**: Removed all layout method calls on CDM item frames:
+  - Removed `button:SetSize()` — icon buttons keep Blizzard's default dimensions.
+  - Removed `iconTexture:ClearAllPoints()` and `SetPoint()` — only UV coordinates modified via `SetTexCoord(crop, …)` (safe texture-data op).
+  - Removed swipe-child `ClearAllPoints()` and `SetPoint()` — kept `SetSwipeTexture(BASE_SQUARE_MASK)` only.
+  - Removed `child.DebuffBorder:SetScale(1.7)` from `ProcessViewer`.
+  - Changed `buttonBorders` parent from `button` (CDM item frame) to `UIParent`; anchored via `SetPoint` (safe — setting points on our own frame with a Blizzard anchor is fine).
+- **`RestoreOriginalStyle`**: Same removals — `button:SetSize()`, `iconTexture:ClearAllPoints/SetPoint/SetSize`, swipe `ClearAllPoints/SetPoint/SetSize`. Kept `iconTexture:SetTexCoord(0,1,0,1)` and `SetSwipeTexture(6707800)`.
+- **`ApplyNormalizedSizeToButton` / `RestoreOriginalSizeToButton`**: Fully disabled (no-ops). "Normalize Utility Size" suspended until a taint-safe approach exists.
+
+#### Fix — [utils/sui_actionbars.lua]
+- **`OnHide` deferred callback**: Added `if InCombatLockdown() then return end` guard inside the `C_Timer.After(0)` body. When the timer fires during combat lockdown, `:Hide()` on `SUI_extraActionButtonHolder` raises `ADDON_ACTION_BLOCKED`; the guard causes it to silently skip.
+
+#### Session triage
+- Session 4823: `SUI_extraActionButtonHolder:Hide()` ADDON_ACTION_BLOCKED (counter=3) — fixed.
+- Session 4823: `pandemicEndTime` secret number `BuffIconCooldownViewer:565` (counter=3) — fixed.
+- Session 4823: `EnableSpellRangeCheck bad argument` `CooldownViewer:706` (counter=6) — Blizzard pool edge case; no longer tainted.
+- Session 4823: `wasOnGCDLookup = <forbidden table>` `CooldownViewer:877` (counter=272) — fixed.
+- Session 4824: `isActive` secret boolean `BuffBarCooldownViewer:353` (counter=84, drag-reorder) — fixed.
+- Session 4824: `ShouldBeShown` secret boolean `CooldownViewer:303` (counter=1, HideUIPanel) — fixed.
+- Session 4824: `wasOnGCDLookup = <forbidden table>` (counter=276) + `LUA_WARNING` — fixed.
+
+---
+
 ## [v0.3.6](https://github.com/alesys/SuaviUI/tree/v0.3.6) (2026-02-28)
 
 ### ✨ Feature — Draggable Quest & Dialog Windows
