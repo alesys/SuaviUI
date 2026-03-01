@@ -237,10 +237,8 @@ local iconViewerHooked    = false
 local iconViewerElapsed   = 0
 local barViewerHooked     = false
 local barViewerElapsed    = 0
-local iconAuraHook        = nil   -- event-frame for UNIT_AURA (legacy icons)
+local iconAuraHook        = nil   -- event-frame for UNIT_AURA
 local iconRescanPending   = false
-local barAuraHook         = nil   -- event-frame for UNIT_AURA (custom bars)
-local barRescanPending    = false
 
 local function EnsureCooldownViewerLoaded()
     if InCombatLockdown() then return end
@@ -2784,37 +2782,10 @@ local function Initialize()
         end)
     end
 
-    -- Custom bars: UNIT_AURA / SPELL_UPDATE_COOLDOWN event hook for live updates.
-    -- WITHOUT this, USE_CUSTOM_BARS=true has no polling or event trigger after login —
-    -- CheckBarChanges() is never called so activeCustomBars stays empty forever.
-    if USE_CUSTOM_BARS then
-        pcall(function()
-            if not barAuraHook then
-                barAuraHook = CreateFrame("Frame")
-                barAuraHook:RegisterEvent("UNIT_AURA")
-                barAuraHook:RegisterEvent("SPELL_UPDATE_COOLDOWN")
-                barAuraHook:SetScript("OnEvent", function(_, event, unit)
-                    if event == "SPELL_UPDATE_COOLDOWN"
-                    or (event == "UNIT_AURA" and (unit == "player" or unit == "target")) then
-                        if not barRescanPending then
-                            barRescanPending = true
-                            C_Timer.After(0.15, function()
-                                barRescanPending = false
-                                if not isBarLayoutRunning and not IsLayoutSuppressed() then
-                                    CheckBarChanges()
-                                end
-                            end)
-                        end
-                    end
-                end)
-            end
-        end)
-    end
-
     -- Initial layouts (after force populate)
     C_Timer.After(0.3, function()
         LayoutBuffIcons()  -- Direct calls
-        CheckBarChanges()  -- For custom bars: UpdateCustomBarData() + LayoutBuffBars()
+        LayoutBuffBars()
     end)
 end
 
@@ -2839,7 +2810,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             C_Timer.After(1.5, function()
                 ForcePopulateBuffIcons()
                 LayoutBuffIcons()  -- Direct calls
-                CheckBarChanges()  -- UpdateCustomBarData() + LayoutBuffBars() for custom bars
+                LayoutBuffBars()
             end)
         end
     elseif event == "PLAYER_REGEN_ENABLED" then
@@ -2847,7 +2818,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         C_Timer.After(0.5, function()
             ForcePopulateBuffIcons()
             LayoutBuffIcons()  -- Direct calls
-            CheckBarChanges()  -- UpdateCustomBarData() + LayoutBuffBars() for custom bars
+            LayoutBuffBars()
         end)
     end
 end)

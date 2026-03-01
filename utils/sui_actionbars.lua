@@ -627,11 +627,6 @@ local function ApplyExtraButtonSettings(buttonType)
                 -- TAINT-FIX: defer Hide() out of any secure call chain (e.g. CinematicFrame
                 -- → ShowUIPanel → SetAttribute) to avoid ADDON_ACTION_BLOCKED on named frame.
                 C_Timer.After(0, function()
-                    -- TAINT-FIX: by the time the timer fires, the player may have entered combat
-                    -- (or the lockdown that triggered the original Hide is still active).
-                    -- Calling :Hide() on a named global frame during lockdown raises
-                    -- ADDON_ACTION_BLOCKED, so bail out and let the next OnHide cycle handle it.
-                    if InCombatLockdown() then return end
                     if holder and not holder:IsShown() then return end  -- already hidden, skip
                     local ss = GetExtraButtonDB(buttonType)
                     if not (ss and (ss._editModeActive or ss.alwaysShow)) then
