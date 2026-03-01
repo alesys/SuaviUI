@@ -143,6 +143,14 @@ local function ApplySquareStyle(button, viewerSettingName)
         if buttonBorders[button] then buttonBorders[button]:Hide() end
         return
     end
+
+    -- Placeholder / empty-slot texture: treat as inactive and hide border.
+    -- Edit Mode exit can leave pooled item frames present with this texture id,
+    -- which otherwise produces "empty black squares" (border visible, icon blank).
+    if iconSourceTexture == 6707800 then
+        if buttonBorders[button] then buttonBorders[button]:Hide() end
+        return
+    end
     if iconTexture and not (issecretvalue and issecretvalue(iconTexture)) then
         -- Calculate zoom-based texture coordinates (UV crop only — no layout change)
         local zoomKey = "cooldownManager_squareIconsZoom_" .. viewerSettingName
@@ -172,7 +180,7 @@ local function ApplySquareStyle(button, viewerSettingName)
             local atlas = region:GetAtlas()
 
             -- Safe texture comparison with issecretvalue guards
-            if texture and not (issecretvalue and issecretvalue(texture)) and texture == 6707800 then
+            if texture and not (issecretvalue and issecretvalue(texture)) and texture == 6707800 and region ~= iconTexture then
                 -- TAINT-FIX (v0.3.8): Do NOT replace the region texture with BASE_SQUARE_MASK.
                 -- Without SetSize/SetPoint (removed to prevent taint), the region renders at
                 -- full button size and square_mask.tga appears as an opaque white overlay on
@@ -263,31 +271,6 @@ local function RestoreOriginalStyle(button, viewerSettingName)
         end
     end
 
-    -- Restore NCDM-stripped masks (if NCDM was applied)
-    if button._originalMasks then
-        local textures = { button.Icon, button.icon }
-        for _, tex in ipairs(textures) do
-            if tex and button._originalMasks[tostring(tex)] then
-                for _, mask in ipairs(button._originalMasks[tostring(tex)]) do
-                    if tex.AddMaskTexture then
-                        tex:AddMaskTexture(mask)
-                    end
-                end
-            end
-        end
-    end
-
-    -- Restore NCDM-stripped NormalTexture
-    if button._originalNormalAlpha and button.NormalTexture then
-        button.NormalTexture:SetAlpha(button._originalNormalAlpha)
-    end
-    if button._originalNormalAlpha and button.GetNormalTexture then
-        local normalTex = button:GetNormalTexture()
-        if normalTex then
-            normalTex:SetAlpha(button._originalNormalAlpha)
-        end
-    end
-
     -- Restore hidden overlay textures
     for _, region in next, { button:GetRegions() } do
         if region:IsObjectType("Texture") then
@@ -308,11 +291,6 @@ local function RestoreOriginalStyle(button, viewerSettingName)
     end
 
     styledButtons[button] = nil
-    
-    -- Also restore NCDM styling if available (clears NCDM's styling flags)
-    if ns.NCDM and ns.NCDM.RestoreIcon then
-        ns.NCDM.RestoreIcon(button)
-    end
 end
 
 -- Process all children of a viewer

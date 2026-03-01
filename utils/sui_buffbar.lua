@@ -528,6 +528,17 @@ local function UpdateCustomBarData()
         activeCustomBars[#activeCustomBars + 1] = bar
     end
 
+    -- EditMode-exit safety fallback:
+    -- If custom data resolves to zero bars, fall back to Blizzard's native viewer
+    -- so tracked bars remain visible instead of showing nothing.
+    if #activeCustomBars == 0 then
+        SetViewerHidden(false)
+        if customContainer then customContainer:Hide() end
+    else
+        SetViewerHidden(true)
+        if customContainer then customContainer:Show() end
+    end
+
     return activeCustomBars
 end
 
