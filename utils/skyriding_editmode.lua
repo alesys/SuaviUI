@@ -814,5 +814,13 @@ end
 -- Allow external modules to check if preview is active
 -- (so UpdateVisibility doesn't hide the frame during Edit Mode)
 _G.SuaviUI_SkyridingEditMode_IsPreviewActive = function()
-    return SkyridingEditMode.previewActive
+    if not SkyridingEditMode.previewActive then
+        return false
+    end
+    -- Harden against stale previewActive=true if callbacks are missed.
+    -- Preview should only force visibility while Edit Mode UI is actually shown.
+    if EditModeManagerFrame and EditModeManagerFrame:IsShown() then
+        return true
+    end
+    return false
 end

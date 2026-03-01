@@ -454,6 +454,30 @@ local function FetchBuffBarData()
                             duration       = auraData.duration,
                             expirationTime = auraData.expirationTime,
                         }
+                    else
+                        -- Fallback: show tracked spell cooldowns even when no aura exists.
+                        -- Many tracked bars represent pure cooldowns (no UNIT_AURA payload),
+                        -- so aura-only filtering makes custom bars appear empty.
+                        local cdInfo = C_Spell.GetSpellCooldown(spellID)
+                        if cdInfo and cdInfo.startTime and cdInfo.duration
+                           and cdInfo.startTime > 0 and cdInfo.duration > 0.75 then
+                            local texture = nil
+                            local name = ""
+                            local texOk, tex = pcall(C_Spell.GetSpellTexture, spellID)
+                            if texOk then texture = tex end
+                            local nameOk, spellName = pcall(C_Spell.GetSpellName, spellID)
+                            if nameOk and spellName then name = spellName end
+
+                            auraResult = {
+                                cooldownID     = src.cooldownID,
+                                spellID        = spellID,
+                                layoutIndex    = src.layoutIndex,
+                                name           = name,
+                                texture        = texture,
+                                duration       = cdInfo.duration,
+                                expirationTime = cdInfo.startTime + cdInfo.duration,
+                            }
+                        end
                     end
                 end)
                 if auraResult.cooldownID then

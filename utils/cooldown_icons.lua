@@ -97,6 +97,7 @@ local styleConfig = {
 local styledButtons = {}       -- [button] = true when square-styled
 local buttonBorders = {}       -- [button] = border Frame
 local viewerRefreshPending = {} -- [viewerFrame] = true when a deferred refresh is queued
+local pandemicHooked = setmetatable({}, { __mode = "k" }) -- [button] = true if hook installed
 -- TAINT-FIX: Track which regions we replaced with BASE_SQUARE_MASK in a module-level
 -- weak table instead of writing __sui_set6707800 directly onto Blizzard's texture objects.
 -- Writing ANY field onto a Blizzard-owned region taints it; tainted regions bleed taint
@@ -130,6 +131,18 @@ local function ApplySquareStyle(button, viewerSettingName)
     -- Safe operations: SetSwipeTexture (changes visual texture, not frame geometry).
 
     local iconTexture = button.Icon or button.icon or button.texture or button.Texture
+    local iconSourceTexture = nil
+    if iconTexture and iconTexture.GetTexture then
+        pcall(function() iconSourceTexture = iconTexture:GetTexture() end)
+    end
+
+    -- If the icon has no source texture, treat it as inactive/placeholder and hide border.
+    -- This prevents empty black square borders from remaining visible when Blizzard keeps
+    -- pooled item frames shown but with no icon payload.
+    if not iconSourceTexture then
+        if buttonBorders[button] then buttonBorders[button]:Hide() end
+        return
+    end
     if iconTexture and not (issecretvalue and issecretvalue(iconTexture)) then
         -- Calculate zoom-based texture coordinates (UV crop only — no layout change)
         local zoomKey = "cooldownManager_squareIconsZoom_" .. viewerSettingName
@@ -336,8 +349,8 @@ local function ProcessViewer(viewer, viewerSettingName, applyStyle)
                 end
 
                 -- Hook pandemic alerts (guard against tainted child)
-                if (not DISABLE_PANDEMIC_ALERT_HOOK) and not (issecretvalue and issecretvalue(child)) and child.TriggerPandemicAlert and not child._suiStyleHooked then
-                    child._suiStyleHooked = true
+                if (not DISABLE_PANDEMIC_ALERT_HOOK) and not (issecretvalue and issecretvalue(child)) and child.TriggerPandemicAlert and not pandemicHooked[child] then
+                    pandemicHooked[child] = true
                     hooksecurefunc(child, "TriggerPandemicAlert", function()
                         -- TAINT-FIX: Defer ALL work to avoid tainting execution context.
                         -- TriggerPandemicAlert fires inside RefreshData's event chain.
