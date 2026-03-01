@@ -241,6 +241,8 @@ local iconAuraHook        = nil   -- event-frame for UNIT_AURA (legacy icons)
 local iconRescanPending   = false
 local barAuraHook         = nil   -- event-frame for UNIT_AURA (custom bars)
 local barRescanPending    = false
+local SetViewerHidden     -- forward declaration (used before definition)
+local SetIconViewerHidden -- forward declaration (used before definition)
 
 local function EnsureCooldownViewerLoaded()
     if InCombatLockdown() then return end
@@ -562,7 +564,7 @@ local function UpdateCustomBarProgress()
 end
 
 -- Hide Blizzard's viewer children, show it during Edit Mode for positioning
-local function SetViewerHidden(hide)
+SetViewerHidden = function(hide)
     local viewer = SafeGetViewer("BuffBarCooldownViewer")
     if not viewer then return end
     if hide then
@@ -841,7 +843,7 @@ local function UpdateCustomIconData()
 end
 
 -- Hide/show Blizzard's BuffIcon viewer
-local function SetIconViewerHidden(hide)
+SetIconViewerHidden = function(hide)
     local viewer = SafeGetViewer("BuffIconCooldownViewer")
     if not viewer then return end
     if hide then
