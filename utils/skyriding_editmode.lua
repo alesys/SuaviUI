@@ -762,25 +762,6 @@ function SkyridingEditMode:Initialize()
             StopPreview(self.registeredFrame)
         end
     end)
-
-    ---------------------------------------------------------------------------
-    -- SAFETY NET: If LEM's "exit" callback doesn't fire (library version
-    -- differences, late init, etc.), catch the native Blizzard EditMode.Exit
-    -- event as a redundant path to ensure previewActive is always cleared.
-    ---------------------------------------------------------------------------
-    if EventRegistry then
-        EventRegistry:RegisterCallback("EditMode.Exit", function()
-            if SkyridingEditMode.previewActive then
-                local frame = SkyridingEditMode.registeredFrame
-                if frame then
-                    StopPreview(frame)
-                else
-                    SkyridingEditMode.previewActive = false
-                    RefreshVigorBar()
-                end
-            end
-        end, "SuaviSkyridingEditModeExit")
-    end
 end
 
 ---------------------------------------------------------------------------
@@ -814,13 +795,5 @@ end
 -- Allow external modules to check if preview is active
 -- (so UpdateVisibility doesn't hide the frame during Edit Mode)
 _G.SuaviUI_SkyridingEditMode_IsPreviewActive = function()
-    if not SkyridingEditMode.previewActive then
-        return false
-    end
-    -- Harden against stale previewActive=true if callbacks are missed.
-    -- Preview should only force visibility while Edit Mode UI is actually shown.
-    if EditModeManagerFrame and EditModeManagerFrame:IsShown() then
-        return true
-    end
-    return false
+    return SkyridingEditMode.previewActive
 end

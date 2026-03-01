@@ -241,8 +241,6 @@ local iconAuraHook        = nil   -- event-frame for UNIT_AURA (legacy icons)
 local iconRescanPending   = false
 local barAuraHook         = nil   -- event-frame for UNIT_AURA (custom bars)
 local barRescanPending    = false
-local SetViewerHidden     -- forward declaration (used before definition)
-local SetIconViewerHidden -- forward declaration (used before definition)
 
 local function EnsureCooldownViewerLoaded()
     if InCombatLockdown() then return end
@@ -360,20 +358,15 @@ end
 -- (viewer:GetCooldownIDs() is a Lua mixin method on a forbidden table — fails in 12.0.5)
 local function GetViewerCooldownIDs()
     local ok, ids = pcall(function()
-        -- Try C API first: direct, no timing dependency on the settings data provider.
-        if C_CooldownViewer and C_CooldownViewer.GetCooldownIDsForCategory then
-            local result = C_CooldownViewer.GetCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBar)
-            if type(result) == "table" and #result > 0 then
-                return result
-            end
-        end
-        -- Fallback: settings data provider (may return empty before CheckBuildDisplayData runs).
         local settings = CooldownViewerSettings
         if settings and settings.GetDataProvider then
             local provider = settings:GetDataProvider()
             if provider and provider.GetOrderedCooldownIDsForCategory then
                 return provider:GetOrderedCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBar, true)
             end
+        end
+        if C_CooldownViewer and C_CooldownViewer.GetCooldownIDsForCategory then
+            return C_CooldownViewer.GetCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBar)
         end
         return nil
     end)
@@ -383,18 +376,41 @@ end
 
 -- Fetch active aura data using clean C APIs only (no Blizzard frame reads)
 local function FetchBuffBarData()
-    -- ROOT-CAUSE FIX (v0.3.10): Removed direct CDM item frame field reads.
-    -- The previous PRIMARY path iterated viewer.itemFramePool:EnumerateActive() and
-    -- read frame.cooldownID, frame.isActive, frame.layoutIndex from insecure pcall context.
-    -- Reading Lua fields that were SET by Blizzard's secure code from insecure context
-    -- TAINTS those fields at the C level.  Subsequent secure-code comparisons like
-    -- "self.isActive ~= active" then throw "secret boolean value tainted by SuaviUI"
-    -- across the ENTIRE CooldownViewer system (sessions 4796, 4809, 4810, 4811, 4824, 4833).
-    -- Use ONLY the C API; never read .cooldownID / .isActive / .layoutIndex from pool frames.
+    -- PRIMARY: Use BuffBarCooldownViewer.itemFramePool as authoritative active-spell source.
+    -- The viewer is still running (SetAlpha(0) hides it visually but keeps its logic alive),
+    -- so itemFramePool:EnumerateActive() gives exactly the frames Blizzard considers active.
+    -- This sidesteps GetViewerCooldownIDs() which can silently return {} if the settings
+    -- data provider hasn't built its display data yet (CheckBuildDisplayData() timing issue).
     local srcFrames = nil
+    local viewer = SafeGetViewer("BuffBarCooldownViewer")
+    if viewer then
+        local poolFrames = {}
+        pcall(function()
+            local pool = viewer.itemFramePool
+            if not (pool and pool.EnumerateActive) then return end
+            for frame in pool:EnumerateActive() do
+                if not frame then return end
+                local cdID, active, layoutIdx
+                pcall(function()
+                    cdID      = frame.cooldownID
+                    active    = frame.isActive
+                    layoutIdx = frame.layoutIndex
+                end)
+                if cdID and active then
+                    poolFrames[#poolFrames + 1] = {
+                        cooldownID  = cdID,
+                        layoutIndex = layoutIdx or 0,
+                    }
+                end
+            end
+        end)
+        if #poolFrames > 0 then
+            srcFrames = poolFrames
+        end
+    end
 
-    -- PRIMARY (was FALLBACK): data provider API.  GetViewerCooldownIDs() returns all
-    -- configured spell IDs; aura data below acts as the active filter.
+    -- FALLBACK: data provider API.  GetViewerCooldownIDs() returns ALL configured spell IDs
+    -- (active or not), so aura data below acts as the active filter.
     if not srcFrames then
         local cooldownIDs = GetViewerCooldownIDs()
         if #cooldownIDs == 0 then return {} end
@@ -456,30 +472,6 @@ local function FetchBuffBarData()
                             duration       = auraData.duration,
                             expirationTime = auraData.expirationTime,
                         }
-                    else
-                        -- Fallback: show tracked spell cooldowns even when no aura exists.
-                        -- Many tracked bars represent pure cooldowns (no UNIT_AURA payload),
-                        -- so aura-only filtering makes custom bars appear empty.
-                        local cdInfo = C_Spell.GetSpellCooldown(spellID)
-                        if cdInfo and cdInfo.startTime and cdInfo.duration
-                           and cdInfo.startTime > 0 and cdInfo.duration > 0.75 then
-                            local texture = nil
-                            local name = ""
-                            local texOk, tex = pcall(C_Spell.GetSpellTexture, spellID)
-                            if texOk then texture = tex end
-                            local nameOk, spellName = pcall(C_Spell.GetSpellName, spellID)
-                            if nameOk and spellName then name = spellName end
-
-                            auraResult = {
-                                cooldownID     = src.cooldownID,
-                                spellID        = spellID,
-                                layoutIndex    = src.layoutIndex,
-                                name           = name,
-                                texture        = texture,
-                                duration       = cdInfo.duration,
-                                expirationTime = cdInfo.startTime + cdInfo.duration,
-                            }
-                        end
                     end
                 end)
                 if auraResult.cooldownID then
@@ -530,17 +522,6 @@ local function UpdateCustomBarData()
         activeCustomBars[#activeCustomBars + 1] = bar
     end
 
-    -- EditMode-exit safety fallback:
-    -- If custom data resolves to zero bars, fall back to Blizzard's native viewer
-    -- so tracked bars remain visible instead of showing nothing.
-    if #activeCustomBars == 0 then
-        SetViewerHidden(false)
-        if customContainer then customContainer:Hide() end
-    else
-        SetViewerHidden(true)
-        if customContainer then customContainer:Show() end
-    end
-
     return activeCustomBars
 end
 
@@ -564,7 +545,7 @@ local function UpdateCustomBarProgress()
 end
 
 -- Hide Blizzard's viewer children, show it during Edit Mode for positioning
-SetViewerHidden = function(hide)
+local function SetViewerHidden(hide)
     local viewer = SafeGetViewer("BuffBarCooldownViewer")
     if not viewer then return end
     if hide then
@@ -843,7 +824,7 @@ local function UpdateCustomIconData()
 end
 
 -- Hide/show Blizzard's BuffIcon viewer
-SetIconViewerHidden = function(hide)
+local function SetIconViewerHidden(hide)
     local viewer = SafeGetViewer("BuffIconCooldownViewer")
     if not viewer then return end
     if hide then
@@ -2568,14 +2549,10 @@ local function Initialize()
             end, "SuaviBuffBarCustom")
 
             EventRegistry:RegisterCallback("EditMode.Exit", function()
-                -- BUG-FIX (v0.3.9): Defer SetViewerHidden(true) so it runs AFTER Blizzard's
-                -- EditMode.Exit processing.  Blizzard restores the viewer's alpha to 1 as
-                -- part of its own Exit handler; a synchronous SetAlpha(0) fires first and
-                -- gets overwritten, leaving the Blizzard viewer fully visible afterward.
-                C_Timer.After(0.15, function() SetViewerHidden(true) end)
+                SetViewerHidden(true)
                 if customContainer then customContainer:Show() end
                 -- Refresh after Edit Mode repositioning
-                C_Timer.After(0.3, function()
+                C_Timer.After(0.2, function()
                     UpdateCustomBarData()
                     LayoutBuffBars()
                 end)
@@ -2629,10 +2606,9 @@ local function Initialize()
             end, "SuaviBuffIconCustom")
 
             EventRegistry:RegisterCallback("EditMode.Exit", function()
-                -- BUG-FIX (v0.3.9): Defer so we run after Blizzard restores alpha to 1.
-                C_Timer.After(0.15, function() SetIconViewerHidden(true) end)
+                SetIconViewerHidden(true)
                 if customIconContainer then customIconContainer:Show() end
-                C_Timer.After(0.3, function()
+                C_Timer.After(0.2, function()
                     UpdateCustomIconData()
                     LayoutBuffIcons()
                 end)

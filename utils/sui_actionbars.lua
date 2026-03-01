@@ -605,18 +605,17 @@ local function ApplyExtraButtonSettings(buttonType)
                         if not (ss and (ss._editModeActive or ss.alwaysShow)) then
                             holder:Show()
                             holder:EnableMouse(true)
-                            -- BLOCKED-FIX (v0.3.10): Never call :Show()/:Hide() on blizzFrame
-                            -- (ExtraActionBarFrame / ZoneAbilityFrame).  These are protected
-                            -- named Blizzard frames; calling Show/Hide from addon code raises
-                            -- ADDON_ACTION_BLOCKED regardless of defer/timer (session 4832).
-                            -- The holder is our frame; blizzFrame visibility is Blizzard's concern.
+                            blizzFrame:Show()
+                            blizzFrame:EnableMouse(true)
                         end
                     end)
                 else
-                    -- No content - hide holder and block mouse; do NOT touch blizzFrame.
+                    -- No content - hide both holder and Blizzard frame to prevent mouse blocking
                     C_Timer.After(0, function()
                         holder:Hide()
                         holder:EnableMouse(false)
+                        blizzFrame:Hide()
+                        blizzFrame:EnableMouse(false)
                     end)
                 end
             end

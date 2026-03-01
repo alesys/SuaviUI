@@ -97,7 +97,6 @@ local styleConfig = {
 local styledButtons = {}       -- [button] = true when square-styled
 local buttonBorders = {}       -- [button] = border Frame
 local viewerRefreshPending = {} -- [viewerFrame] = true when a deferred refresh is queued
-local pandemicHooked = setmetatable({}, { __mode = "k" }) -- [button] = true if hook installed
 -- TAINT-FIX: Track which regions we replaced with BASE_SQUARE_MASK in a module-level
 -- weak table instead of writing __sui_set6707800 directly onto Blizzard's texture objects.
 -- Writing ANY field onto a Blizzard-owned region taints it; tainted regions bleed taint
@@ -131,26 +130,6 @@ local function ApplySquareStyle(button, viewerSettingName)
     -- Safe operations: SetSwipeTexture (changes visual texture, not frame geometry).
 
     local iconTexture = button.Icon or button.icon or button.texture or button.Texture
-    local iconSourceTexture = nil
-    if iconTexture and iconTexture.GetTexture then
-        pcall(function() iconSourceTexture = iconTexture:GetTexture() end)
-    end
-
-    -- If the icon has no source texture, treat it as inactive/placeholder and hide border.
-    -- This prevents empty black square borders from remaining visible when Blizzard keeps
-    -- pooled item frames shown but with no icon payload.
-    if not iconSourceTexture then
-        if buttonBorders[button] then buttonBorders[button]:Hide() end
-        return
-    end
-
-    -- Placeholder / empty-slot texture: treat as inactive and hide border.
-    -- Edit Mode exit can leave pooled item frames present with this texture id,
-    -- which otherwise produces "empty black squares" (border visible, icon blank).
-    if iconSourceTexture == 6707800 then
-        if buttonBorders[button] then buttonBorders[button]:Hide() end
-        return
-    end
     if iconTexture and not (issecretvalue and issecretvalue(iconTexture)) then
         -- Calculate zoom-based texture coordinates (UV crop only — no layout change)
         local zoomKey = "cooldownManager_squareIconsZoom_" .. viewerSettingName
@@ -180,7 +159,7 @@ local function ApplySquareStyle(button, viewerSettingName)
             local atlas = region:GetAtlas()
 
             -- Safe texture comparison with issecretvalue guards
-            if texture and not (issecretvalue and issecretvalue(texture)) and texture == 6707800 and region ~= iconTexture then
+            if texture and not (issecretvalue and issecretvalue(texture)) and texture == 6707800 then
                 -- TAINT-FIX (v0.3.8): Do NOT replace the region texture with BASE_SQUARE_MASK.
                 -- Without SetSize/SetPoint (removed to prevent taint), the region renders at
                 -- full button size and square_mask.tga appears as an opaque white overlay on
@@ -192,15 +171,6 @@ local function ApplySquareStyle(button, viewerSettingName)
                 region:SetAlpha(0)
             end
         end
-    end
-
-    -- BUG-FIX (v0.3.9): If the CDM item button is hidden (Blizzard pooled it back after
-    -- Edit Mode exit or when no cooldown is active), hide the border immediately.
-    -- The border is parented to UIParent so it does NOT inherit button visibility —
-    -- without this guard it remains floating as an empty black square on screen.
-    if not button:IsShown() then
-        if buttonBorders[button] then buttonBorders[button]:Hide() end
-        return
     end
 
     -- Create/update inset black border.
@@ -271,6 +241,31 @@ local function RestoreOriginalStyle(button, viewerSettingName)
         end
     end
 
+    -- Restore NCDM-stripped masks (if NCDM was applied)
+    if button._originalMasks then
+        local textures = { button.Icon, button.icon }
+        for _, tex in ipairs(textures) do
+            if tex and button._originalMasks[tostring(tex)] then
+                for _, mask in ipairs(button._originalMasks[tostring(tex)]) do
+                    if tex.AddMaskTexture then
+                        tex:AddMaskTexture(mask)
+                    end
+                end
+            end
+        end
+    end
+
+    -- Restore NCDM-stripped NormalTexture
+    if button._originalNormalAlpha and button.NormalTexture then
+        button.NormalTexture:SetAlpha(button._originalNormalAlpha)
+    end
+    if button._originalNormalAlpha and button.GetNormalTexture then
+        local normalTex = button:GetNormalTexture()
+        if normalTex then
+            normalTex:SetAlpha(button._originalNormalAlpha)
+        end
+    end
+
     -- Restore hidden overlay textures
     for _, region in next, { button:GetRegions() } do
         if region:IsObjectType("Texture") then
@@ -291,23 +286,17 @@ local function RestoreOriginalStyle(button, viewerSettingName)
     end
 
     styledButtons[button] = nil
+    
+    -- Also restore NCDM styling if available (clears NCDM's styling flags)
+    if ns.NCDM and ns.NCDM.RestoreIcon then
+        ns.NCDM.RestoreIcon(button)
+    end
 end
 
 -- Process all children of a viewer
 local function ProcessViewer(viewer, viewerSettingName, applyStyle)
     if not viewer then
         return
-    end
-
-    -- Pre-pass: hide borders for any styled button that is no longer shown.
-    -- Complements the 1.5s cleanup ticker; runs on every ProcessViewer call for
-    -- faster cleanup when RefreshAll is triggered by SPELL_UPDATE_COOLDOWN / UNIT_AURA.
-    for button in pairs(styledButtons) do
-        local shown = false
-        pcall(function() shown = button:IsShown() end)
-        if not shown and buttonBorders[button] then
-            buttonBorders[button]:Hide()
-        end
     end
 
     local children = {}
@@ -327,8 +316,8 @@ local function ProcessViewer(viewer, viewerSettingName, applyStyle)
                 end
 
                 -- Hook pandemic alerts (guard against tainted child)
-                if (not DISABLE_PANDEMIC_ALERT_HOOK) and not (issecretvalue and issecretvalue(child)) and child.TriggerPandemicAlert and not pandemicHooked[child] then
-                    pandemicHooked[child] = true
+                if (not DISABLE_PANDEMIC_ALERT_HOOK) and not (issecretvalue and issecretvalue(child)) and child.TriggerPandemicAlert and not child._suiStyleHooked then
+                    child._suiStyleHooked = true
                     hooksecurefunc(child, "TriggerPandemicAlert", function()
                         -- TAINT-FIX: Defer ALL work to avoid tainting execution context.
                         -- TriggerPandemicAlert fires inside RefreshData's event chain.
@@ -462,45 +451,31 @@ function StyledIcons:Enable()
     if not areHooksInitialized then
         areHooksInitialized = true
 
-        -- ROOT-CAUSE FIX (v0.3.10): hooksecurefunc(viewerFrame, "RefreshLayout", ...)
-        -- silently fails when CDM viewer frames are forbidden tables in WoW 12.x.
-        -- pcall catches the error, sets areHooksInitialized=true, but installs no hook.
-        -- Without a working hook, ProcessViewer/ApplySquareStyle never re-runs after
-        -- CDM item pool changes (enter/exit combat, spell CD changes), leaving orphaned
-        -- border frames floating on screen as black squares.
-        --
-        -- Fix: replace viewer hooks with SPELL_UPDATE_COOLDOWN + UNIT_AURA game events
-        -- for re-styling, plus a periodic cleanup ticker for border orphan removal.
-        local refreshEventFrame = CreateFrame("Frame")
-        refreshEventFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
-        refreshEventFrame:RegisterEvent("UNIT_AURA")
-        refreshEventFrame:SetScript("OnEvent", function(_, event, unit)
-            if event == "SPELL_UPDATE_COOLDOWN"
-            or (event == "UNIT_AURA" and (unit == "player" or unit == "target")) then
-                if viewerRefreshPending._global then return end
-                viewerRefreshPending._global = true
-                C_Timer.After(0.15, function()
-                    viewerRefreshPending._global = nil
-                    if not isModuleStyledEnabled then return end
-                    pcall(function() StyledIcons:RefreshAll() end)
+        for viewerName, _ in pairs(viewersSettingKey) do
+            local viewerFrame = _G[viewerName]
+            if viewerFrame then
+                pcall(hooksecurefunc, viewerFrame, "RefreshLayout", function()
+                    -- TAINT-FIX: Defer ALL work to avoid tainting execution context.
+                    -- Even reads of isModuleStyledEnabled (local) are safe, but all
+                    -- Blizzard frame access must be deferred.
+                    -- LOW-LEVEL SAFETY: Debounce to prevent timer flooding on empty viewers.
+                    if viewerRefreshPending[viewerFrame] then return end
+                    viewerRefreshPending[viewerFrame] = true
+                    C_Timer.After(0, function()
+                        viewerRefreshPending[viewerFrame] = nil
+                        if not isModuleStyledEnabled then
+                            return
+                        end
+                        pcall(function()
+                            StyledIcons:RefreshViewer(viewerName)
+                            if viewerName == "UtilityCooldownViewer" then
+                                StyledIcons:ApplyNormalizedSize()
+                            end
+                        end)
+                    end)
                 end)
             end
-        end)
-
-        -- BORDER CLEANUP TICKER: sweep styledButtons every 1.5s and hide any border
-        -- whose CDM item button is no longer shown (pooled/hidden by Blizzard).
-        -- This is the primary safety net — event triggers cover cooldown transitions,
-        -- the ticker covers Edit Mode exit and other non-event-driven pool changes.
-        C_Timer.NewTicker(1.5, function()
-            if not isModuleStyledEnabled then return end
-            for button, _ in pairs(styledButtons) do
-                local shown = false
-                pcall(function() shown = button:IsShown() end)
-                if not shown and buttonBorders[button] then
-                    buttonBorders[button]:Hide()
-                end
-            end
-        end)
+        end
     end
 
     self:RefreshAll()

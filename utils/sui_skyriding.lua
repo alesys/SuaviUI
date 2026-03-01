@@ -843,7 +843,6 @@ local function UpdateVisibility()
         -- NOT just being in a zone where gliding is possible (canGlideNow).
         -- canGlideNow is true whenever you are in a skyriding-capable zone,
         -- even while standing on the ground, so it cannot be used here.
-        local mounted = IsMounted and IsMounted() or false
         if isGliding then
             -- Actively gliding - show immediately (no fade-in lag)
             fadeStart = 0  -- Cancel any ongoing fade
@@ -856,21 +855,7 @@ local function UpdateVisibility()
             end
             skyridingFrame:Show()
         else
-            -- Hard-hide on ground/not mounted to avoid lingering visibility after
-            -- Edit Mode exit or stale fade state.
-            fadeStart = 0
-            skyridingFrame:SetAlpha(0)
-            if abilityIcon then
-                abilityIcon:SetAlpha(0)
-                if abilityIconCooldown then
-                    abilityIconCooldown:SetAlpha(0)
-                end
-            end
-            if not mounted then
-                skyridingFrame:Hide()
-            else
-                StartSkyridingFade(0)
-            end
+            StartSkyridingFade(0)
         end
 
     elseif visibility == "AUTO" then
