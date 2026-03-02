@@ -533,6 +533,18 @@ local function BuildVigorBarSettings()
     order = order + 1
     
     -- Visibility Mode dropdown
+    -- Uses generator (not values) so SetDefaultText initialises the display on every
+    -- open — values-based dropdowns don't call get() to set initial display text.
+    local VISIBILITY_OPTIONS = {
+        { value = "AUTO",        text = "Auto (fade when grounded)" },
+        { value = "FLYING_ONLY", text = "Only When Flying"           },
+        { value = "ALWAYS",      text = "Always Visible"             },
+    }
+    local VISIBILITY_LABEL = {}
+    for _, opt in ipairs(VISIBILITY_OPTIONS) do
+        VISIBILITY_LABEL[opt.value] = opt.text
+    end
+
     table.insert(settings, {
         parentId = "CATEGORY_VISIBILITY_VIGOR",
         order = order,
@@ -540,11 +552,20 @@ local function BuildVigorBarSettings()
         kind = LEM.SettingType.Dropdown,
         default = "AUTO",
         useOldStyle = true,
-        values = {
-            {value = "ALWAYS", text = "Always Visible"},
-            {value = "FLYING_ONLY", text = "Only When Flying"},
-            {value = "AUTO", text = "Auto (fade when grounded)"},
-        },
+        generator = function(dropdown, rootDescription, settingObject)
+            local layoutName = LEM.GetActiveLayoutName() or "Default"
+            local currentValue = settingObject.get(layoutName)
+            dropdown:SetDefaultText(VISIBILITY_LABEL[currentValue] or "Auto (fade when grounded)")
+
+            for _, opt in ipairs(VISIBILITY_OPTIONS) do
+                local optText = opt.text
+                local optValue = opt.value
+                rootDescription:CreateButton(optText, function()
+                    dropdown:SetDefaultText(optText)
+                    settingObject.set(layoutName, optValue)
+                end)
+            end
+        end,
         get = function(layoutName)
             local s = GetSkyridingSettings()
             return s and s.visibility or "AUTO"

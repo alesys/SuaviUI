@@ -354,22 +354,36 @@ end
 
 -- Read cooldownIDs for tracked bars using global data provider
 -- (viewer:GetCooldownIDs() is a Lua mixin method on a forbidden table — fails in 12.0.5)
+-- BUG-FIX: Provider and C API are split into separate pcalls.  When the provider's
+-- GetOrderedCooldownIDsForCategory throws (CheckBuildDisplayData timing issue at load),
+-- the old single-pcall version caught the throw at the top level, skipped the C API
+-- fallback entirely, and returned {} — silencing all bars.
 local function GetViewerCooldownIDs()
-    local ok, ids = pcall(function()
+    -- Path 1: provider (active-only, more accurate when display data is ready)
+    local ids = nil
+    pcall(function()
         local settings = CooldownViewerSettings
         if settings and settings.GetDataProvider then
             local provider = settings:GetDataProvider()
             if provider and provider.GetOrderedCooldownIDsForCategory then
-                return provider:GetOrderedCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBar, true)
+                local result = provider:GetOrderedCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBar, true)
+                if type(result) == "table" and #result > 0 then
+                    ids = result
+                end
             end
         end
+    end)
+    if ids then return ids end
+    -- Path 2: C API fallback — returns ALL configured IDs (not just active ones).
+    -- Aura lookup in FetchBuffBarData acts as the active filter.
+    local ok, result = pcall(function()
         if C_CooldownViewer and C_CooldownViewer.GetCooldownIDsForCategory then
             return C_CooldownViewer.GetCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBar)
         end
         return nil
     end)
-    if not ok or type(ids) ~= "table" then return {} end
-    return ids
+    if ok and type(result) == "table" then return result end
+    return {}
 end
 
 -- Fetch active aura data using clean C APIs only (no Blizzard frame reads)
@@ -388,13 +402,17 @@ local function FetchBuffBarData()
             if not (pool and pool.EnumerateActive) then return end
             for frame in pool:EnumerateActive() do
                 if not frame then return end
-                local cdID, active, layoutIdx
+                -- BUG-FIX: EnumerateActive() yields only active (acquired) frames.
+                -- Old code read frame.isActive and required it to be truthy. If the inner
+                -- pcall fails (e.g. forbidden frame), active stays nil and the frame is
+                -- silently dropped even though EnumerateActive already guarantees it's active.
+                -- Fix: only read the fields we actually need (cdID, layoutIdx).
+                local cdID, layoutIdx
                 pcall(function()
                     cdID      = frame.cooldownID
-                    active    = frame.isActive
                     layoutIdx = frame.layoutIndex
                 end)
-                if cdID and active then
+                if cdID then
                     poolFrames[#poolFrames + 1] = {
                         cooldownID  = cdID,
                         layoutIndex = layoutIdx or 0,
@@ -645,22 +663,33 @@ end
 
 -- Read cooldownIDs for tracked buff icons using global data provider
 -- (viewer:GetCooldownIDs() is a Lua mixin method on a forbidden table — fails in 12.0.5)
+-- BUG-FIX: Same as GetViewerCooldownIDs — split into two independent pcalls so the
+-- C API fallback still runs when the provider's GetOrderedCooldownIDsForCategory throws.
 local function GetIconViewerCooldownIDs()
-    local ok, ids = pcall(function()
+    -- Path 1: provider (active-only)
+    local ids = nil
+    pcall(function()
         local settings = CooldownViewerSettings
         if settings and settings.GetDataProvider then
             local provider = settings:GetDataProvider()
             if provider and provider.GetOrderedCooldownIDsForCategory then
-                return provider:GetOrderedCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBuff, true)
+                local result = provider:GetOrderedCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBuff, true)
+                if type(result) == "table" and #result > 0 then
+                    ids = result
+                end
             end
         end
+    end)
+    if ids then return ids end
+    -- Path 2: C API fallback — all configured IDs; aura lookup in FetchBuffIconData filters active.
+    local ok, result = pcall(function()
         if C_CooldownViewer and C_CooldownViewer.GetCooldownIDsForCategory then
             return C_CooldownViewer.GetCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBuff)
         end
         return nil
     end)
-    if not ok or type(ids) ~= "table" then return {} end
-    return ids
+    if ok and type(result) == "table" then return result end
+    return {}
 end
 
 -- Fetch active aura data for icons
@@ -676,13 +705,14 @@ local function FetchBuffIconData()
             if not (pool and pool.EnumerateActive) then return end
             for frame in pool:EnumerateActive() do
                 if not frame then return end
-                local cdID, active, layoutIdx
+                -- BUG-FIX: same as FetchBuffBarData — EnumerateActive guarantees active.
+                -- Drop the frame.isActive read so a pcall failure can't silently drop frames.
+                local cdID, layoutIdx
                 pcall(function()
                     cdID      = frame.cooldownID
-                    active    = frame.isActive
                     layoutIdx = frame.layoutIndex
                 end)
-                if cdID and active then
+                if cdID then
                     poolFrames[#poolFrames + 1] = {
                         cooldownID  = cdID,
                         layoutIndex = layoutIdx or 0,
@@ -2547,9 +2577,14 @@ local function Initialize()
             end, "SuaviBuffBarCustom")
 
             EventRegistry:RegisterCallback("EditMode.Exit", function()
-                SetViewerHidden(true)
-                if customContainer then customContainer:Show() end
-                -- Refresh after Edit Mode repositioning
+                -- Defer viewer hide + container show to after all synchronous EditMode.Exit
+                -- processing. Our callback fires before Blizzard's CDM handler, so any
+                -- alpha/visibility reset Blizzard performs in the same frame would override
+                -- a synchronous SetAlpha(0) call here.
+                C_Timer.After(0, function()
+                    SetViewerHidden(true)
+                    if customContainer then customContainer:Show() end
+                end)
                 C_Timer.After(0.2, function()
                     UpdateCustomBarData()
                     LayoutBuffBars()
@@ -2604,8 +2639,11 @@ local function Initialize()
             end, "SuaviBuffIconCustom")
 
             EventRegistry:RegisterCallback("EditMode.Exit", function()
-                SetIconViewerHidden(true)
-                if customIconContainer then customIconContainer:Show() end
+                -- Same deferral as bar viewer: let Blizzard's CDM exit handler run first.
+                C_Timer.After(0, function()
+                    SetIconViewerHidden(true)
+                    if customIconContainer then customIconContainer:Show() end
+                end)
                 C_Timer.After(0.2, function()
                     UpdateCustomIconData()
                     LayoutBuffIcons()
@@ -2837,6 +2875,11 @@ end)
 SUI_BuffBar.LayoutIcons = LayoutBuffIcons
 SUI_BuffBar.LayoutBars = LayoutBuffBars
 SUI_BuffBar.Initialize = Initialize
+-- Feature-flag exports: cooldownmanager.lua checks these to skip its own bar/icon layout
+-- when sui_buffbar is managing them. Without these exports cooldownmanager reads nil and
+-- falls through to its own (now redundant) layout logic on the hidden Blizzard viewers.
+SUI_BuffBar.USE_CUSTOM_BARS  = USE_CUSTOM_BARS
+SUI_BuffBar.USE_CUSTOM_ICONS = USE_CUSTOM_ICONS
 
 -- Force refresh function (can be called from GUI)
 function SUI_BuffBar.Refresh()
@@ -2878,10 +2921,6 @@ function SUI_BuffBar.Refresh()
     LayoutBuffIcons()
     LayoutBuffBars()
 end
-
--- Expose feature flags for external queries
-SUI_BuffBar.USE_CUSTOM_BARS = USE_CUSTOM_BARS
-SUI_BuffBar.USE_CUSTOM_ICONS = USE_CUSTOM_ICONS
 
 -- Global refresh function for GUI
 _G.SuaviUI_RefreshBuffBar = SUI_BuffBar.Refresh

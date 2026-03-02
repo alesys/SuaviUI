@@ -194,8 +194,13 @@ local function ApplyHideSettings()
                         end
 
                         if shouldHideNow then
-                            self:Hide()
-                            self:EnableMouse(false)  -- Prevent hidden frame from blocking clicks
+                            C_Timer.After(0, function()
+                                if EditModeManagerFrame and EditModeManagerFrame:IsShown() then return end
+                                if self and self.Hide then
+                                    self:Hide()
+                                    self:EnableMouse(false)  -- Prevent hidden frame from blocking clicks
+                                end
+                            end)
                         end
                     end
                 end)
@@ -466,7 +471,12 @@ end
                 pcall(hooksecurefunc, StatusTrackingBarManager, "Show", function(self)
                     local s = GetSettings()
                     if s and s.hideExperienceBar and s.hideReputationBar then
-                        self:Hide()
+                        C_Timer.After(0, function()
+                            if EditModeManagerFrame and EditModeManagerFrame:IsShown() then return end
+                            if self and self.Hide then
+                                self:Hide()
+                            end
+                        end)
                     end
                 end)
             end

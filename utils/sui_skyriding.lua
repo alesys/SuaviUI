@@ -792,6 +792,9 @@ local function StartSkyridingFade(targetAlpha)
 
     local currentAlpha = skyridingFrame:GetAlpha()
     if math.abs(currentAlpha - targetAlpha) < 0.01 then return end
+    -- Don't restart if already fading toward this target (prevents 50ms OnUpdate
+    -- from resetting fadeStart every tick and turning 0.3s fade into a slow crawl)
+    if fadeStart > 0 and math.abs(fadeTargetAlpha - targetAlpha) < 0.01 then return end
 
     fadeStart = GetTime()
     fadeStartAlpha = currentAlpha
@@ -810,6 +813,14 @@ local function UpdateVisibility()
        and _G.SuaviUI_SkyridingEditMode_IsPreviewActive() then
         skyridingFrame:Show()
         skyridingFrame:SetAlpha(1)
+        fadeStart = 0  -- Cancel any in-progress fade so it can't override alpha
+        -- Ability icon starts hidden and is only shown by UpdateAbilityIcon when
+        -- canGlideNow=true. In Edit Mode (ground) that never fires, so force-show here.
+        if abilityIcon then
+            abilityIcon:Show()
+            abilityIcon:SetAlpha(1)
+            if abilityIconCooldown then abilityIconCooldown:SetAlpha(1) end
+        end
         return
     end
 

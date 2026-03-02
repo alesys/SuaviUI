@@ -12,6 +12,10 @@ local LSM = LibStub("LibSharedMedia-3.0")
 
 local IS_MIDNIGHT = select(4, GetBuildInfo()) >= 120000
 
+-- Safety fallback: extra action/zone ability frame reparenting is taint-prone
+-- on recent client builds during Edit Mode/action bar updates.
+local DISABLE_EXTRA_BUTTON_CUSTOMIZATION = true
+
 ---------------------------------------------------------------------------
 -- CONSTANTS
 ---------------------------------------------------------------------------
@@ -456,6 +460,8 @@ end
 
 -- Apply settings (scale, position, artwork) to an extra button frame
 local function ApplyExtraButtonSettings(buttonType)
+    if DISABLE_EXTRA_BUTTON_CUSTOMIZATION then return end
+
     if InCombatLockdown() then
         ActionBars.pendingExtraButtonRefresh = true
         return
@@ -647,6 +653,8 @@ local hookingSetPoint = false
 
 -- Hook Blizzard frames to prevent them from repositioning
 HookExtraButtonPositioning = function()
+    if DISABLE_EXTRA_BUTTON_CUSTOMIZATION then return end
+
     -- Hook ExtraActionBarFrame
     if ExtraActionBarFrame and not ExtraActionBarFrame._quiHooked then
         ExtraActionBarFrame._quiHooked = true
@@ -714,6 +722,8 @@ end
 
 -- Initialize extra button holders
 local function InitializeExtraButtons()
+    if DISABLE_EXTRA_BUTTON_CUSTOMIZATION then return end
+
     if InCombatLockdown() then
         ActionBars.pendingExtraButtonInit = true
         return
@@ -750,6 +760,8 @@ end
 
 -- Refresh extra button settings (called from options)
 local function RefreshExtraButtons()
+    if DISABLE_EXTRA_BUTTON_CUSTOMIZATION then return end
+
     if InCombatLockdown() then
         ActionBars.pendingExtraButtonRefresh = true
         return

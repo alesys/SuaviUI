@@ -1380,7 +1380,7 @@ local defaults = {
             useClassColorSecondWind = false,
             secondWindColor = { 1.0, 0.8, 0.2, 1 },       -- FFCC33
             secondWindBackgroundColor = { 0.102, 0.102, 0.102, 0.301 }, -- 1A1A1A with lower alpha
-            visibility = "FLYING_ONLY",
+            visibility = "AUTO",
             fadeDelay = 1,
             fadeDuration = 0.3,
         },
