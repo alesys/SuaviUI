@@ -5,6 +5,8 @@
 local _, SUI = ...
 
 local CooldownAdvanced = {}
+local FORCE_DISABLE_CDM_ADVANCED = false
+local rotationGlowState = setmetatable({}, { __mode = "k" })
 
 -- Get setting value from profile
 local function GetSetting(key, default)
@@ -184,9 +186,11 @@ function CooldownAdvanced.ApplyRotationHighlight(icon, viewerType)
     
     if not enabled then
         -- Remove any existing highlights
-        if icon.suiRotationGlow then
-            icon.suiRotationGlow:Hide()
-            icon.suiRotationGlow = nil
+        if rotationGlowState[icon] then
+            if SUI.CustomGlow then
+                SUI.CustomGlow.RemoveGlow(icon)
+            end
+            rotationGlowState[icon] = nil
         end
         return
     end
@@ -200,7 +204,7 @@ function CooldownAdvanced.ApplyRotationHighlight(icon, viewerType)
     
     if isRecommended then
         -- Apply glow effect using SuaviUI's custom glow system
-        if SUI.CustomGlow and not icon.suiRotationGlow then
+        if SUI.CustomGlow and not rotationGlowState[icon] then
             SUI.CustomGlow.CreateGlow(icon, {
                 glowType = "Pixel Glow",
                 color = {1, 1, 0, 1},  -- Yellow highlight
@@ -208,15 +212,15 @@ function CooldownAdvanced.ApplyRotationHighlight(icon, viewerType)
                 frequency = 0.25,
                 thickness = 2,
             })
-            icon.suiRotationGlow = true
+            rotationGlowState[icon] = true
         end
     else
         -- Remove highlight
-        if icon.suiRotationGlow then
+        if rotationGlowState[icon] then
             if SUI.CustomGlow then
                 SUI.CustomGlow.RemoveGlow(icon)
             end
-            icon.suiRotationGlow = nil
+            rotationGlowState[icon] = nil
         end
     end
 end
@@ -247,6 +251,9 @@ end
 
 -- Apply all advanced features to a single icon
 function CooldownAdvanced.ApplyAllFeatures(icon, viewerType)
+    if FORCE_DISABLE_CDM_ADVANCED then
+        return
+    end
     CooldownAdvanced.ApplySwipeColors(icon)
     
     if viewerType == "Utility" then
@@ -258,6 +265,9 @@ end
 
 -- Refresh all advanced features for a specific viewer
 function CooldownAdvanced.RefreshViewerFeatures(viewerName, viewerType)
+    if FORCE_DISABLE_CDM_ADVANCED then
+        return
+    end
     CooldownAdvanced.RefreshViewerSwipeColors(viewerName)
     
     if viewerType == "Utility" then
@@ -269,6 +279,9 @@ end
 
 -- Refresh all advanced features across all viewers
 function CooldownAdvanced.RefreshAllFeatures()
+    if FORCE_DISABLE_CDM_ADVANCED then
+        return
+    end
     local viewers = {
         {"EssentialCooldownViewer", "Essential"},
         {"UtilityCooldownViewer", "Utility"},
@@ -285,13 +298,21 @@ end
 
 -- Hook cooldown updates to refresh dimming and colors
 local function HookCooldownUpdates()
+    if FORCE_DISABLE_CDM_ADVANCED then
+        return
+    end
     local frame = CreateFrame("Frame")
     frame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
     frame:RegisterEvent("UNIT_AURA")
     frame:SetScript("OnEvent", function(self, event, ...)
         if event == "SPELL_UPDATE_COOLDOWN" then
+            -- TAINT-FIX (session 4924): Calling SetSwipeColor on CDM item frames from addon
+            -- context during combat fires constantly (every GCD) and risks tainting CDM frame
+            -- state. Skip all CDM frame writes while in combat lockdown; dimming and swipe
+            -- colors are refreshed out-of-combat and on the next UNIT_AURA below.
+            if InCombatLockdown() then return end
             CooldownAdvanced.RefreshUtilityDimming()
-            
+
             -- Refresh swipe colors for all viewers
             local viewers = {"EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer"}
             for _, viewerName in ipairs(viewers) do

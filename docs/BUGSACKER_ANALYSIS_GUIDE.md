@@ -210,6 +210,20 @@ Session 4811 hit different gameplay scenarios (totem usage, aura changes, Damage
 
 ---
 
+## External Source Guardrails (2026-03-03 refresh)
+
+When reviewing `CooldownManagerCentered` for ideas, treat it as a layout-algorithm reference only, not a taint-safety reference for CDM object state.
+
+- Do **not** port CMC region/frame marker writes such as:
+  - `region.__wt_set6707800 = true` (`modules/styled.lua`)
+  - `child._wt_isHooked = true` / `frame._wt_isHooked = true` (`modules/cooldownManager.lua`)
+- Do **not** reintroduce provider build calls in custom buff/icon pipelines (`CheckBuildDisplayData()`-style paths) when C API category sets are sufficient.
+- Do **not** assign addon closures into Blizzard frame method fields (for example `viewer.GetScaledRect = function ... end`).
+
+Use module-level weak tables for addon state and keep Blizzard CDM objects field-clean from addon writes.
+
+---
+
 ## Audit Matrix (One-Group Isolation)
 
 Use this matrix to enable only one feature group at a time from [utils/utils.xml](utils/utils.xml), then run a short combat scenario and inspect the newest BugSack session.
@@ -310,4 +324,24 @@ Use this matrix to enable only one feature group at a time from [utils/utils.xml
 - Unique error types:
 - Top stack source:
 - Verdict: `clean` / `tainted`
+
+---
+
+### Sessions 4941-4942 - ActionBar/EditMode taint regression and emergency mitigation
+
+**Observed (2026-03-03):**
+- `[ADDON_ACTION_BLOCKED] MainActionBar:ClearAllPointsBase()` during Edit Mode layout updates.
+- `Blizzard_ActionBar/Shared/ActionButton.lua:609` secret number tainted by SuaviUI (ActionButton1 update path).
+- Session 4941 also includes CDM Edit Mode errors (`CooldownViewer.lua:706`, `:877`).
+
+**Likely root cause:**
+Direct addon field writes on Blizzard action button/bar objects (`_qui*` markers and hook-state fields) can taint protected ActionBar/EditMode execution paths.
+
+**Emergency fix applied (current tree):**
+- `utils/sui_actionbars.lua`: `DISABLE_STANDARD_ACTIONBAR_CUSTOMIZATION = true`
+- This disables standard actionbar skin/fade/usability mutation paths and keeps only lock-state sync.
+
+**Expected next validation run:**
+- `MainActionBar:ClearAllPointsBase()` should be gone.
+- `ActionButton.lua:609` taint should be gone after a clean `/reload` (full restart preferred if taint persists).
 

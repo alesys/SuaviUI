@@ -5,6 +5,8 @@
 local _, SUI = ...
 
 local CooldownFonts = {}
+local stackTextByIcon = setmetatable({}, { __mode = "k" })
+local keybindTextByIcon = setmetatable({}, { __mode = "k" })
 
 -- Font flag options
 local FONT_FLAGS = {
@@ -117,8 +119,9 @@ function CooldownFonts.ApplyStackFont(icon, viewerType)
     
     if not enabled then
         -- Hide stack text if disabled
-        if icon.StackText then
-            icon.StackText:Hide()
+        local stackText = stackTextByIcon[icon]
+        if stackText then
+            stackText:Hide()
         end
         return
     end
@@ -147,22 +150,24 @@ function CooldownFonts.ApplyStackFont(icon, viewerType)
     local font, size, flagsStr = CreateFontString(globalFont, fontSize, globalFlags)
     
     -- Create or update stack text
-    if not icon.StackText then
-        icon.StackText = icon:CreateFontString(nil, "OVERLAY")
+    local stackText = stackTextByIcon[icon]
+    if not stackText then
+        stackText = icon:CreateFontString(nil, "OVERLAY")
+        stackTextByIcon[icon] = stackText
     end
     
-    icon.StackText:SetFont(font, size, flagsStr)
-    icon.StackText:ClearAllPoints()
-    icon.StackText:SetPoint(anchor, icon, anchor, offsetX, offsetY)
-    icon.StackText:Show()
+    stackText:SetFont(font, size, flagsStr)
+    stackText:ClearAllPoints()
+    stackText:SetPoint(anchor, icon, anchor, offsetX, offsetY)
+    stackText:Show()
     
     -- Hook to show stack count
     if icon.GetStackCount then
         local count = icon:GetStackCount()
         if count and count > 1 then
-            icon.StackText:SetText(tostring(count))
+            stackText:SetText(tostring(count))
         else
-            icon.StackText:SetText("")
+            stackText:SetText("")
         end
     end
 end
@@ -197,8 +202,9 @@ function CooldownFonts.ApplyKeybindFont(icon, viewerType)
     
     if not show then
         -- Hide keybind text if disabled
-        if icon.KeybindText then
-            icon.KeybindText:Hide()
+        local keybindText = keybindTextByIcon[icon]
+        if keybindText then
+            keybindText:Hide()
         end
         return
     end
@@ -221,14 +227,16 @@ function CooldownFonts.ApplyKeybindFont(icon, viewerType)
     local font, size, flagsStr = CreateFontString(globalFont, fontSize, globalFlags)
     
     -- Create or update keybind text
-    if not icon.KeybindText then
-        icon.KeybindText = icon:CreateFontString(nil, "OVERLAY")
+    local keybindText = keybindTextByIcon[icon]
+    if not keybindText then
+        keybindText = icon:CreateFontString(nil, "OVERLAY")
+        keybindTextByIcon[icon] = keybindText
     end
     
-    icon.KeybindText:SetFont(font, size, flagsStr)
-    icon.KeybindText:ClearAllPoints()
-    icon.KeybindText:SetPoint(anchor, icon, anchor, offsetX, offsetY)
-    icon.KeybindText:Show()
+    keybindText:SetFont(font, size, flagsStr)
+    keybindText:ClearAllPoints()
+    keybindText:SetPoint(anchor, icon, anchor, offsetX, offsetY)
+    keybindText:Show()
     
     -- Try to get keybind from action button
     if icon.GetActionSlot then
@@ -236,13 +244,13 @@ function CooldownFonts.ApplyKeybindFont(icon, viewerType)
         if slot then
             local keybind = GetBindingKey("ACTIONBUTTON" .. slot)
             if keybind then
-                icon.KeybindText:SetText(keybind)
+                keybindText:SetText(keybind)
             else
-                icon.KeybindText:SetText("")
+                keybindText:SetText("")
             end
         end
     else
-        icon.KeybindText:SetText("")
+        keybindText:SetText("")
     end
 end
 

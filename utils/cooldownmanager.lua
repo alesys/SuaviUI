@@ -120,6 +120,10 @@ CMC_DEBUG = false
 local function FORCE_DISABLE_CDM_LAYOUT()
     return not GetSetting("cooldownManager_useCenteredStyling", false)
 end
+-- TAINT-SAFE MODE (WoW 12.x): avoid mutating Blizzard CooldownViewer item frames
+-- from addon code. This prevents "secret value tainted by 'SuaviUI'" chains in
+-- Blizzard_CooldownViewer.lua / CooldownViewerItemData.lua.
+local DISABLE_BLIZZARD_VIEWER_MUTATIONS = true
 local PrintDebug = function(...)
     if CMC_DEBUG then
         print("[CMC]", ...)
@@ -139,12 +143,6 @@ local StateTracker = {}
 local ViewerAdapters = {}
 local EventHandler = {}
 
-local HookState = {
-    buffIconHooked = setmetatable({}, { __mode = "k" }),
-    buffBarHooked = setmetatable({}, { __mode = "k" }),
-    viewerRefreshHooked = setmetatable({}, { __mode = "k" }),
-    viewerRefreshPending = setmetatable({}, { __mode = "k" }),
-}
 
 local function DebugPrintSquare(...)
     print("[SuaviUI SquareIcons]", ...)
@@ -419,11 +417,6 @@ function ViewerAdapters.GetBuffIconFrames()
             if child:IsShown() then
                 visible[#visible + 1] = child
             end
-            if not HookState.buffIconHooked[child] then
-                HookState.buffIconHooked[child] = true
-                -- Synchronous hook - hooksecurefunc doesn't taint the caller.
-                pcall(hooksecurefunc, child, "OnActiveStateChanged", StateTracker.MarkBuffIconsDirty)
-            end
         end
     end
     table.sort(visible, function(a, b)
@@ -466,11 +459,6 @@ function ViewerAdapters.GetBuffBarFrames()
         if frame:IsShown() and frame:IsVisible() then
             active[#active + 1] = frame
         end
-        if not HookState.buffBarHooked[frame] and (frame.icon or frame.Icon or frame.bar or frame.Bar) then
-            HookState.buffBarHooked[frame] = true
-            -- Synchronous hook - hooksecurefunc doesn't taint the caller.
-            pcall(hooksecurefunc, frame, "OnActiveStateChanged", StateTracker.MarkBuffBarsDirty)
-        end
     end
     table.sort(active, function(a, b)
         return (a.layoutIndex or 0) < (b.layoutIndex or 0)
@@ -486,6 +474,9 @@ function ViewerAdapters.UpdateBuffIcons()
         return
     end
     if FORCE_DISABLE_CDM_LAYOUT() then
+        return
+    end
+    if DISABLE_BLIZZARD_VIEWER_MUTATIONS then
         return
     end
 
@@ -583,6 +574,9 @@ function ViewerAdapters.UpdateBuffBarsIfNeeded()
         return
     end
     if FORCE_DISABLE_CDM_LAYOUT() then
+        return
+    end
+    if DISABLE_BLIZZARD_VIEWER_MUTATIONS then
         return
     end
     if not Runtime:IsReady(BuffBarCooldownViewer)
@@ -726,6 +720,9 @@ function ViewerAdapters.CenterAllRows(viewer, fromDirection)
     -- When: `UpdateEssentialIfNeeded` or `UpdateUtilityIfNeeded` determines changes require recompute.
     -- WoW 12.0.5: viewer may be forbidden. All access wrapped in pcall.
     if FORCE_DISABLE_CDM_LAYOUT() then
+        return
+    end
+    if DISABLE_BLIZZARD_VIEWER_MUTATIONS then
         return
     end
     if not viewer then return end
@@ -889,6 +886,10 @@ EventHandler.EventRefreshMap = {
 }
 
 function EventHandler.RequestOrDefer(parts)
+    if Runtime.stop then
+        QueueDeferredRefresh(parts)
+        return
+    end
     if IsInCombat() then
         QueueDeferredRefresh(parts)
         return
@@ -952,6 +953,9 @@ if EventRegistry then
 
     EventRegistry:RegisterCallback("EditMode.Exit", function()
         EventHandler.RequestOrDefer({ icons = true, bars = true, essential = true, utility = true })
+        C_Timer.After(0, function()
+            EventHandler.FlushDeferredIfSafe()
+        end)
     end)
 end
 

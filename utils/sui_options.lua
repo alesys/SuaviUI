@@ -5340,8 +5340,10 @@ local function CreateCooldownViewersPage(parent)
 
     -- Refresh functions
     local function RefreshIcons()
+        local editModeShown = _G.EditModeManagerFrame and _G.EditModeManagerFrame.IsShown and _G.EditModeManagerFrame:IsShown()
+
         -- Direct and immediate refresh for responsive feel
-        if SUI and SUI.StyledIcons then
+        if (not editModeShown) and SUI and SUI.StyledIcons then
             -- RefreshAll applies styles immediately without going through state tracking
             if SUI.StyledIcons.RefreshAll then
                 SUI.StyledIcons:RefreshAll()
@@ -5353,30 +5355,16 @@ local function CreateCooldownViewersPage(parent)
 
         local coordinator = (SUI and SUI.CooldownCoordinator) or (_G.SuaviUI and _G.SuaviUI.CooldownCoordinator)
         if coordinator and coordinator.RequestRefresh then
-            coordinator:RequestRefresh("options", { icons = true, bars = true, essential = true, utility = true }, { delay = 0 })
-            return
-        end
-
-        -- Force the viewer frames to refresh their layout immediately
-        -- Wrap in pcall to avoid Blizzard EditMode bugs
-        local viewers = {
-            _G["EssentialCooldownViewer"],
-            _G["UtilityCooldownViewer"],
-            _G["BuffIconCooldownViewer"],
-        }
-        for _, viewer in ipairs(viewers) do
-            if viewer then
-                pcall(function()
-                    if viewer.RefreshLayout then
-                        viewer:RefreshLayout()
-                    end
-                end)
+            coordinator:RequestRefresh(
+                "options",
+                { icons = true, bars = true, essential = true, utility = true },
+                { delay = editModeShown and 0.2 or 0 }
+            )
+        else
+            -- Also call ForceRefreshAll for centering
+            if SUI and SUI.CooldownManager and SUI.CooldownManager.ForceRefreshAll then
+                SUI.CooldownManager.ForceRefreshAll()
             end
-        end
-
-        -- Also call ForceRefreshAll for centering
-        if SUI and SUI.CooldownManager and SUI.CooldownManager.ForceRefreshAll then
-            SUI.CooldownManager.ForceRefreshAll()
         end
     end
     

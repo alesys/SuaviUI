@@ -69,7 +69,8 @@ attempt to perform arithmetic on local 'left' (a nil value)
 
 **Fix Pattern**:
 - Hook `EditModeSystemMixin:GetScaledSelectionSides()` to handle `nil` and compute a fallback rect from `GetCenter()` and `GetWidth/Height()`.
-- Keep frame-level `GetScaledRect()` hooks only as a secondary fallback (frames may use metatable `__index`, bypassing per-frame overrides).
+- Do **not** assign addon closures to Blizzard frame methods like `viewer.GetScaledRect = function(...) ... end`; this taints execution context in WoW 12.x and can cascade into CDM `RefreshData -> RefreshLayout` secret-value errors.
+- If extra fallback behavior is needed, keep it in addon-owned helper code or mixin-level guarded hooks, not on Blizzard frame method fields.
 
 **Reminder**: Ensure the mixin hook runs at file load time and again at `PLAYER_LOGIN` (in case the mixin loads late).
 

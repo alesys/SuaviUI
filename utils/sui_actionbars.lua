@@ -15,6 +15,9 @@ local IS_MIDNIGHT = select(4, GetBuildInfo()) >= 120000
 -- Safety fallback: extra action/zone ability frame reparenting is taint-prone
 -- on recent client builds during Edit Mode/action bar updates.
 local DISABLE_EXTRA_BUTTON_CUSTOMIZATION = true
+-- Emergency safety mode (session 4942): standard actionbar button/object mutation
+-- is disabled to avoid protected ActionBar/EditMode taint until refactor to weak tables.
+local DISABLE_STANDARD_ACTIONBAR_CUSTOMIZATION = true
 
 ---------------------------------------------------------------------------
 -- CONSTANTS
@@ -1432,6 +1435,12 @@ end
 
 -- Apply all bar layout settings
 local function ApplyBarLayoutSettings()
+    if DISABLE_STANDARD_ACTIONBAR_CUSTOMIZATION then
+        -- Keep Blizzard lock state sync only; skip all button mutation features.
+        ApplyButtonLock()
+        return
+    end
+
     ApplyBarScale()
     ApplyButtonLock()
     UpdateUsabilityPolling()
@@ -1947,6 +1956,8 @@ end
 
 -- Skin all enabled bars
 local function SkinAllBars()
+    if DISABLE_STANDARD_ACTIONBAR_CUSTOMIZATION then return end
+
     local db = GetDB()
     if not db or not db.enabled then return end
 
@@ -1995,6 +2006,11 @@ _G.SuaviUI_ApplyPageArrowVisibility = ApplyPageArrowVisibility
 function ActionBars:Refresh()
     if not ActionBars.initialized then return end
 
+    if DISABLE_STANDARD_ACTIONBAR_CUSTOMIZATION then
+        ApplyButtonLock()
+        return
+    end
+
     -- Clear skinned cache to force re-skin
     for button, _ in pairs(ActionBars.skinnedButtons) do
         button._quiSkinKey = nil
@@ -2024,6 +2040,11 @@ function ActionBars:Initialize()
     if not db or not db.enabled then return end
 
     ActionBars.initialized = true
+
+    if DISABLE_STANDARD_ACTIONBAR_CUSTOMIZATION then
+        ApplyButtonLock()
+        return
+    end
 
     -- One-time migration for lock setting (preserves user setting after CVar sync fix)
     MigrateLockSetting()
@@ -2102,6 +2123,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end)
 
     elseif event == "ACTIONBAR_SLOT_CHANGED" then
+        if DISABLE_STANDARD_ACTIONBAR_CUSTOMIZATION then return end
         -- Re-apply text styling when actions change
         C_Timer.After(0.1, function()
             for barKey, _ in pairs(BUTTON_PATTERNS) do
@@ -2116,6 +2138,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end)
 
     elseif event == "UPDATE_BINDINGS" then
+        if DISABLE_STANDARD_ACTIONBAR_CUSTOMIZATION then return end
         -- Re-apply keybind styling when bindings change
         C_Timer.After(0.1, function()
             for barKey, _ in pairs(BUTTON_PATTERNS) do
@@ -2157,6 +2180,11 @@ end)
 ---------------------------------------------------------------------------
 
 _G.SuaviUI_RefreshActionBars = function()
+    if DISABLE_STANDARD_ACTIONBAR_CUSTOMIZATION then
+        ApplyButtonLock()
+        return
+    end
+
     if InCombatLockdown() then
         ActionBars.pendingRefresh = true
         return

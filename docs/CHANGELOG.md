@@ -1,5 +1,121 @@
 # SuaviUI Changelog
 
+## [v0.3.10](https://github.com/alesys/SuaviUI/tree/v0.3.10) (2026-03-03)
+
+### 🛡️ CDM Systemic Taint Elimination — Sessions 4891 / 4912 / 4924 / 4927
+
+This version resolves a chain of persistent "secret value" taint errors across all four CDM viewers (`BuffBarCooldownViewer`, `BuffIconCooldownViewer`, `EssentialCooldownViewer`, `UtilityCooldownViewer`) that persisted across multiple sessions despite incremental fixes.
+
+---
+
+#### Background: How WoW Value-Based Taint Works
+
+In WoW's Lua security model, **taint is tracked per Lua value** (table, string, number, boolean), not per execution frame. When addon code **writes** a field on a Blizzard-owned frame object (e.g. `viewer.isHorizontal = false` from addon context), that specific field becomes a "secret value tainted by SuaviUI". Any subsequent Blizzard secure code that reads that field gets a "secret value" error. The error cascades: if the tainted read propagates into another write (e.g. Blizzard writes `self.isActive = ...` using a tainted input), that field becomes tainted too, spreading across the entire CDM data pipeline.
+
+---
+
+#### Root Cause Chain (resolved across four sessions)
+
+**Vector 1 — `hooksecurefunc` on `OnActiveStateChanged` (cooldownmanager.lua)**
+
+The `GetBuffIconFrames()` and `GetBuffBarFrames()` functions installed per-frame `hooksecurefunc` hooks on `OnActiveStateChanged` whenever new CDM item frames were discovered. These hooks fired synchronously inside Blizzard's secure call chain: `OnUpdate → RefreshActive → SetIsActive → OnActiveStateChanged`. Addon code running in this chain taints CDM item frame fields (`isActive`, `charges`, `spellID`, etc.). Blizzard's subsequent secure reads of those fields failed with "secret value" errors.
+
+**Fix:** Removed the `HookState` table and all `hooksecurefunc(child/frame, "OnActiveStateChanged", ...)` hook installations from `cooldownmanager.lua`. The `OnActiveStateChanged` event was an optimization (immediate dirty-marking); `UNIT_AURA`-driven refresh provides equivalent coverage with no taint risk.
+
+---
+
+**Vector 2 — `viewer:Show()` and `ShouldBeShown` override (sui_buffbar.lua, session 4912)**
+
+A proposed fix attempted to keep `BuffBarCooldownViewer` shown (so its item pool stayed live) by:
+1. Calling `viewer:Show()` after `SetAlpha(0)` inside `SetViewerHidden(true)`
+2. Overriding `ShouldBeShown` on the viewer to always return `true` when custom bars are active
+
+Both caused new taint:
+- `viewer:Show()` on `BuffBarCooldownViewer` triggers `OnShow → RefreshLayout → RefreshData`. Running that from addon context (even via pcall) taints the data chain.
+- Overriding `ShouldBeShown` replaces a Blizzard method field with an addon closure. Blizzard's `UpdateShownState()` calls `self:ShouldBeShown()` from secure context — executing the addon closure taints the execution context for the entire `UpdateShownState → SetShown` chain.
+
+**Fix:** Reverted both changes. `SetViewerHidden` uses `SetAlpha(0/1)` and `EnableMouse(false/false)` only — no `Show()`, no method override. The item pool stays live because the viewer is never `Hide()`d; only its alpha is zeroed.
+
+Also fixed in this pass:
+- Wrong API name `GetCooldownInfoByCooldownID` → correct name `GetCooldownViewerCooldownInfo`
+- `linkedSpellID` (scalar) → `linkedSpellIDs` (table); added iteration loop
+
+---
+
+**Vector 3 — `isHorizontal` field write from C_Timer callback (sui_buffbar.lua, session 4924)**
+
+A `hooksecurefunc(BuffBarCooldownViewer, "Layout", ...)` hook with a `C_Timer.After(0, ...)` deferral wrote `BuffBarCooldownViewer.isHorizontal = false` and `layoutFramesGoingRight`/`layoutFramesGoingUp` to the Blizzard viewer frame. Even with deferral via C_Timer, the write executes in addon (tainted) execution context. Blizzard's next `RefreshLayout` reads the tainted `isHorizontal` field at `CooldownViewer.lua:1781-1787`, cascades the taint into `itemContainerFrame` fields, and from there through `Layout()` and `RefreshData()` into all item frame fields (`isActive`, `charges`, `spellID`, `hasTotem`, `previousCooldownChargesCount`) across **all four CDM viewers**.
+
+**Fix (`utils/cooldownmanager.lua`):** Removed the `hooksecurefunc` on `BuffBarCooldownViewer.Layout` that wrote to `isHorizontal`. Replaced with a comment block explaining the rule. `USE_CUSTOM_BARS = true` renders bars into `customContainer` (SuaviUI-owned frames) — the CDM viewer's layout direction is completely irrelevant.
+
+Note: Other writes to `BuffBarCooldownViewer.isHorizontal` exist in the file but are all guarded by `if not USE_CUSTOM_BARS` or `else` of `IsCustomBarsActive()` — they do not execute when `USE_CUSTOM_BARS = true`.
+
+---
+
+**Vector 4 — `provider:CheckBuildDisplayData()` explicit call (sui_buffbar.lua, session 4924 → 4927)**
+
+`GetViewerCooldownIDs()` and `GetIconViewerCooldownIDs()` called into `CooldownViewerSettings:GetDataProvider()` to retrieve active cooldown IDs. The provider path included:
+- An explicit `provider:CheckBuildDisplayData()` call in `GetIconViewerCooldownIDs()` (removed in session 4924)
+- A `provider:GetOrderedCooldownIDsForCategory(...)` call in both functions
+
+Removing the explicit `CheckBuildDisplayData()` call (session 4924 fix) had no effect on session 4927 errors, because **`GetOrderedCooldownIDsForCategory` internally calls `self:CheckBuildDisplayData()` at `CooldownViewerSettingsDataProvider.lua:243`**. Calling either function from addon (tainted) context is equivalent — both write to the shared CDM data provider tables, tainting the provider's display data. Blizzard's `RefreshData()` then reads tainted values from the provider and writes tainted `isActive`/`spellID`/`charges`/`hasTotem` to ALL viewer item frames, producing "secret value" errors in `CooldownViewer.lua` and `CooldownViewerItemData.lua`.
+
+**Fix (`utils/sui_buffbar.lua`):** Removed the entire provider path from both `GetViewerCooldownIDs()` and `GetIconViewerCooldownIDs()`. Both functions now use the C API only:
+
+```lua
+local function GetViewerCooldownIDs()
+    local ok, result = pcall(function()
+        if C_CooldownViewer then
+            if C_CooldownViewer.GetCooldownViewerCategorySet then
+                return C_CooldownViewer.GetCooldownViewerCategorySet(Enum.CooldownViewerCategory.TrackedBar, true)
+            elseif C_CooldownViewer.GetCooldownIDsForCategory then
+                return C_CooldownViewer.GetCooldownIDsForCategory(Enum.CooldownViewerCategory.TrackedBar)
+            end
+        end
+        return nil
+    end)
+    if ok and type(result) == "table" then return result end
+    return {}
+end
+```
+
+The C API (`GetCooldownViewerCategorySet` / `GetCooldownIDsForCategory`) returns a flat list of configured spell IDs without touching any Lua data structures on CDM frames. It has `SecretArguments="AllowedWhenUntainted"` — safe from addon context. The aura lookup in `FetchBuffBarData()` / `FetchBuffIconData()` still acts as the active filter.
+
+---
+
+**Vector 5 — `SPELL_UPDATE_COOLDOWN` writes during combat (cooldown_advanced.lua, session 4924)**
+
+The `SPELL_UPDATE_COOLDOWN` event fires on every GCD. The handler called `RefreshUtilityDimming()` and `RefreshViewerSwipeColors()` which write to CDM item frames. Writing to CDM frames during combat at GCD frequency risks cascading taint into Blizzard's active combat processing.
+
+**Fix (`utils/cooldown_advanced.lua`):** Added `if InCombatLockdown() then return end` as the first check in both the `SPELL_UPDATE_COOLDOWN` and `UNIT_AURA` event branches. Dimming and swipe colors are refreshed on the next out-of-combat tick instead.
+
+---
+
+#### Files Changed
+
+| File | Change | Session |
+|------|--------|---------|
+| `utils/cooldownmanager.lua` | Removed `HookState` table; removed `hooksecurefunc(child, "OnActiveStateChanged", ...)` hooks from `GetBuffIconFrames` and `GetBuffBarFrames` | 4891 |
+| `utils/cooldownmanager.lua` | Removed `hooksecurefunc(BuffBarCooldownViewer, "Layout", ...)` hook that wrote `isHorizontal` from deferred callback | 4924 |
+| `utils/sui_buffbar.lua` | Reverted `viewer:Show()` call inside `SetViewerHidden(true)` — was causing `OnShow → RefreshData` taint | 4912 |
+| `utils/sui_buffbar.lua` | Reverted `ShouldBeShown` method override — was executing addon closure from Blizzard's secure `UpdateShownState()` | 4912 |
+| `utils/sui_buffbar.lua` | Fixed API name: `GetCooldownInfoByCooldownID` → `GetCooldownViewerCooldownInfo` | 4912 |
+| `utils/sui_buffbar.lua` | Fixed `linkedSpellID` (scalar) → `linkedSpellIDs` (table) with iteration | 4912 |
+| `utils/sui_buffbar.lua` | Removed entire provider path from `GetViewerCooldownIDs()` — both explicit `CheckBuildDisplayData()` and `GetOrderedCooldownIDsForCategory()` (which calls it internally); C API only | 4924/4927 |
+| `utils/sui_buffbar.lua` | Removed entire provider path from `GetIconViewerCooldownIDs()` — same reason | 4924/4927 |
+| `utils/cooldown_advanced.lua` | Added `InCombatLockdown()` guard to `SPELL_UPDATE_COOLDOWN` and `UNIT_AURA` handlers | 4924 |
+
+---
+
+#### Session Triage
+
+- Session 4891: `isActive`, `charges`, `wasOnGCDLookup`, `spellID` tainted on multiple viewers — root cause: `OnActiveStateChanged` hooks in `cooldownmanager.lua` firing synchronously inside Blizzard's secure call chain.
+- Session 4912: new `OnShow → RefreshData` taint after `viewer:Show()` attempt; `ShouldBeShown` override executing addon closure from secure context — both reverted.
+- Session 4924: `isActive` tainted — `BuffBarCooldownViewer.isHorizontal` written from C_Timer callback; `spellID`/`charges`/`hasTotem` tainted — `provider:CheckBuildDisplayData()` called explicitly; `spellID` on SPELL_UPDATE_COOLDOWN — CDM frame writes during combat.
+- Session 4927: identical errors to session 4924 despite fixes — root cause: `GetOrderedCooldownIDsForCategory()` internally calls `CheckBuildDisplayData()` at `CooldownViewerSettingsDataProvider.lua:243`; removing the explicit call was insufficient. Fix: entire provider path removed from both functions.
+
+---
+
 ## [v0.3.6](https://github.com/alesys/SuaviUI/tree/v0.3.6) (2026-02-28)
 
 ### ✨ Feature — Draggable Quest & Dialog Windows

@@ -16,6 +16,10 @@ Located in [`GUIDES/`](GUIDES/):
 - **TERTIARY_BAR_IMPLEMENTATION.md** - Strategy for implementing tertiary resource bars
 - **CROSS_PROJECT_KNOWLEDGE_PLAYBOOK.md** - Portable debugging, taint-safety, Edit Mode, and release practices for reuse in other addons
 
+### Debugging & Incident Records
+- **[CDM_TAINT_INVESTIGATION.md](CDM_TAINT_INVESTIGATION.md)** - Complete record of CDM "secret value" taint bugs (sessions 4891–4927): how WoW value-based taint works, every taint vector found and fixed, rules for safe CDM integration, and the Blizzard data pipeline explained. Read this before touching any code that interacts with `BuffBarCooldownViewer`, `BuffIconCooldownViewer`, or `CooldownViewerSettings`.
+- **[BUGSACKER_ANALYSIS_GUIDE.md](BUGSACKER_ANALYSIS_GUIDE.md)** - How to read BugGrabber/BugSack output and triage session errors.
+
 ### Technical References
 Located in [`REFERENCES/`](REFERENCES/):
 - **KNOWLEDGE_WOW_EVENTS.md** - WoW event system reference
@@ -75,6 +79,7 @@ SuaviUI/
 - **"How do I install SuaviUI?"** → [README.md](README.md)
 - **"What changed in the latest version?"** → [CHANGELOG.md](CHANGELOG.md)
 - **"How do I make a release?"** → [RELEASE_PROCESS.md](RELEASE_PROCESS.md)
+- **"Why are CDM 'secret value' errors appearing?"** → [CDM_TAINT_INVESTIGATION.md](CDM_TAINT_INVESTIGATION.md)
 - **"What's the code style?"** → [DEVELOPMENT_PRINCIPLES.md](DEVELOPMENT_PRINCIPLES.md)
 - **"How are libraries managed?"** → [LIBRARY_AUDIT.md](LIBRARY_AUDIT.md)
 - **"How does settings save work?"** → [SETTINGS_SAVE_SYSTEM.md](SETTINGS_SAVE_SYSTEM.md)

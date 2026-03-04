@@ -97,6 +97,7 @@ local styleConfig = {
 local styledButtons = {}       -- [button] = true when square-styled
 local buttonBorders = {}       -- [button] = border Frame
 local viewerRefreshPending = {} -- [viewerFrame] = true when a deferred refresh is queued
+local styleHookedChildren = setmetatable({}, { __mode = "k" }) -- [child] = true
 -- TAINT-FIX: Track which regions we replaced with BASE_SQUARE_MASK in a module-level
 -- weak table instead of writing __sui_set6707800 directly onto Blizzard's texture objects.
 -- Writing ANY field onto a Blizzard-owned region taints it; tainted regions bleed taint
@@ -320,8 +321,8 @@ local function ProcessViewer(viewer, viewerSettingName, applyStyle)
                 end
 
                 -- Hook pandemic alerts (guard against tainted child)
-                if (not DISABLE_PANDEMIC_ALERT_HOOK) and not (issecretvalue and issecretvalue(child)) and child.TriggerPandemicAlert and not child._suiStyleHooked then
-                    child._suiStyleHooked = true
+                if (not DISABLE_PANDEMIC_ALERT_HOOK) and not (issecretvalue and issecretvalue(child)) and child.TriggerPandemicAlert and not styleHookedChildren[child] then
+                    styleHookedChildren[child] = true
                     hooksecurefunc(child, "TriggerPandemicAlert", function()
                         -- TAINT-FIX: Defer ALL work to avoid tainting execution context.
                         -- TriggerPandemicAlert fires inside RefreshData's event chain.

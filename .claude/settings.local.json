@@ -6,7 +6,8 @@
       "Bash(git commit:*)",
       "Bash(git tag:*)",
       "Bash(git push:*)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(awk 'NR>=2060 && NR<=2085' \"e:/Games/World of Warcraft/_retail_/Interface/AddOns/SuaviUI/utils/sui_buffbar.lua\")"
     ]
   }
 }

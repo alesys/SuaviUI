@@ -17,6 +17,7 @@
 		}
 	],
 	"settings": {
-		"powershell.cwd": "SuaviUI"
+		"powershell.cwd": "SuaviUI",
+		"python.defaultInterpreterPath": "${workspaceFolder:SuaviUI}/.venv/Scripts/python.exe"
 	}
 }

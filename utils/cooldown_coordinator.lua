@@ -18,6 +18,18 @@ end
 
 local DEFAULT_PARTS = { icons = true, bars = true, essential = true, utility = true }
 
+local function IsEditModeActive()
+    local em = _G.EditModeManagerFrame
+    if em and em.IsShown and em:IsShown() then
+        return true
+    end
+    local runtime = ns and ns.CooldownRuntime
+    if runtime and runtime.isInEditMode then
+        return true
+    end
+    return false
+end
+
 local function SetInProgress(value)
     Coordinator.state.inProgress = value and true or false
     _G.SuaviUI_CooldownRefreshInProgress = Coordinator.state.inProgress
@@ -46,6 +58,11 @@ function Coordinator:RequestRefresh(source, parts, opts)
     end
 
     self.state.timer = C_Timer.After(delay, function()
+        if IsEditModeActive() then
+            -- Defer until Edit Mode has fully exited.
+            Coordinator:RequestRefresh(source, parts, { delay = 0.2 })
+            return
+        end
         if self.state.inProgress then
             return
         end
