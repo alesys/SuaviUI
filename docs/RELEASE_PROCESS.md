@@ -215,6 +215,11 @@ if (Test-Path "SuaviUI-vX.X.X.zip") {
 
 ## Version History
 
+### v0.3.12 - Legacy Skinning Edition (March 6, 2026)
+- Tracked bars: legacy path (USE_CUSTOM_BARS=false), skin Blizzard viewers in place
+- Tracked icons: legacy path (USE_CUSTOM_ICONS=false), remove ForcePopulate taint, show stack counts
+- Size: ~2 MB
+
 ### v0.3.11 - Taint Purge Edition (March 5, 2026)
 - CDM frame-field taint purge complete
 - Action bars re-enabled after full weak-table migration
