@@ -183,6 +183,36 @@ local function IsCustomIconsActive()
     return USE_CUSTOM_ICONS and settings and settings.enabled ~= false
 end
 
+---------------------------------------------------------------------------
+-- ALPHA ENFORCER (QUI pattern: cdm_spelldata.lua:141-153)
+-- Keeps viewer alpha=0 every frame when custom styling is active.
+-- Blizzard's CDM system may restore alpha via UpdateShownState; this
+-- catches it immediately. Disabled during Edit Mode so viewers are visible.
+---------------------------------------------------------------------------
+local alphaEnforcerActive = false
+local alphaEnforcerFrame = CreateFrame("Frame")
+alphaEnforcerFrame:SetScript("OnUpdate", function()
+    if not alphaEnforcerActive then return end
+    if IsCustomBarsActive() then
+        local v = _G["BuffBarCooldownViewer"]
+        if v then
+            local ok, alpha = pcall(v.GetAlpha, v)
+            if ok and alpha and alpha > 0 then
+                pcall(v.SetAlpha, v, 0)
+            end
+        end
+    end
+    if IsCustomIconsActive() then
+        local v = _G["BuffIconCooldownViewer"]
+        if v then
+            local ok, alpha = pcall(v.GetAlpha, v)
+            if ok and alpha and alpha > 0 then
+                pcall(v.SetAlpha, v, 0)
+            end
+        end
+    end
+end)
+
 local function UpdateOwnershipExports()
     if FORCE_DISABLE_CDM_BUFFBAR then
         SUI_BuffBar.USE_CUSTOM_BARS = false
@@ -247,14 +277,11 @@ end
 -- by the viewer's alpha (which we set to 0 to hide Blizzard's children).
 ---------------------------------------------------------------------------
 
-USE_CUSTOM_BARS = true   -- TAINT-FIX (sessions 4772+): Legacy path writes
--- BuffBarCooldownViewer.isHorizontal / layoutFramesGoingRight / layoutFramesGoingUp
--- directly to the Blizzard viewer frame, and calls ApplyBarStyle on Blizzard's pool
--- item frames. Both taint those frame objects, causing Blizzard's RefreshLayout →
--- ReleaseAll → resetFunc → SetIsActive chain to run in tainted execution context,
--- making frame.isActive a "secret boolean tainted by SuaviUI". Custom bars use
--- SuaviBuffBar* frames (owned by us) and set BuffBarCooldownViewer alpha=0 — no
--- Blizzard frame field writes, no taint. Mirrors the working USE_CUSTOM_ICONS=true path.
+USE_CUSTOM_BARS = false  -- Legacy path is taint-safe now: viewer field writes
+-- (isHorizontal, layoutFramesGoingRight, layoutFramesGoingUp) were removed in
+-- session 4979. Legacy path skins Blizzard's children in place using C API calls
+-- (SetSize, SetPoint, SetFrameStrata, ApplyBarStyle) — no Lua field writes.
+-- Viewer stays visible; Blizzard manages data, we only apply visual styling.
 local customContainer          -- Frame: SuaviBuffBarContainer (created lazily)
 local customBarPool = {}       -- All created bar frames (recycled via ._inUse)
 local activeCustomBars = {}    -- Currently visible custom bar frames
@@ -408,14 +435,100 @@ local function GetViewerCooldownIDs()
     return {}
 end
 
--- Fetch active aura data using clean C APIs only (no Blizzard frame reads)
+---------------------------------------------------------------------------
+-- VIEWER CHILDREN DATA PATH (QUI "owned engine" pattern)
+-- Reads Blizzard's viewer children as the source of truth for active state.
+-- child:IsShown() gives Blizzard's ShouldBeActive() result directly,
+-- eliminating manual aura detection. Sub-region reads (GetValue, GetTexture)
+-- are C API widget methods — safe from addon code, no taint.
+-- Returns nil if viewer is hidden or has no shown children → caller falls
+-- through to C API path.
+---------------------------------------------------------------------------
+local function TryFetchFromChildren(viewer)
+    -- Try to read viewer children regardless of viewer shown state.
+    -- When viewer is shown (alpha=0, IsShown=true), Blizzard's OnUpdate keeps
+    -- children current. When viewer is hidden (visibility≠"Always"), children
+    -- may have stale data from their last active state — still useful for spell
+    -- identity, and our progress update cycle handles expiration.
+    local results = {}
+    pcall(function()
+        local children = { viewer:GetChildren() }
+        local now = GetTime()
+        for idx, child in ipairs(children) do
+            if child:IsShown() then
+                -- Read spell identity from Blizzard's cooldownInfo struct
+                local spellID = nil
+                if child.cooldownInfo then
+                    spellID = child.cooldownInfo.overrideSpellID or child.cooldownInfo.spellID
+                end
+                if spellID then
+                    -- Read bar progress from StatusBar sub-region (C API)
+                    local duration, remaining = 0, 0
+                    local bar = child.Bar or child.bar
+                    if bar then
+                        pcall(function()
+                            local _, maxVal = bar:GetMinMaxValues()
+                            if maxVal then duration = maxVal end
+                            remaining = bar:GetValue() or 0
+                        end)
+                    end
+                    -- If bar sub-region didn't have data, try aura lookup
+                    if duration == 0 then
+                        local aura = C_UnitAuras.GetPlayerAuraBySpellID(spellID)
+                        if aura and aura.duration and aura.duration > 0 then
+                            duration = aura.duration
+                            remaining = (aura.expirationTime or now) - now
+                        end
+                    end
+                    -- Infinite aura sentinel (duration=0 means permanent buff)
+                    local expTime
+                    if duration == 0 then
+                        duration = 86400      -- 24h sentinel
+                        expTime = now + duration
+                    else
+                        expTime = now + math.max(0, remaining)
+                    end
+                    -- Texture from sub-region (C API) or spell API
+                    local texture = nil
+                    local iconTex = child.Icon or child.icon
+                    if iconTex then
+                        pcall(function() texture = iconTex:GetTexture() end)
+                    end
+                    if not texture then
+                        pcall(function() texture = C_Spell.GetSpellTexture(spellID) end)
+                    end
+
+                    results[#results + 1] = {
+                        spellID        = spellID,
+                        layoutIndex    = child.layoutIndex or idx,
+                        name           = C_Spell.GetSpellName(spellID) or "",
+                        texture        = texture,
+                        duration       = duration,
+                        expirationTime = expTime,
+                    }
+                end
+            end
+        end
+    end)
+    -- Accept partial results even if pcall failed midway
+    if #results > 0 then return results end
+    return nil  -- Fall through to C API
+end
+
+-- Fetch active aura data — hybrid: viewer children (preferred) + C API fallback
 local function FetchBuffBarData()
-    -- TAINT-FIX (session 4986): Paths 1+2 called Lua mixin methods on
-    -- BuffBarCooldownViewer (GetItemFrames) and accessed viewer.itemFramePool
-    -- (a forbidden table in WoW 12.x). Even pcall-wrapped, these accesses from
-    -- addon context taint the viewer's item frames, causing Blizzard's secure
-    -- RefreshData → SetIsActive to write tainted isActive values. Path 3 (C API
-    -- only) avoids ALL Lua-level viewer interaction and is the only safe path.
+    -- PATH 1: Viewer children (preferred) — reads Blizzard's active state directly.
+    -- child:IsShown() = Blizzard's ShouldBeActive() result. Eliminates manual aura
+    -- detection edge cases. Only available when viewer is shown (OnUpdate running).
+    local viewer = SafeGetViewer("BuffBarCooldownViewer")
+    if viewer then
+        local childrenResult = TryFetchFromChildren(viewer)
+        if childrenResult then return childrenResult end
+    end
+
+    -- PATH 2 (C API fallback): Works when viewer is hidden (visibility="Hidden"
+    -- or "InCombat" out of combat). Uses C_CooldownViewer for configuration data
+    -- then manual aura/totem lookup for active state detection.
 
     local srcFrames = nil
 
@@ -516,6 +629,44 @@ local function FetchBuffBarData()
                                     end
                                 end
                                 if auraData then break end
+                            end
+                        end
+                    end
+
+                    -- 4. Cooldown detection (abilities tracked by cooldown, not aura)
+                    if not auraData and C_Spell and C_Spell.GetSpellCooldown then
+                        for _, sid in ipairs(allSpellIDs) do
+                            local cdOk, cdInfo = pcall(C_Spell.GetSpellCooldown, sid)
+                            if cdOk and cdInfo and cdInfo.duration and cdInfo.duration > 1.5 then
+                                -- duration > 1.5 filters out GCD (1.5s). Only real cooldowns.
+                                auraData = {
+                                    name = C_Spell.GetSpellName(sid) or "",
+                                    icon = C_Spell.GetSpellTexture(sid),
+                                    duration = cdInfo.duration,
+                                    expirationTime = cdInfo.startTime + cdInfo.duration,
+                                    spellId = sid,
+                                }
+                                break
+                            end
+                        end
+                    end
+
+                    -- 5. Charge detection (abilities with charges on cooldown)
+                    if not auraData and C_Spell and C_Spell.GetSpellCharges then
+                        for _, sid in ipairs(allSpellIDs) do
+                            local chOk, chInfo = pcall(C_Spell.GetSpellCharges, sid)
+                            if chOk and chInfo and chInfo.currentCharges ~= nil then
+                                if chInfo.maxCharges and chInfo.currentCharges < chInfo.maxCharges
+                                    and chInfo.cooldownDuration and chInfo.cooldownDuration > 0 then
+                                    auraData = {
+                                        name = C_Spell.GetSpellName(sid) or "",
+                                        icon = C_Spell.GetSpellTexture(sid),
+                                        duration = chInfo.cooldownDuration,
+                                        expirationTime = chInfo.cooldownStartTime + chInfo.cooldownDuration,
+                                        spellId = sid,
+                                    }
+                                    break
+                                end
                             end
                         end
                     end
@@ -745,10 +896,86 @@ local function GetIconViewerCooldownIDs()
     return {}
 end
 
--- Fetch active aura data for icons using clean C APIs only (no Blizzard frame reads)
+-- Viewer children path for icons (same pattern as TryFetchFromChildren for bars).
+-- Reads CooldownFrame sub-region for cooldown timing, and aura for stack count.
+local function TryFetchIconsFromChildren(viewer)
+    local results = {}
+    pcall(function()
+        local children = { viewer:GetChildren() }
+        local now = GetTime()
+        for idx, child in ipairs(children) do
+            if child:IsShown() then
+                local spellID = nil
+                if child.cooldownInfo then
+                    spellID = child.cooldownInfo.overrideSpellID or child.cooldownInfo.spellID
+                end
+                if spellID then
+                    -- Read cooldown from CooldownFrame sub-region (C API)
+                    local duration, expTime = 0, 0
+                    local cd = child.Cooldown or child.cooldown
+                    if cd then
+                        pcall(function()
+                            local startMs, durMs = cd:GetCooldownTimes()
+                            if startMs and durMs and durMs > 0 then
+                                duration = durMs / 1000
+                                expTime = (startMs + durMs) / 1000
+                            end
+                        end)
+                    end
+                    -- If CooldownFrame didn't have data, try aura lookup
+                    if duration == 0 then
+                        local aura = C_UnitAuras.GetPlayerAuraBySpellID(spellID)
+                        if aura and aura.duration and aura.duration > 0 then
+                            duration = aura.duration
+                            expTime = aura.expirationTime or (now + duration)
+                        end
+                    end
+                    -- Infinite aura sentinel
+                    if duration == 0 then
+                        duration = 86400
+                        expTime = now + duration
+                    end
+                    -- Texture from sub-region or spell API
+                    local texture = nil
+                    local iconTex = child.Icon or child.icon
+                    if iconTex then
+                        pcall(function() texture = iconTex:GetTexture() end)
+                    end
+                    if not texture then
+                        pcall(function() texture = C_Spell.GetSpellTexture(spellID) end)
+                    end
+                    -- Stack count from aura lookup
+                    local applications = 0
+                    local aura = C_UnitAuras.GetPlayerAuraBySpellID(spellID)
+                    if aura then applications = aura.applications or 0 end
+
+                    results[#results + 1] = {
+                        spellID        = spellID,
+                        layoutIndex    = child.layoutIndex or idx,
+                        name           = C_Spell.GetSpellName(spellID) or "",
+                        texture        = texture,
+                        duration       = duration,
+                        expirationTime = expTime,
+                        applications   = applications,
+                    }
+                end
+            end
+        end
+    end)
+    if #results > 0 then return results end
+    return nil
+end
+
+-- Fetch active icon aura data — hybrid: viewer children (preferred) + C API fallback
 local function FetchBuffIconData()
-    -- TAINT-FIX (session 4986): Same as FetchBuffBarData — removed viewer.itemFramePool
-    -- access (forbidden table in WoW 12.x). C API only path avoids all viewer interaction.
+    -- PATH 1: Viewer children (preferred) — same as FetchBuffBarData
+    local viewer = SafeGetViewer("BuffIconCooldownViewer")
+    if viewer then
+        local childrenResult = TryFetchIconsFromChildren(viewer)
+        if childrenResult then return childrenResult end
+    end
+
+    -- PATH 2 (C API fallback): Works when viewer is hidden
     local cooldownIDs = GetIconViewerCooldownIDs()
     if #cooldownIDs == 0 then return {} end
     local srcFrames = {}
@@ -836,6 +1063,45 @@ local function FetchBuffIconData()
                                     end
                                 end
                                 if auraData then break end
+                            end
+                        end
+                    end
+
+                    -- 4. Cooldown detection (abilities tracked by cooldown, not aura)
+                    if not auraData and C_Spell and C_Spell.GetSpellCooldown then
+                        for _, sid in ipairs(allSpellIDs) do
+                            local cdOk, cdInfo = pcall(C_Spell.GetSpellCooldown, sid)
+                            if cdOk and cdInfo and cdInfo.duration and cdInfo.duration > 1.5 then
+                                auraData = {
+                                    name = C_Spell.GetSpellName(sid) or "",
+                                    icon = C_Spell.GetSpellTexture(sid),
+                                    duration = cdInfo.duration,
+                                    expirationTime = cdInfo.startTime + cdInfo.duration,
+                                    spellId = sid,
+                                    applications = 0,
+                                }
+                                break
+                            end
+                        end
+                    end
+
+                    -- 5. Charge detection (abilities with charges on cooldown)
+                    if not auraData and C_Spell and C_Spell.GetSpellCharges then
+                        for _, sid in ipairs(allSpellIDs) do
+                            local chOk, chInfo = pcall(C_Spell.GetSpellCharges, sid)
+                            if chOk and chInfo and chInfo.currentCharges ~= nil then
+                                if chInfo.maxCharges and chInfo.currentCharges < chInfo.maxCharges
+                                    and chInfo.cooldownDuration and chInfo.cooldownDuration > 0 then
+                                    auraData = {
+                                        name = C_Spell.GetSpellName(sid) or "",
+                                        icon = C_Spell.GetSpellTexture(sid),
+                                        duration = chInfo.cooldownDuration,
+                                        expirationTime = chInfo.cooldownStartTime + chInfo.cooldownDuration,
+                                        spellId = sid,
+                                        applications = chInfo.currentCharges,
+                                    }
+                                    break
+                                end
                             end
                         end
                     end
@@ -2196,12 +2462,12 @@ LayoutBuffBars = function()
         if customContainer then
             customContainer:Hide()
         end
-        isBarLayoutRunning = false
-        return
+        -- Fall through to legacy path below
     end
 
     ---------------------------------------------------------------------------
-    -- LEGACY PATH: Original Blizzard viewer layout (USE_CUSTOM_BARS = false)
+    -- LEGACY PATH: Skin Blizzard's viewer children in place (USE_CUSTOM_BARS = false)
+    -- Viewer stays visible; Blizzard manages data, we only apply visual styling.
     -- Entire body wrapped in pcall — viewer internals may be forbidden (12.0.5)
     ---------------------------------------------------------------------------
     pcall(function()
@@ -2239,7 +2505,9 @@ LayoutBuffBars = function()
     -- Use settings for dimensions if styling enabled, otherwise use frame defaults
     local barWidth = refBar:GetWidth()
     local barHeight = stylingEnabled and settings.barHeight or refBar:GetHeight()
-    local spacing = stylingEnabled and settings.spacing or (BuffBarCooldownViewer.childYPadding or 0)
+    -- Always use Blizzard's CDM Icon Padding (set by RefreshLayout → childYPadding/childXPadding)
+    -- so the Edit Mode panel setting takes effect immediately.
+    local spacing = BuffBarCooldownViewer.childYPadding or (stylingEnabled and settings.spacing or 0)
     local growFromBottom = (not stylingEnabled) or (settings.growUp ~= false)
 
     -- Vertical bar support
@@ -2377,45 +2645,15 @@ LayoutBuffBars = function()
         end
     end
 
-    -- Update container dimensions to prevent Blizzard's Layout() from resizing and causing drift
-    -- Keep the viewer at single-bar size to avoid position shifts; expand the selection
-    -- overlay during Edit Mode instead so the full stack is selectable.
+    -- During Edit Mode, let Blizzard manage viewer size + Selection overlay so the
+    -- panel settings (Bar Width, Icon Size, Padding, etc.) update immediately.
+    -- Outside Edit Mode, pin viewer to single-bar size to prevent layout drift.
     local isEditMode = EditModeManagerFrame and EditModeManagerFrame.editModeActive
 
-    SuppressLayout()
-    BuffBarCooldownViewer:SetSize(roundPixel(effectiveBarWidth), roundPixel(effectiveBarHeight))
-    UnsuppressLayout()
-
-    -- Expand selection overlay during Edit Mode to cover the full stack
-    if BuffBarCooldownViewer.Selection then
-        local selection = BuffBarCooldownViewer.Selection
-        selection:ClearAllPoints()
-
-        if isEditMode and count > 1 then
-            if isVertical then
-                local extra = math.max(0, totalSize - effectiveBarWidth)
-                if growFromBottom then
-                    selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", 0, 0)
-                    selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", extra, 0)
-                else
-                    selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", -extra, 0)
-                    selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", 0, 0)
-                end
-            else
-                local extra = math.max(0, totalSize - effectiveBarHeight)
-                if growFromBottom then
-                    selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", 0, extra)
-                    selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", 0, 0)
-                else
-                    selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", 0, 0)
-                    selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", 0, -extra)
-                end
-            end
-        else
-            selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", 0, 0)
-            selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", 0, 0)
-        end
-        selection:SetFrameLevel(BuffBarCooldownViewer:GetFrameLevel())
+    if not isEditMode then
+        SuppressLayout()
+        BuffBarCooldownViewer:SetSize(roundPixel(effectiveBarWidth), roundPixel(effectiveBarHeight))
+        UnsuppressLayout()
     end
 
     end) -- end pcall wrapping legacy bar path
@@ -2568,13 +2806,13 @@ local function Initialize()
     ---------------------------------------------------------------------------
     if USE_CUSTOM_BARS and BuffBarCooldownViewer then
         -- Hide Blizzard viewer's visual output (our custom bars render instead).
-        -- We do NOT override ShouldBeShown or call viewer:Show() — both run addon code
-        -- inside Blizzard's secure call chain, tainting CDM item frame fields (charges,
-        -- isActive, hasTotem, etc.) and causing "secret value" errors in subsequent
-        -- secure reads. When CDM visibility ≠ "Always" the viewer may be hidden by
-        -- Blizzard, but FetchBuffBarData()'s C-API + aura-lookup fallback path works
-        -- without the viewer being shown.
+        -- Alpha enforcer (QUI pattern) zeros alpha every frame so Blizzard can't
+        -- restore it. We do NOT override ShouldBeShown or call viewer:Show() — both
+        -- run addon code inside Blizzard's secure chain, tainting CDM fields.
+        -- FetchBuffBarData uses hybrid pipeline: viewer children (when shown) for
+        -- accurate active state, C API fallback when viewer is hidden.
         SetViewerHidden(IsCustomBarsActive())
+        alphaEnforcerActive = IsCustomBarsActive() or IsCustomIconsActive()
 
         -- Create the container
         local container = GetOrCreateContainer()
@@ -2625,6 +2863,7 @@ local function Initialize()
 
             -- Edit Mode: show Blizzard viewer for positioning, hide our bars
             EventRegistry:RegisterCallback("EditMode.Enter", function()
+                alphaEnforcerActive = false  -- Let viewers be visible for positioning
                 SetViewerHidden(false)
                 -- Re-enable mouse for Edit Mode interaction (SetViewerHidden(false) disables
                 -- it to prevent blocking outside Edit Mode; enable it explicitly here).
@@ -2641,6 +2880,7 @@ local function Initialize()
                 C_Timer.After(0, function()
                     local useCustom = IsCustomBarsActive()
                     SetViewerHidden(useCustom)
+                    alphaEnforcerActive = useCustom or IsCustomIconsActive()
                     if customContainer then
                         if useCustom then customContainer:Show() else customContainer:Hide() end
                     end
@@ -2661,6 +2901,7 @@ local function Initialize()
     if USE_CUSTOM_ICONS and BuffIconCooldownViewer then
         -- Hide Blizzard viewer's visual output (our custom icons render instead)
         SetIconViewerHidden(IsCustomIconsActive())
+        alphaEnforcerActive = IsCustomIconsActive()
 
         local iconContainer = GetOrCreateIconContainer()
         if iconContainer then
@@ -2701,6 +2942,7 @@ local function Initialize()
 
             -- Edit Mode: show Blizzard viewer for positioning, hide our icons
             EventRegistry:RegisterCallback("EditMode.Enter", function()
+                alphaEnforcerActive = false  -- Let viewers be visible for positioning
                 SetIconViewerHidden(false)
                 if customIconContainer then customIconContainer:Hide() end
             end, "SuaviBuffIconCustom")
@@ -2710,6 +2952,7 @@ local function Initialize()
                 C_Timer.After(0, function()
                     local useCustom = IsCustomIconsActive()
                     SetIconViewerHidden(useCustom)
+                    alphaEnforcerActive = useCustom or IsCustomBarsActive()
                     if customIconContainer then
                         if useCustom then customIconContainer:Show() else customIconContainer:Hide() end
                     end
