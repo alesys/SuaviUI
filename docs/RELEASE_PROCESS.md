@@ -37,23 +37,20 @@ git push origin vX.X.X
 
 **Files EXCLUDED from ZIP:**
 - `docs/` - All development documentation
+- `dev/` - All development scripts, debug files, and backups (`package.ps1`, `DEBUG_*.lua`, `TEST_*.lua`, `*_backup.lua`, `ACE3_UPDATE_REPORT.txt`, `error.log`, etc.)
+- `spec/` - Test specs (and `spec/mocks/`)
 - `.git/`, `.github/` - Git metadata
-- `.gitignore`, `.pkgmeta`, `.wowup_ignore` - Config files
-- `.copilot-instructions.md` - AI instructions
-- `SuaviUI.code-workspace` - VS Code workspace
-- `error.log` - Runtime error log
-- `.DS_Store` - macOS metadata
-- `DS_Store` - macOS metadata (without dot)
-- `.previews/` - Screenshot previews
+- `.venv/` - Python virtual environment (development tooling)
+- `.vscode/` - VS Code workspace settings
 - `.claude/` - Claude AI context files
+- `.previews/` - Screenshot previews
+- `.gitignore`, `.pkgmeta`, `.wowup_ignore` - Packaging/CI config files
+- `.copilot-instructions.md` - AI instructions
 - `.busted` - Busted test runner config
-- `spec/` - Test specs
-- `mocks/` - Test mocks
+- `SuaviUI.code-workspace` - VS Code workspace file
+- `.DS_Store`, `DS_Store` - macOS metadata
 - `*_BACKUP*` - Backup folders (e.g., `LibOpenRaid_BACKUP_v173_MODIFIED/`)
-- `package.ps1` - Build/packaging script
-- `ACE3_UPDATE_REPORT.txt` - Development report
 - `SUAVIUI_PATCHES.md` - Internal documentation
-- `DEBUG_*.lua` - Debugging scripts
 
 **Files INCLUDED in ZIP:**
 - All Lua files (`utils/`, `imports/`, `libs/`, `skinning/`)
@@ -131,21 +128,39 @@ ignore:
     - .github
     - .gitignore
     - .copilot-instructions.md
+    - .busted
+    - .venv
+    - .vscode
+    - .claude
+    - .previews
     - docs
+    - dev
+    - spec
     - README.md
     - .pkgmeta
     - .wowup_ignore
+    - SuaviUI.code-workspace
+    - SUAVIUI_PATCHES.md
 ```
 
 ### .wowup_ignore (WowUp Packaging)
 ```
 .git/
 .github/
+.venv/
+.vscode/
+.claude/
+.previews/
 docs/
+dev/
+spec/
 README.md
 .copilot-instructions.md
 .gitignore
 .wowup_ignore
+.busted
+SuaviUI.code-workspace
+SUAVIUI_PATCHES.md
 ```
 
 ### .gitignore (Development)
@@ -181,10 +196,9 @@ if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
 
 # /E = recursive, /XD = exclude dirs, /XF = exclude files
 robocopy "SuaviUI" "$staging\SuaviUI" /E /NFL /NDL /NJH /NJS /NC /NS `
-    /XD docs .git .github .previews .claude spec mocks "*_BACKUP*" `
+    /XD docs dev .git .github .previews .claude spec .venv .vscode "*_BACKUP*" `
     /XF .gitignore .pkgmeta .wowup_ignore .copilot-instructions.md `
-        SuaviUI.code-workspace error.log .DS_Store DS_Store .busted `
-        package.ps1 ACE3_UPDATE_REPORT.txt SUAVIUI_PATCHES.md DEBUG_*.lua
+        SuaviUI.code-workspace .DS_Store DS_Store .busted SUAVIUI_PATCHES.md
 
 # Create ZIP from staging (SuaviUI/ is the root folder inside the archive)
 Compress-Archive -Path "$staging\SuaviUI" -DestinationPath "SuaviUI-vX.X.X.zip" -Force
