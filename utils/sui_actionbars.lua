@@ -2254,6 +2254,334 @@ if SUICore then
     SUICore.ActionBars = ActionBars
 end
 
+---------------------------------------------------------------------------
+-- EDIT MODE PANEL INJECTION (Action Bars)
+-- Injects SuaviUI master visual + mouseover hide controls into Blizzard's
+-- native EditModeSystemSettingsDialog when any action bar is selected.
+---------------------------------------------------------------------------
+
+do
+    local EP = ns.EditModePanels
+    if not EP then return end
+
+    local controls = EP.controls
+
+    ---------------------------------------------------------------------------
+    -- DB helpers
+    ---------------------------------------------------------------------------
+    local function GetABDB()
+        local core = _G.SuaviUI and _G.SuaviUI.SUICore
+        return core and core.db and core.db.profile and core.db.profile.actionBars or nil
+    end
+
+    local function GetGlobal()
+        local ab = GetABDB()
+        return ab and ab.global or nil
+    end
+
+    local function GetFade()
+        local ab = GetABDB()
+        return ab and ab.fade or nil
+    end
+
+    local function GetBarDB(barKey)
+        local ab = GetABDB()
+        return ab and ab.bars and ab.bars[barKey] or nil
+    end
+
+    local function RefreshAB()
+        if _G.SuaviUI_RefreshActionBars then _G.SuaviUI_RefreshActionBars() end
+    end
+
+    ---------------------------------------------------------------------------
+    -- Map Blizzard systemIndex to SuaviUI bar key
+    ---------------------------------------------------------------------------
+    local SYSTEM_INDEX_TO_BAR_KEY = {
+        [1]  = "bar1",    -- MainBar
+        [2]  = "bar2",    -- Bar2
+        [3]  = "bar3",    -- Bar3
+        [4]  = "bar4",    -- RightBar1
+        [5]  = "bar5",    -- RightBar2
+        [6]  = "bar6",    -- ExtraBar1
+        [7]  = "bar7",    -- ExtraBar2
+        [8]  = "bar8",    -- ExtraBar3
+        [11] = "stance",  -- StanceBar
+        [12] = "pet",     -- PetActionBar
+    }
+
+    ---------------------------------------------------------------------------
+    -- 9-point anchor options
+    ---------------------------------------------------------------------------
+    local function GetAnchorOptions()
+        return {
+            {value = "TOPLEFT", text = "Top Left"},
+            {value = "TOP", text = "Top"},
+            {value = "TOPRIGHT", text = "Top Right"},
+            {value = "LEFT", text = "Left"},
+            {value = "CENTER", text = "Center"},
+            {value = "RIGHT", text = "Right"},
+            {value = "BOTTOMLEFT", text = "Bottom Left"},
+            {value = "BOTTOM", text = "Bottom"},
+            {value = "BOTTOMRIGHT", text = "Bottom Right"},
+        }
+    end
+
+    ---------------------------------------------------------------------------
+    -- Predicate: is this an action bar system?
+    ---------------------------------------------------------------------------
+    local function IsActionBarSystem(sf)
+        return sf and sf.system == Enum.EditModeSystem.ActionBar
+    end
+
+    ---------------------------------------------------------------------------
+    -- Control keys (built dynamically per-bar for the Always Show checkbox)
+    ---------------------------------------------------------------------------
+    local abControlKeys = {
+        "abDivider",
+        -- Button Appearance
+        "abIconCrop", "abBackdrop", "abBackdropAlpha",
+        "abGloss", "abGlossAlpha", "abBorders", "abHideEmpty",
+        -- Text: Keybinds
+        "abShowKeybinds", "abHideEmptyKeybinds", "abKeybindSize",
+        "abKeybindAnchor", "abKeybindOffX", "abKeybindOffY",
+        -- Text: Macro Names
+        "abShowMacro", "abMacroSize",
+        "abMacroAnchor", "abMacroOffX", "abMacroOffY",
+        -- Text: Stack Counts
+        "abShowCounts", "abCountSize",
+        "abCountAnchor", "abCountOffX", "abCountOffY",
+        -- Mouseover Hide
+        "abFadeDivider",
+        "abFadeEnable", "abFadeIn", "abFadeOut", "abFadeAlpha", "abFadeDelay",
+        "abFadeCombat", "abFadeLink",
+        "abAlwaysShow",
+    }
+
+    ---------------------------------------------------------------------------
+    -- Init all controls (called once)
+    ---------------------------------------------------------------------------
+    local function InitABControls()
+        controls.abDivider = EP.CreateDivider("AB", "SuaviUI")
+
+        -- Button Appearance
+        controls.abIconCrop = EP.CreateSlider("ABIconCrop", "Icon Crop", 5, 15, 1,
+            function() local g = GetGlobal(); return g and math.floor((g.iconZoom or 0.08) * 100 + 0.5) or 8 end,
+            function(v) local g = GetGlobal(); if g then g.iconZoom = v / 100 end; RefreshAB() end
+        )
+        controls.abBackdrop = EP.CreateCheckbox("ABBackdrop", "Show Backdrop",
+            function() local g = GetGlobal(); return g and g.showBackdrop or false end,
+            function(v) local g = GetGlobal(); if g then g.showBackdrop = v end; RefreshAB() end
+        )
+        controls.abBackdropAlpha = EP.CreateSlider("ABBackdropAlpha", "Backdrop Alpha", 0, 100, 5,
+            function() local g = GetGlobal(); return g and math.floor((g.backdropAlpha or 0.5) * 100 + 0.5) or 50 end,
+            function(v) local g = GetGlobal(); if g then g.backdropAlpha = v / 100 end; RefreshAB() end
+        )
+        controls.abGloss = EP.CreateCheckbox("ABGloss", "Show Gloss",
+            function() local g = GetGlobal(); return g and g.showGloss or false end,
+            function(v) local g = GetGlobal(); if g then g.showGloss = v end; RefreshAB() end
+        )
+        controls.abGlossAlpha = EP.CreateSlider("ABGlossAlpha", "Gloss Alpha", 0, 100, 5,
+            function() local g = GetGlobal(); return g and math.floor((g.glossAlpha or 0.3) * 100 + 0.5) or 30 end,
+            function(v) local g = GetGlobal(); if g then g.glossAlpha = v / 100 end; RefreshAB() end
+        )
+        controls.abBorders = EP.CreateCheckbox("ABBorders", "Show Borders",
+            function() local g = GetGlobal(); return g and g.showBorders ~= false end,
+            function(v) local g = GetGlobal(); if g then g.showBorders = v end; RefreshAB() end
+        )
+        controls.abHideEmpty = EP.CreateCheckbox("ABHideEmpty", "Hide Empty Slots",
+            function() local g = GetGlobal(); return g and g.hideEmptySlots or false end,
+            function(v) local g = GetGlobal(); if g then g.hideEmptySlots = v end; RefreshAB() end
+        )
+
+        -- Text: Keybinds
+        controls.abShowKeybinds = EP.CreateCheckbox("ABShowKeybinds", "Show Keybinds",
+            function() local g = GetGlobal(); return g and g.showKeybinds ~= false end,
+            function(v) local g = GetGlobal(); if g then g.showKeybinds = v end; RefreshAB() end
+        )
+        controls.abHideEmptyKeybinds = EP.CreateCheckbox("ABHideEmptyKB", "Hide Empty Keybinds",
+            function() local g = GetGlobal(); return g and g.hideEmptyKeybinds or false end,
+            function(v) local g = GetGlobal(); if g then g.hideEmptyKeybinds = v end; RefreshAB() end
+        )
+        controls.abKeybindSize = EP.CreateSlider("ABKeybindSize", "Keybind Size", 8, 50, 1,
+            function() local g = GetGlobal(); return g and g.keybindFontSize or 12 end,
+            function(v) local g = GetGlobal(); if g then g.keybindFontSize = v end; RefreshAB() end
+        )
+        controls.abKeybindAnchor = EP.CreateDropdown("ABKeybindAnchor", "KB Anchor",
+            GetAnchorOptions,
+            function() local g = GetGlobal(); return g and g.keybindAnchor or "TOPRIGHT" end,
+            function(v) local g = GetGlobal(); if g then g.keybindAnchor = v end; RefreshAB() end
+        )
+        controls.abKeybindOffX = EP.CreateSlider("ABKeybindOffX", "KB X Offset", -20, 20, 1,
+            function() local g = GetGlobal(); return g and g.keybindOffsetX or 0 end,
+            function(v) local g = GetGlobal(); if g then g.keybindOffsetX = v end; RefreshAB() end
+        )
+        controls.abKeybindOffY = EP.CreateSlider("ABKeybindOffY", "KB Y Offset", -20, 20, 1,
+            function() local g = GetGlobal(); return g and g.keybindOffsetY or 0 end,
+            function(v) local g = GetGlobal(); if g then g.keybindOffsetY = v end; RefreshAB() end
+        )
+
+        -- Text: Macro Names
+        controls.abShowMacro = EP.CreateCheckbox("ABShowMacro", "Show Macro Names",
+            function() local g = GetGlobal(); return g and g.showMacroNames or false end,
+            function(v) local g = GetGlobal(); if g then g.showMacroNames = v end; RefreshAB() end
+        )
+        controls.abMacroSize = EP.CreateSlider("ABMacroSize", "Macro Size", 8, 50, 1,
+            function() local g = GetGlobal(); return g and g.macroNameFontSize or 10 end,
+            function(v) local g = GetGlobal(); if g then g.macroNameFontSize = v end; RefreshAB() end
+        )
+        controls.abMacroAnchor = EP.CreateDropdown("ABMacroAnchor", "Macro Anchor",
+            GetAnchorOptions,
+            function() local g = GetGlobal(); return g and g.macroNameAnchor or "BOTTOM" end,
+            function(v) local g = GetGlobal(); if g then g.macroNameAnchor = v end; RefreshAB() end
+        )
+        controls.abMacroOffX = EP.CreateSlider("ABMacroOffX", "Macro X Offset", -20, 20, 1,
+            function() local g = GetGlobal(); return g and g.macroNameOffsetX or 0 end,
+            function(v) local g = GetGlobal(); if g then g.macroNameOffsetX = v end; RefreshAB() end
+        )
+        controls.abMacroOffY = EP.CreateSlider("ABMacroOffY", "Macro Y Offset", -20, 20, 1,
+            function() local g = GetGlobal(); return g and g.macroNameOffsetY or 0 end,
+            function(v) local g = GetGlobal(); if g then g.macroNameOffsetY = v end; RefreshAB() end
+        )
+
+        -- Text: Stack Counts
+        controls.abShowCounts = EP.CreateCheckbox("ABShowCounts", "Show Stack Counts",
+            function() local g = GetGlobal(); return g and g.showCounts ~= false end,
+            function(v) local g = GetGlobal(); if g then g.showCounts = v end; RefreshAB() end
+        )
+        controls.abCountSize = EP.CreateSlider("ABCountSize", "Count Size", 8, 50, 1,
+            function() local g = GetGlobal(); return g and g.countFontSize or 14 end,
+            function(v) local g = GetGlobal(); if g then g.countFontSize = v end; RefreshAB() end
+        )
+        controls.abCountAnchor = EP.CreateDropdown("ABCountAnchor", "Count Anchor",
+            GetAnchorOptions,
+            function() local g = GetGlobal(); return g and g.countAnchor or "BOTTOMRIGHT" end,
+            function(v) local g = GetGlobal(); if g then g.countAnchor = v end; RefreshAB() end
+        )
+        controls.abCountOffX = EP.CreateSlider("ABCountOffX", "Count X Offset", -20, 20, 1,
+            function() local g = GetGlobal(); return g and g.countOffsetX or 0 end,
+            function(v) local g = GetGlobal(); if g then g.countOffsetX = v end; RefreshAB() end
+        )
+        controls.abCountOffY = EP.CreateSlider("ABCountOffY", "Count Y Offset", -20, 20, 1,
+            function() local g = GetGlobal(); return g and g.countOffsetY or 0 end,
+            function(v) local g = GetGlobal(); if g then g.countOffsetY = v end; RefreshAB() end
+        )
+
+        -- Mouseover Hide
+        controls.abFadeDivider = EP.CreateDivider("ABFade", "Mouseover Hide")
+
+        controls.abFadeEnable = EP.CreateCheckbox("ABFadeEnable", "Enable Mouseover Hide",
+            function() local f = GetFade(); return f and f.enabled or false end,
+            function(v) local f = GetFade(); if f then f.enabled = v end; RefreshAB() end
+        )
+        controls.abFadeIn = EP.CreateSlider("ABFadeIn", "Fade In (sec)", 1, 100, 5,
+            function() local f = GetFade(); return f and math.floor((f.fadeInDuration or 0.2) * 100 + 0.5) or 20 end,
+            function(v) local f = GetFade(); if f then f.fadeInDuration = v / 100 end; RefreshAB() end
+        )
+        controls.abFadeOut = EP.CreateSlider("ABFadeOut", "Fade Out (sec)", 1, 100, 5,
+            function() local f = GetFade(); return f and math.floor((f.fadeOutDuration or 0.3) * 100 + 0.5) or 30 end,
+            function(v) local f = GetFade(); if f then f.fadeOutDuration = v / 100 end; RefreshAB() end
+        )
+        controls.abFadeAlpha = EP.CreateSlider("ABFadeAlpha", "Faded Opacity", 0, 100, 5,
+            function() local f = GetFade(); return f and math.floor((f.fadeOutAlpha or 0) * 100 + 0.5) or 0 end,
+            function(v) local f = GetFade(); if f then f.fadeOutAlpha = v / 100 end; RefreshAB() end
+        )
+        controls.abFadeDelay = EP.CreateSlider("ABFadeDelay", "Fade Delay (sec)", 0, 200, 10,
+            function() local f = GetFade(); return f and math.floor((f.fadeOutDelay or 0) * 100 + 0.5) or 0 end,
+            function(v) local f = GetFade(); if f then f.fadeOutDelay = v / 100 end; RefreshAB() end
+        )
+        controls.abFadeCombat = EP.CreateCheckbox("ABFadeCombat", "Show In Combat",
+            function() local f = GetFade(); return f and f.alwaysShowInCombat or false end,
+            function(v) local f = GetFade(); if f then f.alwaysShowInCombat = v end; RefreshAB() end
+        )
+        controls.abFadeLink = EP.CreateCheckbox("ABFadeLink", "Link Bars 1-8",
+            function() local f = GetFade(); return f and f.linkBars1to8 or false end,
+            function(v) local f = GetFade(); if f then f.linkBars1to8 = v end; RefreshAB() end
+        )
+
+        -- Per-bar "Always Show" checkbox (refreshed dynamically per selected bar)
+        controls.abAlwaysShow = EP.CreateCheckbox("ABAlwaysShow", "Always Show This Bar",
+            function() return false end,  -- Overridden dynamically
+            function() end  -- Overridden dynamically
+        )
+    end
+
+    ---------------------------------------------------------------------------
+    -- Custom inject: update the Always Show checkbox for the currently selected bar
+    ---------------------------------------------------------------------------
+    local lastBarKey = nil
+
+    local function InjectABControls(dialog, systemFrame)
+        local barKey = SYSTEM_INDEX_TO_BAR_KEY[systemFrame.systemIndex]
+        lastBarKey = barKey
+
+        -- Update the Always Show checkbox getter/setter for this specific bar
+        local alwaysShow = controls.abAlwaysShow
+        if alwaysShow and barKey then
+            alwaysShow._suiGetter = function()
+                local bdb = GetBarDB(barKey)
+                return bdb and bdb.alwaysShow or false
+            end
+            alwaysShow.Button:SetScript("OnClick", function()
+                PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+                local bdb = GetBarDB(barKey)
+                if bdb then
+                    bdb.alwaysShow = not bdb.alwaysShow
+                    alwaysShow.checked = bdb.alwaysShow
+                    alwaysShow.Button:SetChecked(bdb.alwaysShow)
+                    RefreshAB()
+                end
+            end)
+        end
+
+        EP.InjectControls(dialog, abControlKeys)
+    end
+
+    ---------------------------------------------------------------------------
+    -- Register with shared infrastructure
+    -- We use a custom inject override via the predicate return + manual call
+    ---------------------------------------------------------------------------
+    EP.RegisterSystem(IsActionBarSystem, InitABControls, abControlKeys)
+
+    -- Override the default inject to add per-bar dynamic behavior
+    -- The registration above handles init + standard inject. We hook
+    -- UpdateDialog again to update the Always Show checkbox dynamically.
+    C_Timer.After(0.1, function()
+        local dialog = EditModeSystemSettingsDialog
+        if not dialog then return end
+        hooksecurefunc(dialog, "UpdateDialog", function(self, systemFrame)
+            if IsActionBarSystem(systemFrame) and controls.abAlwaysShow then
+                local barKey = SYSTEM_INDEX_TO_BAR_KEY[systemFrame.systemIndex]
+                if barKey then
+                    local bdb = GetBarDB(barKey)
+                    local isShown = bdb and bdb.alwaysShow or false
+                    controls.abAlwaysShow.checked = isShown
+                    if controls.abAlwaysShow.Button then
+                        controls.abAlwaysShow.Button:SetChecked(isShown)
+                    end
+                    -- Update the setter for this bar
+                    controls.abAlwaysShow._suiGetter = function()
+                        local bd = GetBarDB(barKey)
+                        return bd and bd.alwaysShow or false
+                    end
+                    controls.abAlwaysShow.Button:SetScript("OnClick", function()
+                        PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+                        local bd = GetBarDB(barKey)
+                        if bd then
+                            bd.alwaysShow = not bd.alwaysShow
+                            controls.abAlwaysShow.checked = bd.alwaysShow
+                            controls.abAlwaysShow.Button:SetChecked(bd.alwaysShow)
+                            RefreshAB()
+                        end
+                    end)
+                else
+                    -- Not a mappable bar (e.g. possess bar) — hide the Always Show checkbox
+                    controls.abAlwaysShow:Hide()
+                end
+            end
+        end)
+    end)
+end
+
 
 
 

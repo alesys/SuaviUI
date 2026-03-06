@@ -1793,7 +1793,182 @@ local function BuildUnitFrameSettings(unitKey)
         end,
     })
     order = order + 1
-    
+
+    ---------------------------------------------------------------------------
+    -- GENERAL SETTINGS (global across all unit frames)
+    -- These use db.general, not db.suiUnitFrames[unitKey]
+    ---------------------------------------------------------------------------
+    local function GetGeneralDB()
+        if not SUICore or not SUICore.db or not SUICore.db.profile then return nil end
+        return SUICore.db.profile.general
+    end
+
+    local function RefreshAllUF()
+        local SUI_UF = ns.SUI_UnitFrames
+        if SUI_UF and SUI_UF.RefreshAll then SUI_UF:RefreshAll() end
+    end
+
+    table.insert(settings, {
+        order = order,
+        name = "General (All Frames)",
+        kind = LEM.SettingType.Collapsible,
+        id = "CATEGORY_GENERAL_" .. unitKey,
+        defaultCollapsed = true,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_GENERAL_" .. unitKey,
+        order = order,
+        name = "Dark Mode",
+        kind = LEM.SettingType.Checkbox,
+        default = false,
+        get = function(layoutName, layoutIndex)
+            local g = GetGeneralDB()
+            return g and g.darkMode or false
+        end,
+        set = function(layoutName, value, layoutIndex)
+            local g = GetGeneralDB()
+            if g then g.darkMode = value; RefreshAllUF() end
+        end,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_GENERAL_" .. unitKey,
+        order = order,
+        name = "Health Opacity",
+        kind = LEM.SettingType.Slider,
+        default = 1.0,
+        minValue = 0.1,
+        maxValue = 1.0,
+        valueStep = 0.05,
+        formatter = function(value) return string.format("%.0f%%", value * 100) end,
+        get = function(layoutName, layoutIndex)
+            local g = GetGeneralDB()
+            return g and g.defaultHealthOpacity or 1.0
+        end,
+        set = function(layoutName, value, layoutIndex)
+            local g = GetGeneralDB()
+            if g then g.defaultHealthOpacity = value; RefreshAllUF() end
+        end,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_GENERAL_" .. unitKey,
+        order = order,
+        name = "Background Opacity",
+        kind = LEM.SettingType.Slider,
+        default = 1.0,
+        minValue = 0.1,
+        maxValue = 1.0,
+        valueStep = 0.05,
+        formatter = function(value) return string.format("%.0f%%", value * 100) end,
+        get = function(layoutName, layoutIndex)
+            local g = GetGeneralDB()
+            return g and g.defaultBgOpacity or 1.0
+        end,
+        set = function(layoutName, value, layoutIndex)
+            local g = GetGeneralDB()
+            if g then g.defaultBgOpacity = value; RefreshAllUF() end
+        end,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_GENERAL_" .. unitKey,
+        order = order,
+        name = "Dark Mode Health Opacity",
+        kind = LEM.SettingType.Slider,
+        default = 0.6,
+        minValue = 0.1,
+        maxValue = 1.0,
+        valueStep = 0.05,
+        formatter = function(value) return string.format("%.0f%%", value * 100) end,
+        get = function(layoutName, layoutIndex)
+            local g = GetGeneralDB()
+            return g and g.darkModeHealthOpacity or 0.6
+        end,
+        set = function(layoutName, value, layoutIndex)
+            local g = GetGeneralDB()
+            if g then g.darkModeHealthOpacity = value; RefreshAllUF() end
+        end,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_GENERAL_" .. unitKey,
+        order = order,
+        name = "Dark Mode BG Opacity",
+        kind = LEM.SettingType.Slider,
+        default = 0.3,
+        minValue = 0.1,
+        maxValue = 1.0,
+        valueStep = 0.05,
+        formatter = function(value) return string.format("%.0f%%", value * 100) end,
+        get = function(layoutName, layoutIndex)
+            local g = GetGeneralDB()
+            return g and g.darkModeBgOpacity or 0.3
+        end,
+        set = function(layoutName, value, layoutIndex)
+            local g = GetGeneralDB()
+            if g then g.darkModeBgOpacity = value; RefreshAllUF() end
+        end,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_GENERAL_" .. unitKey,
+        order = order,
+        name = "Color All Name Text",
+        kind = LEM.SettingType.Checkbox,
+        default = false,
+        get = function(layoutName, layoutIndex)
+            local g = GetGeneralDB()
+            return g and g.masterColorNameText or false
+        end,
+        set = function(layoutName, value, layoutIndex)
+            local g = GetGeneralDB()
+            if g then g.masterColorNameText = value; RefreshAllUF() end
+        end,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_GENERAL_" .. unitKey,
+        order = order,
+        name = "Color All Health Text",
+        kind = LEM.SettingType.Checkbox,
+        default = false,
+        get = function(layoutName, layoutIndex)
+            local g = GetGeneralDB()
+            return g and g.masterColorHealthText or false
+        end,
+        set = function(layoutName, value, layoutIndex)
+            local g = GetGeneralDB()
+            if g then g.masterColorHealthText = value; RefreshAllUF() end
+        end,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_GENERAL_" .. unitKey,
+        order = order,
+        name = "Color All Power Text",
+        kind = LEM.SettingType.Checkbox,
+        default = false,
+        get = function(layoutName, layoutIndex)
+            local g = GetGeneralDB()
+            return g and g.masterColorPowerText or false
+        end,
+        set = function(layoutName, value, layoutIndex)
+            local g = GetGeneralDB()
+            if g then g.masterColorPowerText = value; RefreshAllUF() end
+        end,
+    })
+    order = order + 1
+
     return settings
 end
 

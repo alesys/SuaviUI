@@ -3109,378 +3109,240 @@ C_Timer.After(0, function()
 end)
 
 ---------------------------------------------------------------------------
--- EDIT MODE PANEL INJECTION
--- Hooks EditModeSystemSettingsDialog:UpdateDialog to append SuaviUI
--- settings (sliders, checkboxes) below Blizzard's native controls
--- when the Tracked Bars or Tracked Buffs viewer is selected.
+-- EDIT MODE PANEL INJECTION (CDM Viewers)
+-- Uses shared ns.EditModePanels infrastructure to inject SuaviUI controls
+-- into Blizzard's native EditModeSystemSettingsDialog for CDM viewers.
 ---------------------------------------------------------------------------
 
-local suiEditModeControls = {}  -- Reusable frames, created once
+do
+    local EP = ns.EditModePanels
+    if not EP then return end
 
----------------------------------------------------------------------------
--- Control factory functions: visual clones of Blizzard's Edit Mode templates
--- but completely isolated from Blizzard's setting pipeline.
----------------------------------------------------------------------------
+    local controls = EP.controls
 
-local function CreateSuiSlider(name, label, minVal, maxVal, stepSize, getter, setter)
-    local frame = CreateFrame("Frame", "SUI_EditMode_" .. name, UIParent)
-    frame:SetSize(343, 32)
-    frame:Hide()
+    ---------------------------------------------------------------------------
+    -- DB helpers
+    ---------------------------------------------------------------------------
+    local function GetOrCreateTrackedBarDB()
+        local db = GetDB()
+        if not db then return nil end
+        if not db.trackedBar then db.trackedBar = {} end
+        return db.trackedBar
+    end
 
-    local labelFS = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlightMedium")
-    labelFS:SetSize(100, 32)
-    labelFS:SetPoint("LEFT")
-    labelFS:SetJustifyH("LEFT")
-    labelFS:SetText(label)
-    frame.Label = labelFS
+    local function GetProfile()
+        return SUICore and SUICore.db and SUICore.db.profile
+    end
 
-    local slider = CreateFrame("Frame", nil, frame, "MinimalSliderWithSteppersTemplate")
-    slider:SetSize(200, 32)
-    slider:SetPoint("LEFT", labelFS, "RIGHT", 5, 0)
-    frame.Slider = slider
+    local function RefreshIcons()
+        if _G.SuaviUI_RefreshCooldownIcons then _G.SuaviUI_RefreshCooldownIcons() end
+    end
 
-    frame.initInProgress = false
-    frame._cbrHandles = EventUtil.CreateCallbackHandleContainer()
-    frame._cbrHandles:RegisterCallback(slider, MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, value)
-        if not frame.initInProgress then
-            setter(value)
-        end
-    end)
+    local function RefreshAdvanced()
+        local SUI = _G.SuaviUI and _G.SuaviUI.SUICore
+        if SUI and SUI.CooldownAdvanced then SUI.CooldownAdvanced.RefreshAllFeatures() end
+    end
 
-    frame._suiGetter = getter
-    frame._suiMin = minVal
-    frame._suiMax = maxVal
-    frame._suiStep = stepSize
-    return frame
-end
-
-local function CreateSuiCheckbox(name, label, getter, setter)
-    local frame = CreateFrame("Frame", "SUI_EditMode_" .. name, UIParent)
-    frame:SetSize(343, 32)
-    frame:Hide()
-
-    local button = CreateFrame("CheckButton", nil, frame)
-    button:SetSize(32, 32)
-    button:SetPoint("LEFT", -5, 0)
-    button:SetNormalTexture("Interface\\Buttons\\UI-CheckBox-Up")
-    button:SetPushedTexture("Interface\\Buttons\\UI-CheckBox-Down")
-    button:SetHighlightTexture("Interface\\Buttons\\UI-CheckBox-Highlight", "ADD")
-    button:SetCheckedTexture("Interface\\Buttons\\UI-CheckBox-Check")
-    button:SetDisabledCheckedTexture("Interface\\Buttons\\UI-CheckBox-Check-Disabled")
-    button:SetScript("OnClick", function()
-        PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-        frame.checked = not frame.checked
-        button:SetChecked(frame.checked)
-        setter(frame.checked)
-    end)
-    frame.Button = button
-
-    local labelFS = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlightMedium")
-    labelFS:SetSize(300, 32)
-    labelFS:SetPoint("LEFT", button, "RIGHT", 5, 0)
-    labelFS:SetJustifyH("LEFT")
-    labelFS:SetText(label)
-    frame.Label = labelFS
-
-    frame._suiGetter = getter
-    return frame
-end
-
-local function CreateSuiDropdown(name, label, optionsGetter, getter, setter)
-    local frame = CreateFrame("Frame", "SUI_EditMode_" .. name, UIParent)
-    frame:SetSize(343, 32)
-    frame:Hide()
-
-    local labelFS = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlightMedium")
-    labelFS:SetSize(100, 32)
-    labelFS:SetPoint("LEFT")
-    labelFS:SetJustifyH("LEFT")
-    labelFS:SetText(label)
-    frame.Label = labelFS
-
-    local dropdown = CreateFrame("DropdownButton", nil, frame, "WowStyle1DropdownTemplate")
-    dropdown:SetWidth(225)
-    dropdown:SetPoint("LEFT", labelFS, "RIGHT", 5, 0)
-    frame.Dropdown = dropdown
-
-    frame._suiGetter = getter
-    frame._suiOptionsGetter = optionsGetter
-    frame._suiSetup = function()
-        dropdown:SetupMenu(function(dd, rootDescription)
-            local currentVal = getter()
-            for _, opt in ipairs(optionsGetter()) do
-                rootDescription:CreateRadio(opt.text, function() return getter() == opt.value end, function()
-                    setter(opt.value)
-                end, opt.value)
+    ---------------------------------------------------------------------------
+    -- Texture list from LibSharedMedia
+    ---------------------------------------------------------------------------
+    local function GetLSMTextureOptions()
+        local textures = {}
+        local lsm = LibStub and LibStub("LibSharedMedia-3.0", true)
+        local TEXTURE_NAMES = (ns.ResourceBars and ns.ResourceBars.TEXTURE_DISPLAY_NAMES) or {}
+        if lsm then
+            for _, name in ipairs(lsm:List("statusbar")) do
+                local displayName = TEXTURE_NAMES[name] or name
+                table.insert(textures, {value = name, text = displayName})
             end
-        end)
-    end
-    return frame
-end
-
-local function CreateSuiDivider(name, label)
-    local frame = CreateFrame("Frame", "SUI_EditMode_Divider_" .. name, UIParent)
-    frame:SetSize(343, 20)
-    frame:Hide()
-    local text = frame:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-    text:SetPoint("LEFT", 0, 0)
-    text:SetText("|cff00ccff" .. label .. "|r")
-    text:SetJustifyH("LEFT")
-    local line = frame:CreateTexture(nil, "ARTWORK")
-    line:SetHeight(1)
-    line:SetPoint("LEFT", text, "RIGHT", 6, 0)
-    line:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
-    line:SetColorTexture(0.3, 0.3, 0.3, 0.6)
-    return frame
-end
-
----------------------------------------------------------------------------
--- DB helpers for Edit Mode setters (ensure path exists before writing)
----------------------------------------------------------------------------
-
-local function GetOrCreateTrackedBarDB()
-    local db = GetDB()
-    if not db then return nil end
-    if not db.trackedBar then db.trackedBar = {} end
-    return db.trackedBar
-end
-
-local function GetProfile()
-    return SUICore and SUICore.db and SUICore.db.profile
-end
-
----------------------------------------------------------------------------
--- Texture list from LibSharedMedia (same source as sui_options.lua)
----------------------------------------------------------------------------
-
-local function GetLSMTextureOptions()
-    local textures = {}
-    local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
-    local TEXTURE_NAMES = (ns.ResourceBars and ns.ResourceBars.TEXTURE_DISPLAY_NAMES) or {}
-    if LSM then
-        for _, name in ipairs(LSM:List("statusbar")) do
-            local displayName = TEXTURE_NAMES[name] or name
-            table.insert(textures, {value = name, text = displayName})
+            table.sort(textures, function(a, b) return a.text < b.text end)
+        else
+            textures = {{value = "Solid", text = "Solid"}}
         end
-        table.sort(textures, function(a, b) return a.text < b.text end)
-    else
-        textures = {{value = "Solid", text = "Solid"}}
-    end
-    return textures
-end
-
----------------------------------------------------------------------------
--- Control definitions: BuffBar panel
----------------------------------------------------------------------------
-
-local function InitBarControls()
-    if suiEditModeControls.barInited then return end
-    suiEditModeControls.barInited = true
-
-    suiEditModeControls.barDivider = CreateSuiDivider("Bars", "SuaviUI")
-
-    suiEditModeControls.barHeight = CreateSuiSlider("BarHeight", "Bar Height", 2, 48, 1,
-        function() return (GetTrackedBarSettings()).barHeight or 24 end,
-        function(v) local t = GetOrCreateTrackedBarDB(); if t then t.barHeight = v end; LayoutBuffBars() end
-    )
-
-    suiEditModeControls.barTexture = CreateSuiDropdown("BarTexture", "Bar Texture",
-        GetLSMTextureOptions,
-        function() return (GetTrackedBarSettings()).texture or "Suavitex v3" end,
-        function(v) local t = GetOrCreateTrackedBarDB(); if t then t.texture = v end; LayoutBuffBars() end
-    )
-
-    suiEditModeControls.barOrientation = CreateSuiDropdown("BarOrientation", "Orientation",
-        function() return {
-            {value = "horizontal", text = "Horizontal"},
-            {value = "vertical", text = "Vertical"},
-        } end,
-        function() return (GetTrackedBarSettings()).orientation or "horizontal" end,
-        function(v) local t = GetOrCreateTrackedBarDB(); if t then t.orientation = v end; LayoutBuffBars() end
-    )
-
-    suiEditModeControls.barGrowth = CreateSuiDropdown("BarGrowth", "Stack Direction",
-        function() return {
-            {value = true, text = "Up / Right"},
-            {value = false, text = "Down / Left"},
-        } end,
-        function() local s = GetTrackedBarSettings(); return s.growUp ~= false end,
-        function(v) local t = GetOrCreateTrackedBarDB(); if t then t.growUp = v end; LayoutBuffBars() end
-    )
-
-    suiEditModeControls.barClassColor = CreateSuiCheckbox("ClassColor", "Use Class Color",
-        function() return (GetTrackedBarSettings()).useClassColor ~= false end,
-        function(v) local t = GetOrCreateTrackedBarDB(); if t then t.useClassColor = v end; LayoutBuffBars() end
-    )
-
-    suiEditModeControls.barBorderSize = CreateSuiSlider("BarBorderSize", "Border Size", 0, 4, 1,
-        function() return (GetTrackedBarSettings()).borderSize or 1 end,
-        function(v) local t = GetOrCreateTrackedBarDB(); if t then t.borderSize = v end; LayoutBuffBars() end
-    )
-
-    suiEditModeControls.barBgOpacity = CreateSuiSlider("BarBgOpacity", "BG Opacity", 0, 100, 10,
-        function() return math.floor(((GetTrackedBarSettings()).bgOpacity or 0.7) * 100 + 0.5) end,
-        function(v) local t = GetOrCreateTrackedBarDB(); if t then t.bgOpacity = v / 100 end; LayoutBuffBars() end
-    )
-
-    suiEditModeControls.barTextSize = CreateSuiSlider("BarTextSize", "Text Size", 8, 24, 1,
-        function() return (GetTrackedBarSettings()).textSize or 12 end,
-        function(v) local t = GetOrCreateTrackedBarDB(); if t then t.textSize = v end; LayoutBuffBars() end
-    )
-end
-
----------------------------------------------------------------------------
--- Control definitions: BuffIcon panel
----------------------------------------------------------------------------
-
-local function InitIconControls()
-    if suiEditModeControls.iconInited then return end
-    suiEditModeControls.iconInited = true
-
-    suiEditModeControls.iconDivider = CreateSuiDivider("Icons", "SuaviUI")
-
-    suiEditModeControls.iconSquare = CreateSuiCheckbox("IconSquare", "Square Icons",
-        function() local p = GetProfile(); return p and p.cooldownManager_squareIcons_BuffIcons or false end,
-        function(v)
-            local p = GetProfile(); if p then p.cooldownManager_squareIcons_BuffIcons = v end
-            LayoutBuffIcons()
-        end
-    )
-
-    suiEditModeControls.iconBorderSize = CreateSuiSlider("IconBorderSize", "Border Size", 1, 6, 1,
-        function() local p = GetProfile(); return p and p.cooldownManager_squareIconsBorder_BuffIcons or 2 end,
-        function(v)
-            local p = GetProfile(); if p then p.cooldownManager_squareIconsBorder_BuffIcons = v end
-            LayoutBuffIcons()
-        end
-    )
-
-    suiEditModeControls.iconBorderOverlap = CreateSuiCheckbox("IconBorderOverlap", "Border Overlap",
-        function() local p = GetProfile(); return p and p.cooldownManager_squareIconsBorder_BuffIcons_Overlap or false end,
-        function(v)
-            local p = GetProfile(); if p then p.cooldownManager_squareIconsBorder_BuffIcons_Overlap = v end
-            LayoutBuffIcons()
-        end
-    )
-
-    suiEditModeControls.iconZoom = CreateSuiSlider("IconZoom", "Icon Zoom", 0, 50, 5,
-        function() local p = GetProfile(); return math.floor(((p and p.cooldownManager_squareIconsZoom_BuffIcons) or 0) * 100 + 0.5) end,
-        function(v)
-            local p = GetProfile(); if p then p.cooldownManager_squareIconsZoom_BuffIcons = v / 100 end
-            LayoutBuffIcons()
-        end
-    )
-end
-
----------------------------------------------------------------------------
--- Viewer detection
----------------------------------------------------------------------------
-
-local function IsBuffBarViewer(systemFrame)
-    return systemFrame
-        and systemFrame.system == Enum.EditModeSystem.CooldownViewer
-        and systemFrame.systemIndex == Enum.EditModeCooldownViewerSystemIndices.BuffBar
-end
-
-local function IsBuffIconViewer(systemFrame)
-    return systemFrame
-        and systemFrame.system == Enum.EditModeSystem.CooldownViewer
-        and systemFrame.systemIndex == Enum.EditModeCooldownViewerSystemIndices.BuffIcon
-end
-
----------------------------------------------------------------------------
--- Generic inject: show a list of controls in the dialog's Settings container
----------------------------------------------------------------------------
-
-local function HideAllSuiControls()
-    for _, frame in pairs(suiEditModeControls) do
-        if type(frame) == "table" and frame.Hide then
-            frame:Hide()
-        end
-    end
-end
-
-local function InjectControls(dialog, controlKeys)
-    -- Find highest layoutIndex among Blizzard's settings
-    local maxIndex = 0
-    for _, child in ipairs({dialog.Settings:GetChildren()}) do
-        if child:IsShown() and child.layoutIndex then
-            maxIndex = math.max(maxIndex, child.layoutIndex)
-        end
+        return textures
     end
 
-    local nextIndex = maxIndex + 1
-
-    for _, key in ipairs(controlKeys) do
-        local ctrl = suiEditModeControls[key]
-        if ctrl then
-            ctrl:SetParent(dialog.Settings)
-            ctrl:SetPoint("TOPLEFT")
-            ctrl.layoutIndex = nextIndex
-            nextIndex = nextIndex + 1
-
-            -- Type-specific refresh before showing
-            if ctrl.Slider then
-                -- Slider: re-init with current value
-                ctrl.initInProgress = true
-                local steps = (ctrl._suiMax - ctrl._suiMin) / ctrl._suiStep
-                ctrl.Slider:Init(ctrl._suiGetter(), ctrl._suiMin, ctrl._suiMax, steps, {
-                    [MinimalSliderWithSteppersMixin.Label.Right] = CreateMinimalSliderFormatter(MinimalSliderWithSteppersMixin.Label.Right),
-                })
-                ctrl.initInProgress = false
-            elseif ctrl.Button then
-                -- Checkbox: sync checked state
-                local checked = ctrl._suiGetter()
-                ctrl.checked = checked
-                ctrl.Button:SetChecked(checked)
-            elseif ctrl.Dropdown then
-                -- Dropdown: rebuild menu
-                ctrl._suiSetup()
-            end
-
-            ctrl:Show()
-        end
+    ---------------------------------------------------------------------------
+    -- Viewer detection predicates
+    ---------------------------------------------------------------------------
+    local function IsBuffBarViewer(sf)
+        return sf and sf.system == Enum.EditModeSystem.CooldownViewer
+            and sf.systemIndex == Enum.EditModeCooldownViewerSystemIndices.BuffBar
+    end
+    local function IsBuffIconViewer(sf)
+        return sf and sf.system == Enum.EditModeSystem.CooldownViewer
+            and sf.systemIndex == Enum.EditModeCooldownViewerSystemIndices.BuffIcon
+    end
+    local function IsEssentialViewer(sf)
+        return sf and sf.system == Enum.EditModeSystem.CooldownViewer
+            and sf.systemIndex == Enum.EditModeCooldownViewerSystemIndices.Essential
+    end
+    local function IsUtilityViewer(sf)
+        return sf and sf.system == Enum.EditModeSystem.CooldownViewer
+            and sf.systemIndex == Enum.EditModeCooldownViewerSystemIndices.Utility
     end
 
-    dialog.Settings:Layout()
+    ---------------------------------------------------------------------------
+    -- Helper: create square-icon controls for a CDM viewer category
+    ---------------------------------------------------------------------------
+    local function CreateCDMSquareIconControls(prefix, suffix, refreshFn)
+        controls[prefix .. "Divider"] = EP.CreateDivider(prefix, "SuaviUI")
+
+        controls[prefix .. "Square"] = EP.CreateCheckbox(prefix .. "Square", "Square Icons",
+            function() local p = GetProfile(); return p and p["cooldownManager_squareIcons_" .. suffix] or false end,
+            function(v) local p = GetProfile(); if p then p["cooldownManager_squareIcons_" .. suffix] = v end; refreshFn() end
+        )
+        controls[prefix .. "BorderSize"] = EP.CreateSlider(prefix .. "BorderSize", "Border Size", 1, 6, 1,
+            function() local p = GetProfile(); return p and p["cooldownManager_squareIconsBorder_" .. suffix] or 4 end,
+            function(v) local p = GetProfile(); if p then p["cooldownManager_squareIconsBorder_" .. suffix] = v end; refreshFn() end
+        )
+        controls[prefix .. "BorderOverlap"] = EP.CreateCheckbox(prefix .. "BorderOverlap", "Border Overlap",
+            function() local p = GetProfile(); return p and p["cooldownManager_squareIconsBorder_" .. suffix .. "_Overlap"] or false end,
+            function(v) local p = GetProfile(); if p then p["cooldownManager_squareIconsBorder_" .. suffix .. "_Overlap"] = v end; refreshFn() end
+        )
+        controls[prefix .. "Zoom"] = EP.CreateSlider(prefix .. "Zoom", "Icon Zoom", 0, 50, 5,
+            function() local p = GetProfile(); return math.floor(((p and p["cooldownManager_squareIconsZoom_" .. suffix]) or 0) * 100 + 0.5) end,
+            function(v) local p = GetProfile(); if p then p["cooldownManager_squareIconsZoom_" .. suffix] = v / 100 end; refreshFn() end
+        )
+    end
+
+    ---------------------------------------------------------------------------
+    -- BuffBar: bar styling controls
+    ---------------------------------------------------------------------------
+    local barControlKeys = {
+        "barDivider", "barHeight", "barTexture", "barOrientation", "barGrowth",
+        "barClassColor", "barBorderSize", "barBgOpacity", "barTextSize",
+    }
+
+    EP.RegisterSystem(IsBuffBarViewer, function()
+        controls.barDivider = EP.CreateDivider("Bars", "SuaviUI")
+
+        controls.barHeight = EP.CreateSlider("BarHeight", "Bar Height", 2, 48, 1,
+            function() return (GetTrackedBarSettings()).barHeight or 24 end,
+            function(v) local t = GetOrCreateTrackedBarDB(); if t then t.barHeight = v end; LayoutBuffBars() end
+        )
+        controls.barTexture = EP.CreateDropdown("BarTexture", "Bar Texture",
+            GetLSMTextureOptions,
+            function() return (GetTrackedBarSettings()).texture or "Suavitex v3" end,
+            function(v) local t = GetOrCreateTrackedBarDB(); if t then t.texture = v end; LayoutBuffBars() end
+        )
+        controls.barOrientation = EP.CreateDropdown("BarOrientation", "Orientation",
+            function() return {
+                {value = "horizontal", text = "Horizontal"},
+                {value = "vertical", text = "Vertical"},
+            } end,
+            function() return (GetTrackedBarSettings()).orientation or "horizontal" end,
+            function(v) local t = GetOrCreateTrackedBarDB(); if t then t.orientation = v end; LayoutBuffBars() end
+        )
+        controls.barGrowth = EP.CreateDropdown("BarGrowth", "Stack Direction",
+            function() return {
+                {value = true, text = "Up / Right"},
+                {value = false, text = "Down / Left"},
+            } end,
+            function() local s = GetTrackedBarSettings(); return s.growUp ~= false end,
+            function(v) local t = GetOrCreateTrackedBarDB(); if t then t.growUp = v end; LayoutBuffBars() end
+        )
+        controls.barClassColor = EP.CreateCheckbox("ClassColor", "Use Class Color",
+            function() return (GetTrackedBarSettings()).useClassColor ~= false end,
+            function(v) local t = GetOrCreateTrackedBarDB(); if t then t.useClassColor = v end; LayoutBuffBars() end
+        )
+        controls.barBorderSize = EP.CreateSlider("BarBorderSize", "Border Size", 0, 4, 1,
+            function() return (GetTrackedBarSettings()).borderSize or 1 end,
+            function(v) local t = GetOrCreateTrackedBarDB(); if t then t.borderSize = v end; LayoutBuffBars() end
+        )
+        controls.barBgOpacity = EP.CreateSlider("BarBgOpacity", "BG Opacity", 0, 100, 10,
+            function() return math.floor(((GetTrackedBarSettings()).bgOpacity or 0.7) * 100 + 0.5) end,
+            function(v) local t = GetOrCreateTrackedBarDB(); if t then t.bgOpacity = v / 100 end; LayoutBuffBars() end
+        )
+        controls.barTextSize = EP.CreateSlider("BarTextSize", "Text Size", 8, 24, 1,
+            function() return (GetTrackedBarSettings()).textSize or 12 end,
+            function(v) local t = GetOrCreateTrackedBarDB(); if t then t.textSize = v end; LayoutBuffBars() end
+        )
+    end, barControlKeys)
+
+    ---------------------------------------------------------------------------
+    -- BuffIcon: square icon controls
+    ---------------------------------------------------------------------------
+    local iconControlKeys = {
+        "buffIconDivider", "buffIconSquare", "buffIconBorderSize",
+        "buffIconBorderOverlap", "buffIconZoom",
+    }
+
+    EP.RegisterSystem(IsBuffIconViewer, function()
+        CreateCDMSquareIconControls("buffIcon", "BuffIcons", LayoutBuffIcons)
+    end, iconControlKeys)
+
+    ---------------------------------------------------------------------------
+    -- Essential: square icon controls + CDM global settings
+    ---------------------------------------------------------------------------
+    local essentialControlKeys = {
+        "essentialDivider", "essentialSquare", "essentialBorderSize",
+        "essentialBorderOverlap", "essentialZoom",
+        "cdmGlobalDivider", "cdmCentered",
+        "cdmEssentialGrow", "cdmUtilityGrow",
+        "cdmDimUtility", "cdmDimOpacity",
+        "cdmLimitUtilitySize", "cdmNormalizeUtility",
+        "cdmHighlightEssential", "cdmHighlightUtility",
+    }
+
+    EP.RegisterSystem(IsEssentialViewer, function()
+        CreateCDMSquareIconControls("essential", "Essential", RefreshIcons)
+
+        -- CDM Global settings (shown on Essential panel as the "main" CDM panel)
+        controls.cdmGlobalDivider = EP.CreateDivider("CDMGlobal", "CDM Global")
+
+        controls.cdmCentered = EP.CreateCheckbox("CDMCentered", "Use Centered Styling",
+            function() local p = GetProfile(); return p and p.cooldownManager_useCenteredStyling or false end,
+            function(v) local p = GetProfile(); if p then p.cooldownManager_useCenteredStyling = v end; RefreshIcons() end
+        )
+        controls.cdmEssentialGrow = EP.CreateDropdown("CDMEssentialGrow", "Essential Grow",
+            function() return { {value = "TOP", text = "Top"}, {value = "BOTTOM", text = "Bottom"} } end,
+            function() local p = GetProfile(); return p and p.cooldownManager_centerEssential_growFromDirection or "TOP" end,
+            function(v) local p = GetProfile(); if p then p.cooldownManager_centerEssential_growFromDirection = v end; RefreshIcons() end
+        )
+        controls.cdmUtilityGrow = EP.CreateDropdown("CDMUtilityGrow", "Utility Grow",
+            function() return { {value = "TOP", text = "Top"}, {value = "BOTTOM", text = "Bottom"} } end,
+            function() local p = GetProfile(); return p and p.cooldownManager_centerUtility_growFromDirection or "TOP" end,
+            function(v) local p = GetProfile(); if p then p.cooldownManager_centerUtility_growFromDirection = v end; RefreshIcons() end
+        )
+        controls.cdmDimUtility = EP.CreateCheckbox("CDMDimUtility", "Dim Utility Off CD",
+            function() local p = GetProfile(); return p and p.cooldownManager_utility_dimWhenNotOnCD or false end,
+            function(v) local p = GetProfile(); if p then p.cooldownManager_utility_dimWhenNotOnCD = v end; RefreshIcons() end
+        )
+        controls.cdmDimOpacity = EP.CreateSlider("CDMDimOpacity", "Dim Opacity", 0, 90, 5,
+            function() local p = GetProfile(); return math.floor(((p and p.cooldownManager_utility_dimOpacity) or 0.3) * 100 + 0.5) end,
+            function(v) local p = GetProfile(); if p then p.cooldownManager_utility_dimOpacity = v / 100 end; RefreshIcons() end
+        )
+        controls.cdmLimitUtilitySize = EP.CreateCheckbox("CDMLimitUtility", "Limit Utility to Essential Width",
+            function() local p = GetProfile(); return p and p.cooldownManager_limitUtilitySizeToEssential or false end,
+            function(v) local p = GetProfile(); if p then p.cooldownManager_limitUtilitySizeToEssential = v end; RefreshAdvanced() end
+        )
+        controls.cdmNormalizeUtility = EP.CreateCheckbox("CDMNormalizeUtility", "Normalize Utility Size",
+            function() local p = GetProfile(); return p and p.cooldownManager_normalizeUtilitySize or false end,
+            function(v) local p = GetProfile(); if p then p.cooldownManager_normalizeUtilitySize = v end; RefreshAdvanced() end
+        )
+        controls.cdmHighlightEssential = EP.CreateCheckbox("CDMHighlightEssential", "Rotation Highlight",
+            function() local p = GetProfile(); return p and p.cooldownManager_showHighlight_Essential or false end,
+            function(v) local p = GetProfile(); if p then p.cooldownManager_showHighlight_Essential = v end; RefreshAdvanced() end
+        )
+        controls.cdmHighlightUtility = EP.CreateCheckbox("CDMHighlightUtility", "Utility Rot. Highlight",
+            function() local p = GetProfile(); return p and p.cooldownManager_showHighlight_Utility or false end,
+            function(v) local p = GetProfile(); if p then p.cooldownManager_showHighlight_Utility = v end; RefreshAdvanced() end
+        )
+    end, essentialControlKeys)
+
+    ---------------------------------------------------------------------------
+    -- Utility: square icon controls
+    ---------------------------------------------------------------------------
+    local utilityControlKeys = {
+        "utilityDivider", "utilitySquare", "utilityBorderSize",
+        "utilityBorderOverlap", "utilityZoom",
+    }
+
+    EP.RegisterSystem(IsUtilityViewer, function()
+        CreateCDMSquareIconControls("utility", "Utility", RefreshIcons)
+    end, utilityControlKeys)
 end
-
----------------------------------------------------------------------------
--- Hook EditModeSystemSettingsDialog:UpdateDialog
----------------------------------------------------------------------------
-
-C_Timer.After(0, function()
-    local dialog = EditModeSystemSettingsDialog
-    if not dialog then return end
-
-    hooksecurefunc(dialog, "UpdateDialog", function(self, systemFrame)
-        HideAllSuiControls()
-
-        if IsBuffBarViewer(systemFrame) then
-            InitBarControls()
-            InjectControls(self, {
-                "barDivider",
-                "barHeight",
-                "barTexture",
-                "barOrientation",
-                "barGrowth",
-                "barClassColor",
-                "barBorderSize",
-                "barBgOpacity",
-                "barTextSize",
-            })
-        elseif IsBuffIconViewer(systemFrame) then
-            InitIconControls()
-            InjectControls(self, {
-                "iconDivider",
-                "iconSquare",
-                "iconBorderSize",
-                "iconBorderOverlap",
-                "iconZoom",
-            })
-        end
-    end)
-end)
 
 ---------------------------------------------------------------------------
 -- PUBLIC API

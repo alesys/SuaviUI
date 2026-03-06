@@ -17,6 +17,7 @@
     <Script file="buffborders.lua"/>
     <Script file="suicore_main.lua"/>
     <Script file="perfectpixel.lua"/>
+    <Script file="sui_editmode_panels.lua"/>
     <Script file="sui_actionbars.lua"/>
     <Script file="actionbars_editmode.lua"/>
     <!-- Resource Bars Module (Sensei-style architecture) -->

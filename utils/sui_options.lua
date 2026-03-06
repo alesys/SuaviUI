@@ -4039,160 +4039,14 @@ local function CreateMinimapPage(parent)
 
             y = y - 10
 
-            -- SECTION 3: Hide Minimap Elements
-            local hideHeader = GUI:CreateSectionHeader(tabContent, "Hide Minimap Elements")
-            hideHeader:SetPoint("TOPLEFT", PAD, y)
-            y = y - hideHeader.gap
-
-            -- Using inverted checkboxes: checked = hide (DB false), unchecked = show (DB true)
-            local hideMail = GUI:CreateFormCheckboxInverted(tabContent, "Hide Mail (reload after)", "showMail", mm, RefreshMinimap)
-            hideMail:SetPoint("TOPLEFT", PAD, y)
-            hideMail:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local hideTracking = GUI:CreateFormCheckboxInverted(tabContent, "Hide Tracking", "showTracking", mm, RefreshMinimap)
-            hideTracking:SetPoint("TOPLEFT", PAD, y)
-            hideTracking:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local hideDifficulty = GUI:CreateFormCheckboxInverted(tabContent, "Hide Difficulty", "showDifficulty", mm, RefreshMinimap)
-            hideDifficulty:SetPoint("TOPLEFT", PAD, y)
-            hideDifficulty:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local hideExpansion = GUI:CreateFormCheckboxInverted(tabContent, "Hide Progress Report", "showMissions", mm, RefreshMinimap)
-            hideExpansion:SetPoint("TOPLEFT", PAD, y)
-            hideExpansion:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            -- UIHider minimap controls (uses db.uiHider)
-            local hideBorder = GUI:CreateFormCheckbox(tabContent, "Hide Border (Top)", "hideMinimapBorder", db.uiHider, RefreshUIHider)
-            hideBorder:SetPoint("TOPLEFT", PAD, y)
-            hideBorder:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local hideClock = GUI:CreateFormCheckbox(tabContent, "Hide Clock Button", "hideTimeManager", db.uiHider, RefreshUIHider)
-            hideClock:SetPoint("TOPLEFT", PAD, y)
-            hideClock:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local hideCalendar = GUI:CreateFormCheckbox(tabContent, "Hide Calendar Button", "hideGameTime", db.uiHider, RefreshUIHider)
-            hideCalendar:SetPoint("TOPLEFT", PAD, y)
-            hideCalendar:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local hideZoneText = GUI:CreateFormCheckbox(tabContent, "Hide Zone Text (Native)", "hideMinimapZoneText", db.uiHider, RefreshUIHider)
-            hideZoneText:SetPoint("TOPLEFT", PAD, y)
-            hideZoneText:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local hideZoom = GUI:CreateFormCheckboxInverted(tabContent, "Hide Zoom Buttons", "showZoomButtons", mm, RefreshMinimap)
-            hideZoom:SetPoint("TOPLEFT", PAD, y)
-            hideZoom:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            y = y - 10
-
-            -- SECTION 4: Zone Label
-            local zoneHeader = GUI:CreateSectionHeader(tabContent, "Zone Label")
-            zoneHeader:SetPoint("TOPLEFT", PAD, y)
-            y = y - zoneHeader.gap
-
-            local showZoneCheck = GUI:CreateFormCheckbox(tabContent, "Show Zone Label", "showZoneText", mm, RefreshMinimap)
-            showZoneCheck:SetPoint("TOPLEFT", PAD, y)
-            showZoneCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            if mm.zoneTextConfig then
-                local zoneOffsetX = GUI:CreateFormSlider(tabContent, "Horizontal Offset", -150, 150, 1, "offsetX", mm.zoneTextConfig, RefreshMinimap)
-                zoneOffsetX:SetPoint("TOPLEFT", PAD, y)
-                zoneOffsetX:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local zoneOffsetY = GUI:CreateFormSlider(tabContent, "Vertical Offset", -150, 150, 1, "offsetY", mm.zoneTextConfig, RefreshMinimap)
-                zoneOffsetY:SetPoint("TOPLEFT", PAD, y)
-                zoneOffsetY:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local zoneSize = GUI:CreateFormSlider(tabContent, "Label Size", 8, 20, 1, "fontSize", mm.zoneTextConfig, RefreshMinimap)
-                zoneSize:SetPoint("TOPLEFT", PAD, y)
-                zoneSize:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local zoneAllCaps = GUI:CreateFormCheckbox(tabContent, "Uppercase Text", "allCaps", mm.zoneTextConfig, RefreshMinimap)
-                zoneAllCaps:SetPoint("TOPLEFT", PAD, y)
-                zoneAllCaps:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local zoneClassColor = GUI:CreateFormCheckbox(tabContent, "Use Class Color", "useClassColor", mm.zoneTextConfig, RefreshMinimap)
-                zoneClassColor:SetPoint("TOPLEFT", PAD, y)
-                zoneClassColor:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-            end
-        end
-
-        -- SECTION 5: Dungeon Eye (LFG Queue Button)
-        if true then  -- Always build (mm already guaranteed above)
-            y = y - 10
-            GUI:SetSearchSection("Dungeon Eye")
-            local eyeHeader = GUI:CreateSectionHeader(tabContent, "Dungeon Eye (LFG Queue)")
-            eyeHeader:SetPoint("TOPLEFT", PAD, y)
-            y = y - eyeHeader.gap
-
-            -- Description text
-            local eyeDesc = GUI:CreateLabel(tabContent, "When enabled, the queue eye automatically appears on the minimap when you join a queue.", 11, C.textMuted)
-            eyeDesc:SetPoint("TOPLEFT", PAD, y)
-            eyeDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            eyeDesc:SetJustifyH("LEFT")
-            y = y - 20
-
-            -- Ensure dungeonEye settings exist
-            if not mm.dungeonEye then
-                mm.dungeonEye = {
-                    enabled = true,
-                    corner = "BOTTOMLEFT",
-                    scale = 0.6,
-                    offsetX = 0,
-                    offsetY = 0,
-                }
-            end
-            local eye = mm.dungeonEye
-
-            -- Enable toggle
-            local eyeEnable = GUI:CreateFormCheckbox(tabContent, "Enable Dungeon Eye", "enabled", eye, RefreshMinimap)
-            eyeEnable:SetPoint("TOPLEFT", PAD, y)
-            eyeEnable:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            -- Corner dropdown
-            local cornerOptions = {
-                {value = "TOPRIGHT", text = "Top Right"},
-                {value = "TOPLEFT", text = "Top Left"},
-                {value = "BOTTOMRIGHT", text = "Bottom Right"},
-                {value = "BOTTOMLEFT", text = "Bottom Left"},
-            }
-            local eyeCorner = GUI:CreateFormDropdown(tabContent, "Corner Position", cornerOptions, "corner", eye, RefreshMinimap)
-            eyeCorner:SetPoint("TOPLEFT", PAD, y)
-            eyeCorner:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            -- Scale slider
-            local eyeScale = GUI:CreateFormSlider(tabContent, "Icon Scale", 0.1, 2.0, 0.1, "scale", eye, RefreshMinimap)
-            eyeScale:SetPoint("TOPLEFT", PAD, y)
-            eyeScale:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            -- X Offset slider
-            local eyeOffsetX = GUI:CreateFormSlider(tabContent, "X Offset", -30, 30, 1, "offsetX", eye, RefreshMinimap)
-            eyeOffsetX:SetPoint("TOPLEFT", PAD, y)
-            eyeOffsetX:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            -- Y Offset slider
-            local eyeOffsetY = GUI:CreateFormSlider(tabContent, "Y Offset", -30, 30, 1, "offsetY", eye, RefreshMinimap)
-            eyeOffsetY:SetPoint("TOPLEFT", PAD, y)
-            eyeOffsetY:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
+            -- Hide Elements, Zone Label, and Dungeon Eye: migrated to Edit Mode panel
+            local minimapEditModeTip = GUI:CreateLabel(tabContent, "Hide Elements, Zone Label, and Dungeon Eye settings are now in Edit Mode. Select the SuaviUI Minimap frame to access them.", 11, C.textMuted)
+            minimapEditModeTip:SetPoint("TOPLEFT", PAD, y)
+            minimapEditModeTip:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+            minimapEditModeTip:SetJustifyH("LEFT")
+            minimapEditModeTip:SetWordWrap(true)
+            minimapEditModeTip:SetHeight(30)
+            y = y - 40
         end
 
         tabContent:SetHeight(math.abs(y) + 50)
@@ -4229,46 +4083,18 @@ local function CreateMinimapPage(parent)
             panelHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - panelHeader.gap
 
-            -- Description text (grouped together)
-            local noteLabel = GUI:CreateLabel(tabContent, "This datatext panel is anchored below the minimap and cannot be moved. To create additional movable panels, scroll down to 'Custom Movable Panels'.", 11, C.textMuted)
-            noteLabel:SetPoint("TOPLEFT", PAD, y)
-            noteLabel:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            noteLabel:SetJustifyH("LEFT")
-            y = y - 38
-
-            local enableCheck = GUI:CreateFormCheckbox(tabContent, "Enable Minimap Datatext", "enabled", dt, RefreshMinimap)
-            enableCheck:SetPoint("TOPLEFT", PAD, y)
-            enableCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local forceSingleLine = GUI:CreateFormCheckbox(tabContent, "Force Single Line", "forceSingleLine", dt, RefreshMinimap)
-            forceSingleLine:SetPoint("TOPLEFT", PAD, y)
-            forceSingleLine:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local heightSlider = GUI:CreateFormSlider(tabContent, "Panel Height (Per Row)", 18, 50, 1, "height", dt, RefreshMinimap)
-            heightSlider:SetPoint("TOPLEFT", PAD, y)
-            heightSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local bgOpacitySlider = GUI:CreateFormSlider(tabContent, "Background Transparency", 0, 100, 5, "bgOpacity", dt, RefreshMinimap)
-            bgOpacitySlider:SetPoint("TOPLEFT", PAD, y)
-            bgOpacitySlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local borderSizeSlider = GUI:CreateFormSlider(tabContent, "Border Size (0=hidden)", 0, 8, 1, "borderSize", dt, RefreshMinimap)
-            borderSizeSlider:SetPoint("TOPLEFT", PAD, y)
-            borderSizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
+            -- Datatext layout settings: migrated to Edit Mode panel
+            local dtEditModeTip = GUI:CreateLabel(tabContent, "Datatext layout settings (enable, height, opacity, border size, offset, font size) are now in Edit Mode. Select the SuaviUI Minimap frame to access them.", 11, C.textMuted)
+            dtEditModeTip:SetPoint("TOPLEFT", PAD, y)
+            dtEditModeTip:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+            dtEditModeTip:SetJustifyH("LEFT")
+            dtEditModeTip:SetWordWrap(true)
+            dtEditModeTip:SetHeight(30)
+            y = y - 40
 
             local borderColorPicker = GUI:CreateFormColorPicker(tabContent, "Border Color", "borderColor", dt, RefreshMinimap)
             borderColorPicker:SetPoint("TOPLEFT", PAD, y)
             borderColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local offsetYSlider = GUI:CreateFormSlider(tabContent, "Vertical Offset", -40, 40, 1, "offsetY", dt, RefreshMinimap)
-            offsetYSlider:SetPoint("TOPLEFT", PAD, y)
-            offsetYSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
             y = y - 10
@@ -5434,38 +5260,28 @@ local function CreateCooldownViewersPage(parent)
     buffBarAlign:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - FORM_ROW
 
-    local essentialGrow = GUI:CreateFormDropdown(content, "Essential Rows Grow From", centerGrowOptions, "cooldownManager_centerEssential_growFromDirection", db, RefreshIcons)
-    essentialGrow:SetPoint("TOPLEFT", PADDING, y)
-    essentialGrow:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
-
-    local utilityGrow = GUI:CreateFormDropdown(content, "Utility Rows Grow From", centerGrowOptions, "cooldownManager_centerUtility_growFromDirection", db, RefreshIcons)
-    utilityGrow:SetPoint("TOPLEFT", PADDING, y)
-    utilityGrow:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
+    -- Essential/Utility Rows Grow From: migrated to Edit Mode panel
+    local growEditModeTip = GUI:CreateLabel(content, "Essential/Utility row growth direction is now in Edit Mode. Select the Essential or Utility CDM frame to access these settings.", 11, C.textMuted)
+    growEditModeTip:SetPoint("TOPLEFT", PADDING, y)
+    growEditModeTip:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    growEditModeTip:SetJustifyH("LEFT")
+    growEditModeTip:SetWordWrap(true)
+    growEditModeTip:SetHeight(30)
+    y = y - 40
 
     local debugRefresh = GUI:CreateFormCheckbox(content, "Debug Refresh Logs", "cooldownManager_debugRefreshLogs", db, RefreshIcons)
     debugRefresh:SetPoint("TOPLEFT", PADDING, y)
     debugRefresh:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - FORM_ROW
 
-    -- =====================================================
-    -- UTILITY DIMMING
-    -- =====================================================
-    local dimHeader = GUI:CreateSectionHeader(content, "UTILITY DIMMING")
-    dimHeader:SetPoint("TOPLEFT", PADDING, y)
-    y = y - dimHeader.gap
-
-    local dimCheck = GUI:CreateFormCheckbox(content, "Dim Utility Icons When Not On CD", "cooldownManager_utility_dimWhenNotOnCD", db, RefreshIcons)
-    dimCheck:SetPoint("TOPLEFT", PADDING, y)
-    dimCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
-
-    local dimSlider = GUI:CreateFormSlider(content, "Dim Opacity", 0, 0.9, 0.05, "cooldownManager_utility_dimOpacity", db, RefreshIcons)
-    dimSlider:SetPoint("TOPLEFT", PADDING, y)
-    dimSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    dimSlider.SetFormattedValue = function(value) return string.format("%.0f%%", value * 100) end
-    y = y - SLIDER_HEIGHT
+    -- Utility dimming: migrated to Edit Mode panel
+    local dimEditModeTip = GUI:CreateLabel(content, "Utility dimming settings are now in Edit Mode. Select the Utility CDM frame to access them.", 11, C.textMuted)
+    dimEditModeTip:SetPoint("TOPLEFT", PADDING, y)
+    dimEditModeTip:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    dimEditModeTip:SetJustifyH("LEFT")
+    dimEditModeTip:SetWordWrap(true)
+    dimEditModeTip:SetHeight(30)
+    y = y - 40
 
     -- =====================================================
     -- CDM STYLING
@@ -5482,63 +5298,14 @@ local function CreateCooldownViewersPage(parent)
     squareHeader:SetPoint("TOPLEFT", PADDING, y)
     y = y - squareHeader.gap
 
-    local cdmStyleDesc = GUI:CreateLabel(content, "Controls centering (dynamic alignment) and square icon styling for CDM viewers.", 11, C.textMuted)
-    cdmStyleDesc:SetPoint("TOPLEFT", CDM_FORM_LEFT, y)
-    cdmStyleDesc:SetPoint("RIGHT", content, "RIGHT", -CDM_FORM_RIGHT, 0)
-    cdmStyleDesc:SetJustifyH("LEFT")
-    y = y - 20
-
-    local centeredMasterCheck = GUI:CreateFormCheckbox(content, "Use Centered Styling", "cooldownManager_useCenteredStyling", db, RefreshIcons)
-    centeredMasterCheck:SetPoint("TOPLEFT", CDM_FORM_LEFT, y)
-    centeredMasterCheck:SetPoint("RIGHT", content, "RIGHT", -CDM_FORM_RIGHT, 0)
-    y = y - CDM_ROW_HEIGHT
-
-    local function AddCDMStyleGroup(title, toggleLabel, borderKey, overlapKey, zoomKey, toggleKey)
-        y = y - CDM_GROUP_SPACING
-        local subHeader = GUI:CreateLabel(content, title, 12, C.textMuted)
-        subHeader:SetPoint("TOPLEFT", CDM_FORM_LEFT, y)
-        y = y - CDM_GROUP_TITLE_GAP
-
-        local squareCheck = GUI:CreateFormCheckbox(content, toggleLabel, toggleKey, db, RefreshIcons)
-        squareCheck:SetPoint("TOPLEFT", CDM_FORM_LEFT, y)
-        squareCheck:SetPoint("RIGHT", content, "RIGHT", -CDM_FORM_RIGHT, 0)
-        y = y - CDM_ROW_HEIGHT
-
-        local borderSlider = GUI:CreateFormSlider(content, "Border Thickness", 1, 6, 1, borderKey, db, RefreshIcons, { deferOnDrag = true })
-        borderSlider:SetPoint("TOPLEFT", CDM_FORM_LEFT, y)
-        borderSlider:SetPoint("RIGHT", content, "RIGHT", -CDM_FORM_RIGHT, 0)
-        borderSlider.SetFormattedValue = function(value) return string.format("%.0fpx", value) end
-        y = y - CDM_SLIDER_ROW_HEIGHT
-
-        local overlapCheck = GUI:CreateFormCheckbox(content, "Border Overlap", overlapKey, db, RefreshIcons)
-        overlapCheck:SetPoint("TOPLEFT", CDM_FORM_LEFT, y)
-        overlapCheck:SetPoint("RIGHT", content, "RIGHT", -CDM_FORM_RIGHT, 0)
-        y = y - CDM_ROW_HEIGHT
-
-        local zoomSlider = GUI:CreateFormSlider(content, "Icon Zoom", 0, 0.5, 0.05, zoomKey, db, RefreshIcons, { deferOnDrag = true })
-        zoomSlider:SetPoint("TOPLEFT", CDM_FORM_LEFT, y)
-        zoomSlider:SetPoint("RIGHT", content, "RIGHT", -CDM_FORM_RIGHT, 0)
-        zoomSlider.SetFormattedValue = function(value) return string.format("%.0f%%", value * 100) end
-        y = y - CDM_SLIDER_ROW_HEIGHT
-    end
-
-    AddCDMStyleGroup(
-        "Essential Cooldowns",
-        "Enable Square Essential Icons",
-        "cooldownManager_squareIconsBorder_Essential",
-        "cooldownManager_squareIconsBorder_Essential_Overlap",
-        "cooldownManager_squareIconsZoom_Essential",
-        "cooldownManager_squareIcons_Essential"
-    )
-
-    AddCDMStyleGroup(
-        "Utility Cooldowns",
-        "Enable Square Utility Icons",
-        "cooldownManager_squareIconsBorder_Utility",
-        "cooldownManager_squareIconsBorder_Utility_Overlap",
-        "cooldownManager_squareIconsZoom_Utility",
-        "cooldownManager_squareIcons_Utility"
-    )
+    -- CDM styling (centering, square icons, Essential/Utility): migrated to Edit Mode panel
+    local cdmStyleEditModeTip = GUI:CreateLabel(content, "Centered styling, square icon settings, and Essential/Utility CDM styling are now in Edit Mode. Select the Essential or Utility CDM frame to access these settings.", 11, C.textMuted)
+    cdmStyleEditModeTip:SetPoint("TOPLEFT", CDM_FORM_LEFT, y)
+    cdmStyleEditModeTip:SetPoint("RIGHT", content, "RIGHT", -CDM_FORM_RIGHT, 0)
+    cdmStyleEditModeTip:SetJustifyH("LEFT")
+    cdmStyleEditModeTip:SetWordWrap(true)
+    cdmStyleEditModeTip:SetHeight(30)
+    y = y - 40
 
     -- Buff Icons square styling: migrated to Edit Mode panel (select Tracked Buffs frame)
     y = y - CDM_GROUP_SPACING
@@ -5899,45 +5666,24 @@ local function CreateCooldownViewersPage(parent)
     resetButton:SetSize(150, 25)
     y = y - 35
 
-    -- Size Controls
+    -- Size Controls: migrated to Edit Mode panel
     y = y - 10
-    local sizeControlsLabel = GUI:CreateLabel(content, "Size Controls", 12, {1, 1, 1})
-    sizeControlsLabel:SetPoint("TOPLEFT", PADDING, y)
-    y = y - 20
+    local sizeEditModeTip = GUI:CreateLabel(content, "Size controls (limit utility size, normalize utility size) are now in Edit Mode. Select the Essential or Utility CDM frame to access them.", 11, C.textMuted)
+    sizeEditModeTip:SetPoint("TOPLEFT", PADDING, y)
+    sizeEditModeTip:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    sizeEditModeTip:SetJustifyH("LEFT")
+    sizeEditModeTip:SetWordWrap(true)
+    sizeEditModeTip:SetHeight(30)
+    y = y - 40
 
-    local limitSizeCheck = GUI:CreateFormCheckbox(content, "Limit Utility Size to Essential Width", "cooldownManager_limitUtilitySizeToEssential", db, function() 
-        if SUI and SUI.CooldownAdvanced then SUI.CooldownAdvanced.RefreshAllFeatures() end
-    end)
-    limitSizeCheck:SetPoint("TOPLEFT", PADDING, y)
-    limitSizeCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - 60
-
-    local normalizeSizeCheck = GUI:CreateFormCheckbox(content, "Normalize Utility Size", "cooldownManager_normalizeUtilitySize", db, function() 
-        if SUI and SUI.CooldownAdvanced then SUI.CooldownAdvanced.RefreshAllFeatures() end
-    end)
-    normalizeSizeCheck:SetPoint("TOPLEFT", PADDING, y)
-    normalizeSizeCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
-
-    -- Rotation Highlights
-    y = y - 10
-    local rotationLabel = GUI:CreateLabel(content, "Rotation Highlights", 12, {1, 1, 1})
-    rotationLabel:SetPoint("TOPLEFT", PADDING, y)
-    y = y - 20
-
-    local essentialHighlightCheck = GUI:CreateFormCheckbox(content, "Show Rotation Highlight - Essential", "cooldownManager_showHighlight_Essential", db, function() 
-        if SUI and SUI.CooldownAdvanced then SUI.CooldownAdvanced.RefreshAllFeatures() end
-    end)
-    essentialHighlightCheck:SetPoint("TOPLEFT", PADDING, y)
-    essentialHighlightCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - 60
-
-    local utilityHighlightCheck = GUI:CreateFormCheckbox(content, "Show Rotation Highlight - Utility", "cooldownManager_showHighlight_Utility", db, function() 
-        if SUI and SUI.CooldownAdvanced then SUI.CooldownAdvanced.RefreshAllFeatures() end
-    end)
-    utilityHighlightCheck:SetPoint("TOPLEFT", PADDING, y)
-    utilityHighlightCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
+    -- Rotation Highlights: migrated to Edit Mode panel
+    local rotationEditModeTip = GUI:CreateLabel(content, "Rotation highlight settings are now in Edit Mode. Select the Essential or Utility CDM frame to access them.", 11, C.textMuted)
+    rotationEditModeTip:SetPoint("TOPLEFT", PADDING, y)
+    rotationEditModeTip:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    rotationEditModeTip:SetJustifyH("LEFT")
+    rotationEditModeTip:SetWordWrap(true)
+    rotationEditModeTip:SetHeight(30)
+    y = y - 40
 
     -- =====================================================
     -- TRACKED BAR STYLING (Buff Duration Bars)
@@ -8381,107 +8127,15 @@ local function CreateUnitFramesPage(parent)
         defaultWidgets.bgColor = defBgColor
         y = y - FORM_ROW
 
-        -- Health Opacity slider
-        local defHealthOpacity = GUI:CreateFormSlider(tabContent, "Health Opacity", 0.1, 1.0, 0.01, "defaultHealthOpacity", general, RefreshNewUF)
-        defHealthOpacity:SetPoint("TOPLEFT", PAD, y)
-        defHealthOpacity:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        defaultWidgets.healthOpacity = defHealthOpacity
-        y = y - FORM_ROW
-
-        -- Background Opacity slider
-        local defBgOpacity = GUI:CreateFormSlider(tabContent, "Background Opacity", 0.1, 1.0, 0.01, "defaultBgOpacity", general, RefreshNewUF)
-        defBgOpacity:SetPoint("TOPLEFT", PAD, y)
-        defBgOpacity:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        defaultWidgets.bgOpacity = defBgOpacity
-        y = y - FORM_ROW - 10
-
-        -- DARK MODE section
-        local darkHeader = GUI:CreateSectionHeader(tabContent, "Darkmode For Unitframes")
-        darkHeader:SetPoint("TOPLEFT", PAD, y)
-        y = y - darkHeader.gap
-
-        local darkDesc = GUI:CreateLabel(tabContent, "Instantly applies dark flat colors to all unit frame health bars.", 11, C.textMuted)
-        darkDesc:SetPoint("TOPLEFT", PAD, y)
-        darkDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        darkDesc:SetJustifyH("LEFT")
-        y = y - 24
-
-        local darkEnable = GUI:CreateFormCheckbox(tabContent, "Enable Dark Mode", "darkMode", general, function()
-            RefreshNewUF()
-            UpdateDarkModeWidgetStates()
-        end)
-        darkEnable:SetPoint("TOPLEFT", PAD, y)
-        darkEnable:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        -- Darkmode Health Color (no alpha - pure RGB)
-        local healthColor = GUI:CreateFormColorPicker(tabContent, "Darkmode Health Color", "darkModeHealthColor", general, RefreshNewUF, { noAlpha = true })
-        healthColor:SetPoint("TOPLEFT", PAD, y)
-        healthColor:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        darkModeWidgets.healthColor = healthColor
-        y = y - FORM_ROW
-
-        -- Darkmode Background Color (no alpha - pure RGB)
-        local bgColor = GUI:CreateFormColorPicker(tabContent, "Darkmode Background Color", "darkModeBgColor", general, RefreshNewUF, { noAlpha = true })
-        bgColor:SetPoint("TOPLEFT", PAD, y)
-        bgColor:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        darkModeWidgets.bgColor = bgColor
-        y = y - FORM_ROW
-
-        -- Darkmode Health Opacity slider
-        local dmHealthOpacity = GUI:CreateFormSlider(tabContent, "Darkmode Health Opacity", 0.1, 1.0, 0.01, "darkModeHealthOpacity", general, RefreshNewUF)
-        dmHealthOpacity:SetPoint("TOPLEFT", PAD, y)
-        dmHealthOpacity:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        darkModeWidgets.healthOpacity = dmHealthOpacity
-        y = y - FORM_ROW
-
-        -- Darkmode Background Opacity slider
-        local dmBgOpacity = GUI:CreateFormSlider(tabContent, "Darkmode Background Opacity", 0.1, 1.0, 0.01, "darkModeBgOpacity", general, RefreshNewUF)
-        dmBgOpacity:SetPoint("TOPLEFT", PAD, y)
-        dmBgOpacity:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        darkModeWidgets.bgOpacity = dmBgOpacity
-        y = y - FORM_ROW - 10
-
-        -- Set initial enable/disable states for both sections
-        UpdateDarkModeWidgetStates()
-
-        -- MASTER TEXT COLOR OVERRIDES section
-        local textHeader = GUI:CreateSectionHeader(tabContent, "Text Class Color/React Color Overrides (Recommended For Dark Mode)")
-        textHeader:SetPoint("TOPLEFT", PAD, y)
-        y = y - textHeader.gap
-
-        local textDesc = GUI:CreateLabel(tabContent, "Apply class/reaction color to text across ALL unit frames. When enabled, master toggles override individual frame settings.", 11, C.textMuted)
-        textDesc:SetPoint("TOPLEFT", PAD, y)
-        textDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        textDesc:SetJustifyH("LEFT")
-        textDesc:SetWordWrap(true)
-        textDesc:SetHeight(30)
+        -- Dark mode, opacity, and text color toggles: migrated to Edit Mode panel
+        y = y - 10
+        local ufEditModeTip = GUI:CreateLabel(tabContent, "Dark mode, opacity, and text color toggles are now in Edit Mode. Select any Suaviframe to access them.", 11, C.textMuted)
+        ufEditModeTip:SetPoint("TOPLEFT", PAD, y)
+        ufEditModeTip:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        ufEditModeTip:SetJustifyH("LEFT")
+        ufEditModeTip:SetWordWrap(true)
+        ufEditModeTip:SetHeight(30)
         y = y - 40
-
-        local masterNameText = GUI:CreateFormCheckbox(tabContent, "Color ALL Name Text", "masterColorNameText", general, RefreshNewUF)
-        masterNameText:SetPoint("TOPLEFT", PAD, y)
-        masterNameText:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local masterHealthText = GUI:CreateFormCheckbox(tabContent, "Color ALL Health Text", "masterColorHealthText", general, RefreshNewUF)
-        masterHealthText:SetPoint("TOPLEFT", PAD, y)
-        masterHealthText:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local masterPowerText = GUI:CreateFormCheckbox(tabContent, "Color ALL Power Text", "masterColorPowerText", general, RefreshNewUF)
-        masterPowerText:SetPoint("TOPLEFT", PAD, y)
-        masterPowerText:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local masterCastbarText = GUI:CreateFormCheckbox(tabContent, "Color ALL Castbar Text", "masterColorCastbarText", general, RefreshNewUF)
-        masterCastbarText:SetPoint("TOPLEFT", PAD, y)
-        masterCastbarText:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local masterToTText = GUI:CreateFormCheckbox(tabContent, "Color ALL ToT Text", "masterColorToTText", general, RefreshNewUF)
-        masterToTText:SetPoint("TOPLEFT", PAD, y)
-        masterToTText:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
 
         -- TOOLTIPS SECTION
         y = y - 10
@@ -9562,106 +9216,15 @@ local function CreateActionBarsPage(parent)
         y = y - 46  -- Extra spacing before main content
 
         ---------------------------------------------------------
-        -- Section: Mouseover Hide
+        -- Mouseover Hide: migrated to Edit Mode
         ---------------------------------------------------------
-        local fadeHeader = GUI:CreateSectionHeader(tabContent, "Mouseover Hide")
-        fadeHeader:SetPoint("TOPLEFT", PAD, y)
-        y = y - fadeHeader.gap
-
-        local fadeCheck = GUI:CreateFormCheckbox(tabContent, "Enable Mouseover Hide",
-            "enabled", fade, RefreshActionBars)
-        fadeCheck:SetPoint("TOPLEFT", PAD, y)
-        fadeCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local fadeTip = GUI:CreateLabel(tabContent,
-            "Bars hide when mouse is not over them. Hover to reveal.",
-            11, C.textMuted)
-        fadeTip:SetPoint("TOPLEFT", PAD, y)
-        fadeTip:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        fadeTip:SetJustifyH("LEFT")
-        y = y - 24
-
-        local fadeInSlider = GUI:CreateFormSlider(tabContent, "Fade In Speed (sec)",
-            0.1, 1.0, 0.05, "fadeInDuration", fade, RefreshActionBars)
-        fadeInSlider:SetPoint("TOPLEFT", PAD, y)
-        fadeInSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local fadeOutSlider = GUI:CreateFormSlider(tabContent, "Fade Out Speed (sec)",
-            0.1, 1.0, 0.05, "fadeOutDuration", fade, RefreshActionBars)
-        fadeOutSlider:SetPoint("TOPLEFT", PAD, y)
-        fadeOutSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local fadeAlphaSlider = GUI:CreateFormSlider(tabContent, "Faded Opacity",
-            0, 1, 0.05, "fadeOutAlpha", fade, RefreshActionBars)
-        fadeAlphaSlider:SetPoint("TOPLEFT", PAD, y)
-        fadeAlphaSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local fadeDelaySlider = GUI:CreateFormSlider(tabContent, "Fade Out Delay (sec)",
-            0, 2.0, 0.1, "fadeOutDelay", fade, RefreshActionBars)
-        fadeDelaySlider:SetPoint("TOPLEFT", PAD, y)
-        fadeDelaySlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local combatCheck = GUI:CreateFormCheckbox(tabContent, "Do Not Hide In Combat",
-            "alwaysShowInCombat", fade, RefreshActionBars)
-        combatCheck:SetPoint("TOPLEFT", PAD, y)
-        combatCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local linkBarsCheck = GUI:CreateFormCheckbox(tabContent, "Link Action Bars 1-8 on Mouseover",
-            "linkBars1to8", fade, RefreshActionBars)
-        linkBarsCheck:SetPoint("TOPLEFT", PAD, y)
-        linkBarsCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local linkBarsDesc = GUI:CreateLabel(tabContent,
-            "When enabled, hovering any action bar (1-8) reveals all bars 1-8 together.",
-            11, C.textMuted)
-        linkBarsDesc:SetPoint("TOPLEFT", PAD, y)
-        linkBarsDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        linkBarsDesc:SetJustifyH("LEFT")
-        y = y - 24
-
-        -- Always Show toggles (bars that ignore mouseover hide)
-        local alwaysShowTip = GUI:CreateLabel(tabContent,
-            "Bars checked below will always remain visible, ignoring mouseover hide.",
-            11, C.textMuted)
-        alwaysShowTip:SetPoint("TOPLEFT", PAD, y)
-        alwaysShowTip:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        alwaysShowTip:SetJustifyH("LEFT")
-        y = y - 24
-
-        local alwaysShowBars = {
-            { key = "bar1", label = "Always Show Bar 1" },
-            { key = "bar2", label = "Always Show Bar 2" },
-            { key = "bar3", label = "Always Show Bar 3" },
-            { key = "bar4", label = "Always Show Bar 4" },
-            { key = "bar5", label = "Always Show Bar 5" },
-            { key = "bar6", label = "Always Show Bar 6" },
-            { key = "bar7", label = "Always Show Bar 7" },
-            { key = "bar8", label = "Always Show Bar 8" },
-            { key = "microbar", label = "Always Show Microbar" },
-            { key = "bags", label = "Always Show Bags" },
-            { key = "pet", label = "Always Show Pet Bar" },
-            { key = "stance", label = "Always Show Stance Bar" },
-            { key = "extraActionButton", label = "Always Show Extra Action" },
-            { key = "zoneAbility", label = "Always Show Zone Ability" },
-        }
-
-        for _, barInfo in ipairs(alwaysShowBars) do
-            local barDB = bars[barInfo.key]
-            if barDB then
-                local check = GUI:CreateFormCheckbox(tabContent, barInfo.label,
-                    "alwaysShow", barDB, RefreshActionBars)
-                check:SetPoint("TOPLEFT", PAD, y)
-                check:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-            end
-        end
+        local mouseoverEditModeTip = GUI:CreateLabel(tabContent, "Mouseover hide settings are now in Edit Mode. Select any Action Bar frame to access them.", 11, C.textMuted)
+        mouseoverEditModeTip:SetPoint("TOPLEFT", PAD, y)
+        mouseoverEditModeTip:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        mouseoverEditModeTip:SetJustifyH("LEFT")
+        mouseoverEditModeTip:SetWordWrap(true)
+        mouseoverEditModeTip:SetHeight(30)
+        y = y - 40
 
         tabContent:SetHeight(math.abs(y) + 50)
     end  -- End BuildMouseoverHideTab
@@ -9749,68 +9312,15 @@ local function CreateActionBarsPage(parent)
         y = y - 55
 
         ---------------------------------------------------------
-        -- Section: Button Appearance
+        -- Button Appearance & Bar Layout: migrated to Edit Mode
         ---------------------------------------------------------
-        local appearanceHeader = GUI:CreateSectionHeader(tabContent, "Button Appearance")
-        appearanceHeader:SetPoint("TOPLEFT", PAD, y)
-        y = y - appearanceHeader.gap
-
-        local zoomSlider = GUI:CreateFormSlider(tabContent, "Icon Crop Amount",
-            0.05, 0.15, 0.01, "iconZoom", global, RefreshActionBars)
-        zoomSlider:SetPoint("TOPLEFT", PAD, y)
-        zoomSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local backdropCheck = GUI:CreateFormCheckbox(tabContent, "Show Backdrop",
-            "showBackdrop", global, RefreshActionBars)
-        backdropCheck:SetPoint("TOPLEFT", PAD, y)
-        backdropCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local backdropAlphaSlider = GUI:CreateFormSlider(tabContent, "Backdrop Opacity",
-            0, 1, 0.05, "backdropAlpha", global, RefreshActionBars)
-        backdropAlphaSlider:SetPoint("TOPLEFT", PAD, y)
-        backdropAlphaSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local glossCheck = GUI:CreateFormCheckbox(tabContent, "Show Gloss Effect",
-            "showGloss", global, RefreshActionBars)
-        glossCheck:SetPoint("TOPLEFT", PAD, y)
-        glossCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local glossAlphaSlider = GUI:CreateFormSlider(tabContent, "Gloss Opacity",
-            0, 1, 0.05, "glossAlpha", global, RefreshActionBars)
-        glossAlphaSlider:SetPoint("TOPLEFT", PAD, y)
-        glossAlphaSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local bordersCheck = GUI:CreateFormCheckbox(tabContent, "Show Button Borders",
-            "showBorders", global, RefreshActionBars)
-        bordersCheck:SetPoint("TOPLEFT", PAD, y)
-        bordersCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        ---------------------------------------------------------
-        -- Section: Bar Layout
-        ---------------------------------------------------------
-        local layoutHeader = GUI:CreateSectionHeader(tabContent, "Bar Layout")
-        layoutHeader:SetPoint("TOPLEFT", PAD, y)
-        y = y - layoutHeader.gap
-
-        local scaleWarning = GUI:CreateLabel(tabContent, "To scale Action Bars, use Edit Mode: select each bar and adjust the 'Icon Size' slider. Enable 'Snap To Element' for easy alignment.", 11, C.warning)
-        scaleWarning:SetPoint("TOPLEFT", PAD, y)
-        scaleWarning:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        scaleWarning:SetJustifyH("LEFT")
-        scaleWarning:SetWordWrap(true)
-        scaleWarning:SetHeight(30)
-        y = y - 32
-
-        local hideEmptySlotsCheck = GUI:CreateFormCheckbox(tabContent, "Hide Empty Slots",
-            "hideEmptySlots", global, RefreshActionBars)
-        hideEmptySlotsCheck:SetPoint("TOPLEFT", PAD, y)
-        hideEmptySlotsCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
+        local abAppearanceEditModeTip = GUI:CreateLabel(tabContent, "Button appearance (icon crop, backdrop, gloss, borders, empty slots) and text display (keybinds, macro names, stack counts) settings are now in Edit Mode. Select any Action Bar frame to access them.", 11, C.textMuted)
+        abAppearanceEditModeTip:SetPoint("TOPLEFT", PAD, y)
+        abAppearanceEditModeTip:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        abAppearanceEditModeTip:SetJustifyH("LEFT")
+        abAppearanceEditModeTip:SetWordWrap(true)
+        abAppearanceEditModeTip:SetHeight(40)
+        y = y - 50
 
         -- Action Button Lock - combined lock + override key in one clear dropdown
         -- Queue protected modifier changes during combat and apply after combat ends
@@ -9925,126 +9435,7 @@ local function CreateActionBarsPage(parent)
         layoutTipText:SetWordWrap(true)
         y = y - 40
 
-        ---------------------------------------------------------
-        -- Section: Text Display
-        ---------------------------------------------------------
-        local textHeader = GUI:CreateSectionHeader(tabContent, "Text Display")
-        textHeader:SetPoint("TOPLEFT", PAD, y)
-        y = y - textHeader.gap
-
-        local keybindCheck = GUI:CreateFormCheckbox(tabContent, "Show Keybind Text",
-            "showKeybinds", global, RefreshActionBars)
-        keybindCheck:SetPoint("TOPLEFT", PAD, y)
-        keybindCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local hideEmptyCheck = GUI:CreateFormCheckbox(tabContent, "Hide Empty Keybinds",
-            "hideEmptyKeybinds", global, RefreshActionBars)
-        hideEmptyCheck:SetPoint("TOPLEFT", PAD, y)
-        hideEmptyCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local keybindSizeSlider = GUI:CreateFormSlider(tabContent, "Keybind Text Size",
-            8, 50, 1, "keybindFontSize", global, RefreshActionBars)
-        keybindSizeSlider:SetPoint("TOPLEFT", PAD, y)
-        keybindSizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local keybindAnchorDD = GUI:CreateFormDropdown(tabContent, "Keybind Text Anchor",
-            anchorOptions, "keybindAnchor", global, RefreshActionBars)
-        keybindAnchorDD:SetPoint("TOPLEFT", PAD, y)
-        keybindAnchorDD:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local keybindXOffsetSlider = GUI:CreateFormSlider(tabContent, "Keybind Text X-Offset",
-            -20, 20, 1, "keybindOffsetX", global, RefreshActionBars)
-        keybindXOffsetSlider:SetPoint("TOPLEFT", PAD, y)
-        keybindXOffsetSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local keybindYOffsetSlider = GUI:CreateFormSlider(tabContent, "Keybind Text Y-Offset",
-            -20, 20, 1, "keybindOffsetY", global, RefreshActionBars)
-        keybindYOffsetSlider:SetPoint("TOPLEFT", PAD, y)
-        keybindYOffsetSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local keybindColorPicker = GUI:CreateFormColorPicker(tabContent, "Keybind Text Color",
-            "keybindColor", global, RefreshActionBars)
-        keybindColorPicker:SetPoint("TOPLEFT", PAD, y)
-        keybindColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local macroCheck = GUI:CreateFormCheckbox(tabContent, "Show Macro Names",
-            "showMacroNames", global, RefreshActionBars)
-        macroCheck:SetPoint("TOPLEFT", PAD, y)
-        macroCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local macroSizeSlider = GUI:CreateFormSlider(tabContent, "Macro Name Text Size",
-            8, 50, 1, "macroNameFontSize", global, RefreshActionBars)
-        macroSizeSlider:SetPoint("TOPLEFT", PAD, y)
-        macroSizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local macroAnchorDD = GUI:CreateFormDropdown(tabContent, "Macro Name Anchor",
-            anchorOptions, "macroNameAnchor", global, RefreshActionBars)
-        macroAnchorDD:SetPoint("TOPLEFT", PAD, y)
-        macroAnchorDD:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local macroXOffsetSlider = GUI:CreateFormSlider(tabContent, "Macro Name X-Offset",
-            -20, 20, 1, "macroNameOffsetX", global, RefreshActionBars)
-        macroXOffsetSlider:SetPoint("TOPLEFT", PAD, y)
-        macroXOffsetSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local macroYOffsetSlider = GUI:CreateFormSlider(tabContent, "Macro Name Y-Offset",
-            -20, 20, 1, "macroNameOffsetY", global, RefreshActionBars)
-        macroYOffsetSlider:SetPoint("TOPLEFT", PAD, y)
-        macroYOffsetSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local macroColorPicker = GUI:CreateFormColorPicker(tabContent, "Macro Name Color",
-            "macroNameColor", global, RefreshActionBars)
-        macroColorPicker:SetPoint("TOPLEFT", PAD, y)
-        macroColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local countCheck = GUI:CreateFormCheckbox(tabContent, "Show Stack Counts",
-            "showCounts", global, RefreshActionBars)
-        countCheck:SetPoint("TOPLEFT", PAD, y)
-        countCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local countSizeSlider = GUI:CreateFormSlider(tabContent, "Stack Text Size",
-            8, 50, 1, "countFontSize", global, RefreshActionBars)
-        countSizeSlider:SetPoint("TOPLEFT", PAD, y)
-        countSizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local countAnchorDD = GUI:CreateFormDropdown(tabContent, "Stack Text Anchor",
-            anchorOptions, "countAnchor", global, RefreshActionBars)
-        countAnchorDD:SetPoint("TOPLEFT", PAD, y)
-        countAnchorDD:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local countXOffsetSlider = GUI:CreateFormSlider(tabContent, "Stack Text X-Offset",
-            -20, 20, 1, "countOffsetX", global, RefreshActionBars)
-        countXOffsetSlider:SetPoint("TOPLEFT", PAD, y)
-        countXOffsetSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local countYOffsetSlider = GUI:CreateFormSlider(tabContent, "Stack Text Y-Offset",
-            -20, 20, 1, "countOffsetY", global, RefreshActionBars)
-        countYOffsetSlider:SetPoint("TOPLEFT", PAD, y)
-        countYOffsetSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local countColorPicker = GUI:CreateFormColorPicker(tabContent, "Stack Count Color",
-            "countColor", global, RefreshActionBars)
-        countColorPicker:SetPoint("TOPLEFT", PAD, y)
-        countColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
+        -- Text Display section removed: covered by Edit Mode label above
 
         tabContent:SetHeight(math.abs(y) + 50)
     end  -- End BuildMasterSettingsTab

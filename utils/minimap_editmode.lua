@@ -1158,6 +1158,260 @@ local function BuildMinimapSettings()
     })
     order = order + 1
 
+    -- =================================================================
+    -- DATATEXT PANEL
+    -- =================================================================
+    table.insert(settings, {
+        order = order,
+        name = "Datatext Panel",
+        kind = LEM.SettingType.Collapsible,
+        id = "CATEGORY_DATATEXT",
+        defaultCollapsed = true,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_DATATEXT",
+        order = order,
+        name = "Enable Datatext",
+        kind = LEM.SettingType.Checkbox,
+        default = true,
+        get = function(layoutName)
+            local db = GetDB()
+            return db and db.datatext and db.datatext.enabled ~= false
+        end,
+        set = function(layoutName, value)
+            local db = GetDB()
+            if db then
+                if not db.datatext then db.datatext = {} end
+                db.datatext.enabled = value
+                RefreshMinimap()
+            end
+        end,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_DATATEXT",
+        order = order,
+        name = "Force Single Line",
+        kind = LEM.SettingType.Checkbox,
+        default = false,
+        get = function(layoutName)
+            local db = GetDB()
+            return db and db.datatext and db.datatext.forceSingleLine or false
+        end,
+        set = function(layoutName, value)
+            local db = GetDB()
+            if db then
+                if not db.datatext then db.datatext = {} end
+                db.datatext.forceSingleLine = value
+                RefreshMinimap()
+            end
+        end,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_DATATEXT",
+        order = order,
+        name = "Panel Height",
+        kind = LEM.SettingType.Slider,
+        default = 22,
+        minValue = 18,
+        maxValue = 50,
+        valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
+        get = function(layoutName)
+            local db = GetDB()
+            return db and db.datatext and db.datatext.height or 22
+        end,
+        set = function(layoutName, value)
+            local db = GetDB()
+            if db then
+                if not db.datatext then db.datatext = {} end
+                db.datatext.height = value
+                RefreshMinimap()
+            end
+        end,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_DATATEXT",
+        order = order,
+        name = "Background Opacity",
+        kind = LEM.SettingType.Slider,
+        default = 80,
+        minValue = 0,
+        maxValue = 100,
+        valueStep = 5,
+        formatter = function(value) return string.format("%d%%", value) end,
+        get = function(layoutName)
+            local db = GetDB()
+            return db and db.datatext and db.datatext.bgOpacity or 80
+        end,
+        set = function(layoutName, value)
+            local db = GetDB()
+            if db then
+                if not db.datatext then db.datatext = {} end
+                db.datatext.bgOpacity = value
+                RefreshMinimap()
+            end
+        end,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_DATATEXT",
+        order = order,
+        name = "Border Size",
+        kind = LEM.SettingType.Slider,
+        default = 1,
+        minValue = 0,
+        maxValue = 8,
+        valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
+        get = function(layoutName)
+            local db = GetDB()
+            return db and db.datatext and db.datatext.borderSize or 1
+        end,
+        set = function(layoutName, value)
+            local db = GetDB()
+            if db then
+                if not db.datatext then db.datatext = {} end
+                db.datatext.borderSize = value
+                RefreshMinimap()
+            end
+        end,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_DATATEXT",
+        order = order,
+        name = "Vertical Offset",
+        kind = LEM.SettingType.Slider,
+        default = 0,
+        minValue = -40,
+        maxValue = 40,
+        valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
+        get = function(layoutName)
+            local db = GetDB()
+            return db and db.datatext and db.datatext.offsetY or 0
+        end,
+        set = function(layoutName, value)
+            local db = GetDB()
+            if db then
+                if not db.datatext then db.datatext = {} end
+                db.datatext.offsetY = value
+                RefreshMinimap()
+            end
+        end,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_DATATEXT",
+        order = order,
+        name = "Font Size",
+        kind = LEM.SettingType.Slider,
+        default = 11,
+        minValue = 9,
+        maxValue = 18,
+        valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
+        get = function(layoutName)
+            local db = GetDB()
+            return db and db.datatext and db.datatext.fontSize or 11
+        end,
+        set = function(layoutName, value)
+            local db = GetDB()
+            if db then
+                if not db.datatext then db.datatext = {} end
+                db.datatext.fontSize = value
+                RefreshMinimap()
+            end
+        end,
+    })
+    order = order + 1
+
+    -- =================================================================
+    -- UIHIDER MINIMAP ELEMENTS
+    -- =================================================================
+    table.insert(settings, {
+        order = order,
+        name = "UIHider",
+        kind = LEM.SettingType.Collapsible,
+        id = "CATEGORY_UIHIDER",
+        defaultCollapsed = true,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_UIHIDER",
+        order = order,
+        name = "Hide Top Border",
+        kind = LEM.SettingType.Checkbox,
+        default = false,
+        get = function(layoutName)
+            local db = GetDB()
+            return db and db.uiHider and db.uiHider.hideMinimapBorder or false
+        end,
+        set = function(layoutName, value)
+            local db = GetDB()
+            if db then
+                if not db.uiHider then db.uiHider = {} end
+                db.uiHider.hideMinimapBorder = value
+                if _G.SuaviUI_RefreshUIHider then _G.SuaviUI_RefreshUIHider() end
+            end
+        end,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_UIHIDER",
+        order = order,
+        name = "Hide Clock Button",
+        kind = LEM.SettingType.Checkbox,
+        default = false,
+        get = function(layoutName)
+            local db = GetDB()
+            return db and db.uiHider and db.uiHider.hideTimeManager or false
+        end,
+        set = function(layoutName, value)
+            local db = GetDB()
+            if db then
+                if not db.uiHider then db.uiHider = {} end
+                db.uiHider.hideTimeManager = value
+                if _G.SuaviUI_RefreshUIHider then _G.SuaviUI_RefreshUIHider() end
+            end
+        end,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_UIHIDER",
+        order = order,
+        name = "Hide Native Zone Text",
+        kind = LEM.SettingType.Checkbox,
+        default = false,
+        get = function(layoutName)
+            local db = GetDB()
+            return db and db.uiHider and db.uiHider.hideMinimapZoneText or false
+        end,
+        set = function(layoutName, value)
+            local db = GetDB()
+            if db then
+                if not db.uiHider then db.uiHider = {} end
+                db.uiHider.hideMinimapZoneText = value
+                if _G.SuaviUI_RefreshUIHider then _G.SuaviUI_RefreshUIHider() end
+            end
+        end,
+    })
+    order = order + 1
+
     return settings
 end
 
