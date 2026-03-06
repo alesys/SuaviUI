@@ -794,7 +794,7 @@ end
 -- Blizzard viewer kept alive for GetCooldownIDs() and Edit Mode positioning.
 ---------------------------------------------------------------------------
 
-USE_CUSTOM_ICONS = true   -- Feature flag; set false to revert to legacy
+USE_CUSTOM_ICONS = false  -- Legacy path: skin Blizzard's icon children in place (same as bars)
 local customIconContainer       -- Frame: SuaviBuffIconContainer (created lazily)
 local customIconPool = {}       -- All created icon frames (recycled via ._inUse)
 local activeCustomIcons = {}    -- Currently visible custom icon frames
@@ -1807,11 +1807,16 @@ local function ApplyBarStyle(frame, settings)
                 end
             end
 
-            -- Step E2: Hide all text on icon (duration shown by bar, text is redundant)
+            -- Step E2: Hide text on icon EXCEPT stack count (duration shown by bar, text is redundant)
+            local appsFontString = iconContainer.Applications  -- Stack count FontString
             for _, region in ipairs({iconContainer:GetRegions()}) do
-                if region:IsObjectType("FontString") then
+                if region:IsObjectType("FontString") and region ~= appsFontString then
                     region:SetAlpha(0)
                 end
+            end
+            -- Ensure stack count stays visible
+            if appsFontString and appsFontString.SetAlpha then
+                appsFontString:SetAlpha(1)
             end
             -- Also check icon children for text (cooldown timers, count text)
             if iconContainer.GetChildren then
@@ -2173,9 +2178,10 @@ LayoutBuffIcons = function()
         return
     end
 
-    -- Get settings
+    -- Get settings — prefer Blizzard's CDM Icon Padding when available
     local iconSize = settings.iconSize or 42
-    local padding = settings.padding or 0
+    local blizzPadding = BuffIconCooldownViewer.childXPadding or BuffIconCooldownViewer.childYPadding
+    local padding = blizzPadding or (settings.padding or 0)
     local aspectRatio = settings.aspectRatioCrop or 1.0
     local growthDirection = settings.growthDirection or "CENTERED_HORIZONTAL"
 
@@ -2284,20 +2290,14 @@ LayoutBuffIcons = function()
         end
     end
 
-    -- Update viewer size to match icon grid (for Edit Mode)
-    -- Wrap with suppression to prevent OnSizeChanged from triggering recursive layouts
-    if not InCombatLockdown() then
+    -- During Edit Mode, let Blizzard manage viewer size + Selection overlay so panel
+    -- settings (Icon Size, Icon Padding, etc.) update immediately.
+    -- Outside Edit Mode, pin viewer size to prevent layout drift.
+    local isEditMode = EditModeManagerFrame and EditModeManagerFrame.editModeActive
+    if not isEditMode and not InCombatLockdown() then
         SuppressLayout()
         BuffIconCooldownViewer:SetSize(roundPixel(totalWidth), roundPixel(totalHeight))
         UnsuppressLayout()
-
-        -- Also resize Selection child if it exists
-        if BuffIconCooldownViewer.Selection then
-            BuffIconCooldownViewer.Selection:ClearAllPoints()
-            BuffIconCooldownViewer.Selection:SetPoint("TOPLEFT", BuffIconCooldownViewer, "TOPLEFT", 0, 0)
-            BuffIconCooldownViewer.Selection:SetPoint("BOTTOMRIGHT", BuffIconCooldownViewer, "BOTTOMRIGHT", 0, 0)
-            BuffIconCooldownViewer.Selection:SetFrameLevel(BuffIconCooldownViewer:GetFrameLevel())
-        end
     end
 
     end) -- end pcall wrapping legacy icon path
@@ -2736,56 +2736,14 @@ local function CheckBarChanges()
     LayoutBuffBars()
 end
 
----------------------------------------------------------------------------
--- FORCE POPULATE: Briefly trigger Edit Mode behavior to load all spells
--- This ensures the buff icons know what spells to display on first load
----------------------------------------------------------------------------
-
-local forcePopulateDone = false
-
-local function ForcePopulateBuffIcons()
-    if FORCE_DISABLE_CDM_BUFFBAR then return end
-    if forcePopulateDone then return end
-    if InCombatLockdown() then return end
-
-    local viewer = BuffIconCooldownViewer
-    if not viewer then return end
-
-    forcePopulateDone = true
-
-    -- Wrap all viewer access in pcall (viewer internals may be forbidden in 12.0.5)
-    pcall(function()
-        -- Method 1: Call Layout() which triggers Blizzard to populate icons
-        if viewer.Layout and type(viewer.Layout) == "function" then
-            viewer:Layout()
-        end
-
-        -- Method 2: If the viewer has systemInfo with spells, it should auto-populate
-        -- Just triggering a size change can help force refresh
-        if not InCombatLockdown() then
-            local w, h = viewer:GetSize()
-            if w and h and w > 0 and h > 0 then
-                -- Briefly nudge size to trigger internal refresh
-                viewer:SetSize(w + 0.1, h)
-                C_Timer.After(0.05, function()
-                    if viewer and not InCombatLockdown() then
-                        pcall(function() viewer:SetSize(w, h) end)
-                    end
-                end)
-            end
-        end
-    end)
-
-    -- Method 3: Force a rescan via SUICore if available
-    if _G.SuaviUI and _G.SuaviUI.SUICore then
-        local SUICore = _G.SuaviUI.SUICore
-        if SUICore.ForceRefreshBuffIcons then
-            C_Timer.After(0.2, function()
-                pcall(function() SUICore:ForceRefreshBuffIcons() end)
-            end)
-        end
-    end
-end
+-- TAINT-FIX: ForcePopulateBuffIcons REMOVED. It called viewer:Layout() and
+-- viewer:SetSize() from addon context, running Blizzard's entire
+-- Layout → RefreshLayout → RefreshData chain in tainted execution context.
+-- This tainted CDM item frame fields (isActive, hasTotem, etc.), causing
+-- cascading errors in CompactUnitFrame (oldR), AuraUtil (cachedBigDefensives),
+-- and TargetUnit() ADDON_ACTION_FORBIDDEN during Edit Mode transitions.
+-- With USE_CUSTOM_ICONS=false, viewers stay visible and Blizzard populates
+-- them via its own OnShow → RefreshLayout → RefreshData chain.
 
 ---------------------------------------------------------------------------
 -- INITIALIZATION
@@ -2971,8 +2929,7 @@ local function Initialize()
     -- layoutFramesGoingRight, layoutFramesGoingUp). Even in the legacy path these writes
     -- taint the shared CooldownViewerSettingsDataProvider, cascading to all viewers.
 
-    -- Force populate buff icons first (teaches the viewer what spells to show)
-    ForcePopulateBuffIcons()
+    -- ForcePopulateBuffIcons removed (taint source — see comment at line 2734)
 
     -- Legacy icon OnUpdate polling (only when not using custom icons)
     if not USE_CUSTOM_ICONS then
@@ -3127,23 +3084,18 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     if FORCE_DISABLE_CDM_BUFFBAR then return end
     if event == "PLAYER_LOGIN" then
         C_Timer.After(1, Initialize)
-        -- Additional force populate attempts
-        C_Timer.After(2, ForcePopulateBuffIcons)
-        C_Timer.After(4, ForcePopulateBuffIcons)
     elseif event == "PLAYER_ENTERING_WORLD" then
         local isInitialLogin, isReloadingUi = ...
         if isInitialLogin or isReloadingUi then
             C_Timer.After(1.5, function()
-                ForcePopulateBuffIcons()
-                LayoutBuffIcons()  -- Direct calls
+                LayoutBuffIcons()
                 LayoutBuffBars()
             end)
         end
     elseif event == "PLAYER_REGEN_ENABLED" then
-        -- After combat ends, try to populate if we haven't yet
+        -- After combat ends, refresh layout (viewers may have been hidden during combat)
         C_Timer.After(0.5, function()
-            ForcePopulateBuffIcons()
-            LayoutBuffIcons()  -- Direct calls
+            LayoutBuffIcons()
             LayoutBuffBars()
         end)
     end
