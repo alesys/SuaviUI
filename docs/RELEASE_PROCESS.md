@@ -33,7 +33,7 @@ git push origin vX.X.X
 #### Step 4: Create Release ZIP
 - Location: Parent folder of addon (`e:\Games\World of Warcraft\_retail_\Interface\AddOns\`)
 - Filename: `SuaviUI-vX.X.X.zip`
-- Size: ~5-6 MB (clean package without dev files)
+- Size: ~2 MB (clean package without dev files, .venv, docs, spec)
 
 **Files EXCLUDED from ZIP:**
 - `docs/` - All development documentation
@@ -93,7 +93,7 @@ gh release create vX.X.X "SuaviUI-vX.X.X.zip" \
 - Fixed issue with [component]
 - Improved [functionality]
 - Added [enhavisible in release assets (not just "Source code" auto-archives)
-- ✅ ZIP file size appropriate (~2-3 MB, without docs/ and backup folders)
+- ✅ ZIP file size appropriate (~2 MB, without docs/, dev/, .venv/, spec/, and backup folders)
 - ✅ Tag pushed to GitHub: `git tag --list | grep vX.X.X`
 - ✅ Commit pushed to master branch: `git log --oneline -1`
 
@@ -112,7 +112,7 @@ Special thanks to our testers: Vela, Pataz, and Ñora for their feedback and tes
 ### 3. Verification
 After release, verify:
 - ✅ GitHub release published: `https://github.com/alesys/SuaviUI/releases/tag/vX.X.X`
-- ✅ ZIP file created in parent folder with correct size (~5-6 MB)
+- ✅ ZIP file created in parent folder with correct size (~2 MB)
 - ✅ Tag pushed to GitHub
 - ✅ Commit pushed to master branch
 
@@ -214,6 +214,12 @@ if (Test-Path "SuaviUI-vX.X.X.zip") {
 ```
 
 ## Version History
+
+### v0.3.11 - Taint Purge Edition (March 5, 2026)
+- CDM frame-field taint purge complete
+- Action bars re-enabled after full weak-table migration
+- C API data pipeline for tracked bars
+- Size: 2.05 MB (after correcting .venv/.vscode/dev/ exclusions)
 
 ### v0.1.5 - Edit Mode Edition (February 2, 2026)
 - Edit Mode Integration with LibEQOLEditMode
