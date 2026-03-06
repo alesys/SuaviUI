@@ -5540,14 +5540,15 @@ local function CreateCooldownViewersPage(parent)
         "cooldownManager_squareIcons_Utility"
     )
 
-    AddCDMStyleGroup(
-        "Buff Icons",
-        "Enable Square Buff Icons",
-        "cooldownManager_squareIconsBorder_BuffIcons",
-        "cooldownManager_squareIconsBorder_BuffIcons_Overlap",
-        "cooldownManager_squareIconsZoom_BuffIcons",
-        "cooldownManager_squareIcons_BuffIcons"
-    )
+    -- Buff Icons square styling: migrated to Edit Mode panel (select Tracked Buffs frame)
+    y = y - CDM_GROUP_SPACING
+    local buffIconTip = GUI:CreateLabel(content, "Buff Icons: Square icon styling is now in Edit Mode. Select the Tracked Buffs frame to access these settings.", 11, C.textMuted)
+    buffIconTip:SetPoint("TOPLEFT", CDM_FORM_LEFT, y)
+    buffIconTip:SetPoint("RIGHT", content, "RIGHT", -CDM_FORM_RIGHT, 0)
+    buffIconTip:SetJustifyH("LEFT")
+    buffIconTip:SetWordWrap(true)
+    buffIconTip:SetHeight(30)
+    y = y - 40
 
     -- =====================================================
     -- COOLDOWN SETTINGS
@@ -5986,47 +5987,14 @@ local function CreateCooldownViewersPage(parent)
     trackedEnable:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - FORM_ROW
 
-    -- Bar Height
-    local trackedHeightSlider = GUI:CreateFormSlider(content, "Bar Height", 2, 48, 1, "barHeight", trackedData, RefreshTrackedBars)
-    trackedHeightSlider:SetPoint("TOPLEFT", PADDING, y)
-    trackedHeightSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - SLIDER_HEIGHT
-
-    -- Bar Texture (with texture preview)
-    local trackedTextureDropdown = GUI:CreateFormDropdownWithTexturePreview(content, "Bar Texture", "texture", trackedData, RefreshTrackedBars)
-    trackedTextureDropdown:SetPoint("TOPLEFT", PADDING, y)
-    trackedTextureDropdown:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
-
-    -- Forward reference for orientation change callback
-    local updateVerticalStates
-
-    -- Bar Orientation
-    local orientationDropdown = GUI:CreateFormDropdown(content, "Bar Orientation", {
-        {value = "horizontal", text = "Horizontal"},
-        {value = "vertical", text = "Vertical"},
-    }, "orientation", trackedData, function()
-        RefreshTrackedBars()
-        if updateVerticalStates then updateVerticalStates() end
-    end)
-    orientationDropdown:SetPoint("TOPLEFT", PADDING, y)
-    orientationDropdown:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
-
-    -- Stack Direction
-    local growthDropdown = GUI:CreateFormDropdown(content, "Stack Direction", {
-        {value = true, text = "Up / Right"},
-        {value = false, text = "Down / Left"},
-    }, "growUp", trackedData, RefreshTrackedBars)
-    growthDropdown:SetPoint("TOPLEFT", PADDING, y)
-    growthDropdown:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
-
-    local stackTip = GUI:CreateLabel(content, "Up/Down for horizontal bars, Right/Left for vertical bars.", 10, C.textMuted)
-    stackTip:SetPoint("TOPLEFT", PADDING, y + 4)
-    stackTip:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    stackTip:SetJustifyH("LEFT")
-    y = y - 18
+    -- Most bar settings are now in Edit Mode (select Tracked Bars frame)
+    local editModeTip = GUI:CreateLabel(content, "Bar Height, Texture, Orientation, Stack Direction, Class Color, Border, BG Opacity, and Text Size are now in Edit Mode. Select the Tracked Bars frame to access them.", 11, C.textMuted)
+    editModeTip:SetPoint("TOPLEFT", PADDING, y)
+    editModeTip:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    editModeTip:SetJustifyH("LEFT")
+    editModeTip:SetWordWrap(true)
+    editModeTip:SetHeight(36)
+    y = y - 46
 
     -- Fill Direction (Vertical only)
     local fillDropdown = GUI:CreateFormDropdown(content, "Fill Direction (Vertical)", {
@@ -6046,56 +6014,17 @@ local function CreateCooldownViewersPage(parent)
     iconPosDropdown:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - FORM_ROW
 
-    -- UX: Dim vertical-only options when horizontal
-    updateVerticalStates = function()
-        local isVertical = trackedData.orientation == "vertical"
-        local alpha = isVertical and 1.0 or 0.4
-        fillDropdown:SetAlpha(alpha)
-        iconPosDropdown:SetAlpha(alpha)
-    end
-    updateVerticalStates()  -- Initial state
-
-    -- Use Class Color
-    local trackedClassColorCheck = GUI:CreateFormCheckbox(content, "Use Class Color", "useClassColor", trackedData, RefreshTrackedBars)
-    trackedClassColorCheck:SetPoint("TOPLEFT", PADDING, y)
-    trackedClassColorCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
-
-    -- Bar Color (fallback)
+    -- Bar Color (fallback when Class Color is off)
     local trackedBarColorPicker = GUI:CreateFormColorPicker(content, "Bar Color (Fallback)", "barColor", trackedData, RefreshTrackedBars)
     trackedBarColorPicker:SetPoint("TOPLEFT", PADDING, y)
     trackedBarColorPicker:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - FORM_ROW
-
-    -- Border Size
-    local trackedBorderSlider = GUI:CreateFormSlider(content, "Border Size", 0, 4, 1, "borderSize", trackedData, RefreshTrackedBars)
-    trackedBorderSlider:SetPoint("TOPLEFT", PADDING, y)
-    trackedBorderSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - SLIDER_HEIGHT
 
     -- Background Color
     local trackedBgColorPicker = GUI:CreateFormColorPicker(content, "Background Color", "bgColor", trackedData, RefreshTrackedBars)
     trackedBgColorPicker:SetPoint("TOPLEFT", PADDING, y)
     trackedBgColorPicker:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     y = y - FORM_ROW
-
-    -- Background Opacity
-    local trackedBgOpacitySlider = GUI:CreateFormSlider(content, "Background Opacity", 0, 1, 0.1, "bgOpacity", trackedData, RefreshTrackedBars)
-    trackedBgOpacitySlider:SetPoint("TOPLEFT", PADDING, y)
-    trackedBgOpacitySlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - SLIDER_HEIGHT
-
-    -- Text Size
-    local trackedTextSlider = GUI:CreateFormSlider(content, "Text Size", 8, 24, 1, "textSize", trackedData, RefreshTrackedBars)
-    trackedTextSlider:SetPoint("TOPLEFT", PADDING, y)
-    trackedTextSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - SLIDER_HEIGHT
-
-    -- Bar Spacing
-    local trackedSpacingSlider = GUI:CreateFormSlider(content, "Bar Spacing", 0, 20, 1, "spacing", trackedData, RefreshTrackedBars)
-    trackedSpacingSlider:SetPoint("TOPLEFT", PADDING, y)
-    trackedSpacingSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - SLIDER_HEIGHT
 
     content:SetHeight(math.abs(y) + 50)
 end
