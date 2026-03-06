@@ -38,6 +38,13 @@ local iconSkinError          = setmetatable({}, { __mode = "k" })
 local pendingBackdropInfo    = setmetatable({}, { __mode = "k" })
 local pendingBackdropSettings = setmetatable({}, { __mode = "k" })
 
+-- TAINT-FIX: Store border textures and overlay-hooked flags in module-level weak tables
+-- instead of writing fields directly on CDM item frames / sub-regions.
+-- Writing ANY field on a Blizzard-owned frame from addon context taints the frame's Lua
+-- table, causing "secret value tainted by SuaviUI" errors on CDM field reads.
+local iconBorderFrames       = setmetatable({}, { __mode = "k" })  -- [icon] = border texture
+local overlayShowHooked      = setmetatable({}, { __mode = "k" })  -- [region] = true
+
 -- Shared utility functions
 ns.Utils = {}
 
@@ -4126,8 +4133,8 @@ local function StripBlizzardOverlay(icon)
             region:Hide()
             -- TAINT-FIX: hooksecurefunc preserves the original C Show as secure.
             -- Don't call Hide() — causes Show→Hide→Show infinite loop.
-            if not region.__SUI_OverlayShowHooked then
-                region.__SUI_OverlayShowHooked = true
+            if not overlayShowHooked[region] then
+                overlayShowHooked[region] = true
                 hooksecurefunc(region, "Show", function(self)
                     self:SetTexture("")
                     self:SetAlpha(0)
@@ -4223,7 +4230,7 @@ function SUICore:SkinIcon(icon, settings)
     
     local padding   = settings.padding or 5
     local zoom      = settings.zoom or 0
-    local border    = icon.__CDM_Border
+    local border    = iconBorderFrames[icon]
     local cdPadding = math.floor(padding * 0.7 + 0.5)
 
     -- This prevents stretching by cropping the texture to match the container aspect ratio
@@ -4391,7 +4398,7 @@ function SUICore:SkinIcon(icon, settings)
     if edgeSize > 0 then
         if not border then
             border = icon:CreateTexture(nil, "BACKGROUND", nil, -8)
-            icon.__CDM_Border = border
+            iconBorderFrames[icon] = border
         end
 
         local r, g, b, a = unpack(settings.borderColor or { 0, 0, 0, 1 })

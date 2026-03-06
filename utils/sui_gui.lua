@@ -33,6 +33,9 @@ GUI.Colors = {
     tabSelectedText = {0.067, 0.094, 0.153, 1}, -- Dark text on selected
     tabNormal = {0.7, 0.75, 0.78, 1},         -- Slightly cool grey
     tabHover = {0.95, 0.96, 0.96, 1},
+    tabBg = {0.10, 0.135, 0.19, 1},
+    tabBgHover = {0.12, 0.16, 0.22, 1},
+    tabBgActive = {0.14, 0.12, 0.22, 1},
     
     -- Text colors
     text = {0.953, 0.957, 0.965, 1},          -- #F3F4F6 Off-White
@@ -79,8 +82,8 @@ local C = GUI.Colors
 GUI.Layout = {
     -- Form layout (label on left, control on right)
     formLabelWidth = 180,        -- Width allocated for labels
-    formControlStart = 220,  -- Increased to prevent label overlap with controls      -- X position where controls start
-    formRowHeight = 28,          -- Standard row height
+    formControlStart = 220,  -- X position where controls start
+    formRowHeight = 30,          -- Standard row height
     formGap = 6,                 -- Gap between label and control
     
     -- Widget dimensions
@@ -160,8 +163,8 @@ GUI.Layout = {
     -- Tab system
     tabs = {
         perRow = 5,              -- Tabs per row in main grid
-        height = 22,             -- Tab button height
-        spacing = 2,             -- Gap between tab buttons
+        height = 24,             -- Tab button height
+        spacing = 3,             -- Gap between tab buttons
         startY = -35,            -- Top offset for tab container
     },
     
@@ -568,21 +571,21 @@ function GUI:CreateSectionHeader(parent, text)
     end
 
     -- First element: no top margin (18px), others: 12px top margin (30px)
-    local topMargin = isFirstElement and 0 or 12
-    local containerHeight = isFirstElement and 18 or 30
+    local topMargin = isFirstElement and 0 or 10
+    local containerHeight = isFirstElement and 20 or 30
 
     local container = CreateFrame("Frame", nil, parent)
     container:SetHeight(containerHeight)
 
     local header = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    SetFont(header, 13, "", C.sectionHeader)
+    SetFont(header, 14, "", C.sectionHeader)
     header:SetText(text or "Section")
     header:SetPoint("TOPLEFT", container, "TOPLEFT", 0, -topMargin)
 
     -- Store references and recommended gap for calling code
     container.text = header
     container.parent = parent
-    container.gap = isFirstElement and 34 or 46  -- Adjusted gap for y positioning
+    container.gap = isFirstElement and 32 or 40
 
     -- Expose SetText for convenience
     container.SetText = function(self, newText)
@@ -600,9 +603,9 @@ function GUI:CreateSectionHeader(parent, text)
             if not container.underline then
                 local underline = container:CreateTexture(nil, "ARTWORK")
                 underline:SetHeight(2)
-                underline:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -2)
-                underline:SetPoint("RIGHT", container, "RIGHT", 0, 0)
-                underline:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.6)
+                underline:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -3)
+                underline:SetPoint("RIGHT", container, "RIGHT", -4, 0)
+                underline:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.7)
                 container.underline = underline
             end
         end
@@ -3696,18 +3699,22 @@ function GUI:CreateMainFrame()
 
         local availableWidth = targetFrame:GetWidth() - L.panel.paddingDouble - (L.tabs.spacing * (L.tabs.perRow - 1))
         local tabWidth = math.floor(availableWidth / L.tabs.perRow)
+        local totalTabs = #targetFrame.tabs
+        local tabRows = math.max(1, math.ceil(totalTabs / L.tabs.perRow))
+        local tabContainerHeight = (tabRows * L.tabs.height) + ((tabRows - 1) * L.tabs.spacing) + 6
 
         for i, tab in ipairs(targetFrame.tabs) do
             local row = math.floor((i - 1) / L.tabs.perRow)
             local col = (i - 1) % L.tabs.perRow
             local x = col * (tabWidth + L.tabs.spacing)
-            local y = -row * (L.tabs.height + L.tabs.spacing) - 5
+            local y = -row * (L.tabs.height + L.tabs.spacing) - 2
 
             tab:SetWidth(tabWidth)
             tab:ClearAllPoints()
             tab:SetPoint("TOPLEFT", targetFrame.tabContainer, "TOPLEFT", x, y)
         end
 
+        targetFrame.tabContainer:SetHeight(tabContainerHeight)
         targetFrame.TAB_BUTTON_WIDTH = tabWidth
     end
 
@@ -3756,28 +3763,35 @@ function GUI:CreateMainFrame()
     
     -- Tab button container (starts right below title line)
     local tabContainer = CreateFrame("Frame", nil, frame)
-    tabContainer:SetPoint("TOPLEFT", TAB_START_X, -35)
-    tabContainer:SetPoint("TOPRIGHT", -10, -35)
-    tabContainer:SetHeight(100)  -- Height for 4 rows of tabs (22px each + spacing)
+    tabContainer:SetPoint("TOPLEFT", TAB_START_X, L.tabs.startY)
+    tabContainer:SetPoint("TOPRIGHT", -L.space.md, L.tabs.startY)
+    tabContainer:SetHeight(L.tabs.height + 6)
     frame.tabContainer = tabContainer
     
-    -- Content area (below tabs, above bottom panel) - starts after 4 rows of tabs
+    -- Content area (below tabs, above bottom panel)
     local contentArea = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-    contentArea:SetPoint("TOPLEFT", 10, -140)  -- 35 (title) + 100 (tabs) + 5 (gap)
-    contentArea:SetPoint("BOTTOMRIGHT", -10, 50)  -- Leave 50px for bottom panel
+    contentArea:SetPoint("TOPLEFT", tabContainer, "BOTTOMLEFT", 0, -6)
+    contentArea:SetPoint("BOTTOMRIGHT", -L.space.md, 50)  -- Leave 50px for bottom panel
     contentArea:EnableMouse(false)  -- Container frame - let children handle clicks
+    contentArea:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    contentArea:SetBackdropColor(0.07, 0.10, 0.16, 0.55)
+    contentArea:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 0.9)
 
-    -- Content background (Dark Slate with transparency)
+    -- Content background
     local contentBg = contentArea:CreateTexture(nil, "BACKGROUND")
     contentBg:SetAllPoints()
-    contentBg:SetColorTexture(unpack(C.bgContent))
+    contentBg:SetColorTexture(C.bgContent[1], C.bgContent[2], C.bgContent[3], 0.35)
     
-    -- Top line above content (subtle mint hint)
+    -- Top line above content
     local topLine = contentArea:CreateTexture(nil, "ARTWORK")
     topLine:SetPoint("BOTTOMLEFT", contentArea, "TOPLEFT", 0, 0)
     topLine:SetPoint("BOTTOMRIGHT", contentArea, "TOPRIGHT", 0, 0)
     topLine:SetHeight(1)
-    topLine:SetColorTexture(unpack(C.border))
+    topLine:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.55)
     
     frame.contentArea = contentArea
     
@@ -3802,7 +3816,7 @@ function GUI:CreateMainFrame()
         edgeFile = "Interface\\Buttons\\WHITE8x8",
         edgeSize = 1,
     })
-    bottomPanel:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
+    bottomPanel:SetBackdropColor(0.07, 0.09, 0.14, 0.92)
     bottomPanel:SetBackdropBorderColor(unpack(C.border))
     
     -- Separator line above bottom panel
@@ -3822,7 +3836,7 @@ function GUI:CreateMainFrame()
             edgeFile = "Interface\\Buttons\\WHITE8x8",
             edgeSize = 1,
         })
-        btn:SetBackdropColor(0.15, 0.15, 0.15, 0.9)
+        btn:SetBackdropColor(0.10, 0.12, 0.18, 0.95)
         btn:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 0.8)
         
         local btnText = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -3832,10 +3846,12 @@ function GUI:CreateMainFrame()
         
         btn:SetScript("OnEnter", function(self)
             self:SetBackdropBorderColor(C.accent[1], C.accent[2], C.accent[3], 1)
+            self:SetBackdropColor(0.13, 0.15, 0.24, 0.98)
             btnText:SetTextColor(C.accent[1], C.accent[2], C.accent[3], 1)
         end)
         btn:SetScript("OnLeave", function(self)
             self:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 0.8)
+            self:SetBackdropColor(0.10, 0.12, 0.18, 0.95)
             btnText:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
         end)
         btn:SetScript("OnClick", callback)
@@ -4111,7 +4127,7 @@ function GUI:AddTab(frame, name, pageCreateFunc)
         edgeFile = "Interface\\Buttons\\WHITE8x8",
         edgeSize = 1,
     })
-    tab:SetBackdropColor(unpack(C.bgLight))  -- Dark Slate inactive
+    tab:SetBackdropColor(unpack(C.tabBg))
     tab:SetBackdropBorderColor(unpack(C.border))
     tab.index = index
     tab.name = name
@@ -4137,6 +4153,7 @@ function GUI:AddTab(frame, name, pageCreateFunc)
     tab:SetScript("OnEnter", function(self)
         if frame.activeTab ~= self.index then
             self.text:SetTextColor(unpack(C.tabHover))
+            pcall(self.SetBackdropColor, self, unpack(C.tabBgHover))
             pcall(self.SetBackdropBorderColor, self, unpack(C.borderLight))
         end
     end)
@@ -4144,9 +4161,12 @@ function GUI:AddTab(frame, name, pageCreateFunc)
     tab:SetScript("OnLeave", function(self)
         if frame.activeTab ~= self.index then
             self.text:SetTextColor(unpack(C.tabNormal))
+            pcall(self.SetBackdropColor, self, unpack(C.tabBg))
             pcall(self.SetBackdropBorderColor, self, unpack(C.border))
         end
     end)
+
+    GUI:RelayoutTabs(frame)
     
     -- Select first tab by default
     if index == 1 then
@@ -4222,6 +4242,8 @@ function GUI:AddActionButton(frame, name, onClick, accentColor)
         self:SetBackdropBorderColor(unpack(self.borderColor))
         self.text:SetTextColor(unpack(self.borderColor))
     end)
+
+    GUI:RelayoutTabs(frame)
     
     return btn
 end
@@ -4256,7 +4278,7 @@ function GUI:SelectTab(frame, index)
         local prevTab = frame.tabs[frame.activeTab]
         if prevTab and not prevTab.isActionButton then
             prevTab.text:SetTextColor(unpack(C.tabNormal))  -- Normal grey text
-            pcall(prevTab.SetBackdropColor, prevTab, unpack(C.bgLight))
+            pcall(prevTab.SetBackdropColor, prevTab, unpack(C.tabBg))
             pcall(prevTab.SetBackdropBorderColor, prevTab, unpack(C.border))
         end
         
@@ -4270,7 +4292,7 @@ function GUI:SelectTab(frame, index)
     local tab = frame.tabs[index]
     if tab and not tab.isActionButton then
         tab.text:SetTextColor(unpack(C.accent))  -- Mint text when active
-        pcall(tab.SetBackdropColor, tab, unpack(C.bgLight))
+        pcall(tab.SetBackdropColor, tab, unpack(C.tabBgActive))
         pcall(tab.SetBackdropBorderColor, tab, unpack(C.accent))  -- Mint border
     end
     

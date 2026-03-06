@@ -13,9 +13,24 @@ local IsSpellOverlayed = C_SpellActivationOverlay and C_SpellActivationOverlay.I
 
 -- Track which icons currently have active glows
 local activeGlowIcons = {}  -- [icon] = true
-local hookedGlowIcons = setmetatable({}, { __mode = "k" })
-local hookedGlowViewers = setmetatable({}, { __mode = "k" })
-local pendingViewerGlowScan = setmetatable({}, { __mode = "k" })
+
+-- TAINT-FIX: LibCustomGlow writes fields like icon["_PixelGlow_key"] directly on the frame
+-- passed to it. When that frame is a Blizzard CDM item frame, this taints the entire frame,
+-- causing all Blizzard reads of that frame's fields (isActive, charges, spellID, etc.) to
+-- return "secret values tainted by SuaviUI". Fix: create a thin wrapper frame parented to the
+-- CDM item. LibCustomGlow writes to the wrapper (SuaviUI-owned) instead of the CDM item frame.
+local glowWrappers = setmetatable({}, { __mode = "k" })  -- [icon] = wrapper Frame
+
+local function GetOrCreateGlowWrapper(icon)
+    local wrapper = glowWrappers[icon]
+    if not wrapper then
+        wrapper = CreateFrame("Frame", nil, icon)
+        wrapper:SetAllPoints(icon)
+        wrapper:SetFrameLevel(icon:GetFrameLevel() + 2)
+        glowWrappers[icon] = wrapper
+    end
+    return wrapper
+end
 
 -- Glow templates for proc effects
 local GlowTemplates = {
@@ -174,23 +189,24 @@ local function ApplyLibCustomGlow(icon, viewerSettings)
     -- Stop any existing glow first
     StopGlow(icon)
 
+    -- TAINT-FIX: Use a wrapper frame so LibCustomGlow writes its tracking fields
+    -- (e.g., frame["_PixelGlow_key"]) on our wrapper, not on the Blizzard CDM item frame.
+    local wrapper = GetOrCreateGlowWrapper(icon)
+
     if glowType == "Pixel Glow" then
         -- Pixel Glow: animated lines around the border
-        -- Parameters: frame, color, numLines, frequency, length, thickness, xOffset, yOffset, border, key
-        LCG.PixelGlow_Start(icon, color, lines, frequency, nil, thickness, 0, 0, true, "_QUICustomGlow")
-        local glowFrame = icon["_PixelGlow_QUICustomGlow"]
+        LCG.PixelGlow_Start(wrapper, color, lines, frequency, nil, thickness, 0, 0, true, "_QUICustomGlow")
+        local glowFrame = wrapper["_PixelGlow_QUICustomGlow"]
         if glowFrame then
             glowFrame:ClearAllPoints()
-            -- Apply offset: negative expands outward, positive shrinks inward
             glowFrame:SetPoint("TOPLEFT", icon, "TOPLEFT", -xOffset, xOffset)
             glowFrame:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", xOffset, -xOffset)
         end
 
     elseif glowType == "Autocast Shine" then
         -- Autocast Shine: orbiting sparkle spots
-        -- Parameters: frame, color, numSpots, frequency, scale, xOffset, yOffset, key
-        LCG.AutoCastGlow_Start(icon, color, lines, frequency, scale, 0, 0, "_QUICustomGlow")
-        local glowFrame = icon["_AutoCastGlow_QUICustomGlow"]
+        LCG.AutoCastGlow_Start(wrapper, color, lines, frequency, scale, 0, 0, "_QUICustomGlow")
+        local glowFrame = wrapper["_AutoCastGlow_QUICustomGlow"]
         if glowFrame then
             glowFrame:ClearAllPoints()
             glowFrame:SetPoint("TOPLEFT", icon, "TOPLEFT", -xOffset, xOffset)
@@ -230,145 +246,38 @@ end
 function StopGlow(icon)
     if not icon then return end
 
-    -- Stop LibCustomGlow effects
-    if LCG then
-        pcall(LCG.PixelGlow_Stop, icon, "_QUICustomGlow")
-        pcall(LCG.AutoCastGlow_Stop, icon, "_QUICustomGlow")
+    -- TAINT-FIX: Stop glow on the wrapper frame, not the CDM item frame
+    local wrapper = glowWrappers[icon]
+    if LCG and wrapper then
+        pcall(LCG.PixelGlow_Stop, wrapper, "_QUICustomGlow")
+        pcall(LCG.AutoCastGlow_Stop, wrapper, "_QUICustomGlow")
     end
 
     activeGlowIcons[icon] = nil
 end
 
 -- ======================================================
--- CDM Icon Method Hooking (reliable glow detection)
--- Uses Blizzard's built-in CDM icon methods instead of
--- manual spellID matching which fails during combat
+-- Scan for existing proc glows on CDM icons
+-- Used on init and zone changes to catch already-active procs
 -- ======================================================
-
--- Hook individual CDM icon's glow methods
-local function HookCDMIcon(icon)
-    if not icon then return end
-    if hookedGlowIcons[icon] then return end
-
-    local viewerType = GetViewerType(icon)
-    if not viewerType then return end
-
-    -- Hook the glow show event handler
-    if icon.OnSpellActivationOverlayGlowShowEvent then
-        hooksecurefunc(icon, "OnSpellActivationOverlayGlowShowEvent", function(self, spellID)
-            -- Check if this icon should respond to this spellID (wrapped in pcall for safety)
-            local shouldProcess = true
-            if self.NeedSpellActivationUpdate then
-                pcall(function()
-                    if not self:NeedSpellActivationUpdate(spellID) then
-                        shouldProcess = false
+local function ScanForExistingGlows()
+    for _, viewerName in ipairs({"EssentialCooldownViewer", "UtilityCooldownViewer"}) do
+        local viewer = _G[viewerName]
+        if viewer then
+            local ok, children = pcall(function() return {viewer:GetChildren()} end)
+            if ok and children then
+                for _, icon in ipairs(children) do
+                    if not activeGlowIcons[icon] then
+                        pcall(function()
+                            if icon:IsShown() and icon.SpellActivationAlert
+                               and icon.SpellActivationAlert:IsShown() then
+                                StartGlow(icon)
+                            end
+                        end)
                     end
-                end)
-            end
-            if not shouldProcess then return end
-
-            local settings = GetViewerSettings(viewerType)
-            if not settings then return end
-
-            if self:IsShown() then
-                StartGlow(self)
-            end
-        end)
-    end
-
-    -- Hook the glow hide event handler
-    if icon.OnSpellActivationOverlayGlowHideEvent then
-        hooksecurefunc(icon, "OnSpellActivationOverlayGlowHideEvent", function(self, spellID)
-            -- Check if this icon should respond to this spellID (wrapped in pcall for safety)
-            local shouldProcess = true
-            if self.NeedSpellActivationUpdate then
-                pcall(function()
-                    if not self:NeedSpellActivationUpdate(spellID) then
-                        shouldProcess = false
-                    end
-                end)
-            end
-            if not shouldProcess then return end
-
-            StopGlow(self)
-        end)
-    end
-
-    -- Hook RefreshOverlayGlow for initial state and refreshes
-    if icon.RefreshOverlayGlow then
-        hooksecurefunc(icon, "RefreshOverlayGlow", function(self)
-            local settings = GetViewerSettings(viewerType)
-            if not settings then return end
-
-            local shouldGlow = false
-
-            -- Method 1: Try IsSpellOverlayed API (wrapped in pcall for secret value protection)
-            pcall(function()
-                local spellID = self.GetSpellID and self:GetSpellID()
-                if spellID and IsSpellOverlayed and IsSpellOverlayed(spellID) then
-                    shouldGlow = true
                 end
-            end)
-
-            -- Method 2: Fallback - check icon's overlay frames directly
-            if not shouldGlow then
-                pcall(function()
-                    if self.overlay and self.overlay:IsShown() then
-                        shouldGlow = true
-                    elseif self.SpellActivationAlert and self.SpellActivationAlert:IsShown() then
-                        shouldGlow = true
-                    elseif self.OverlayGlow and self.OverlayGlow:IsShown() then
-                        shouldGlow = true
-                    end
-                end)
             end
-
-            if shouldGlow then
-                StartGlow(self)
-            else
-                StopGlow(self)
-            end
-        end)
-    end
-
-    hookedGlowIcons[icon] = true
-end
-
--- Hook all icons in a viewer
-local function HookViewerIcons(viewerName)
-    local viewer = _G[viewerName]
-    if not viewer then return end
-
-    local children = {viewer:GetChildren()}
-    for _, child in ipairs(children) do
-        if child and child ~= viewer.Selection then
-            HookCDMIcon(child)
         end
-    end
-end
-
--- Setup continuous hooking for new icons
-local function SetupViewerHooking(viewerName, trackerKey)
-    local viewer = _G[viewerName]
-    if not viewer then return end
-
-    -- Hook existing icons
-    HookViewerIcons(viewerName)
-
-    -- Watch for new icons via layout changes
-    if not hookedGlowViewers[viewer] then
-        viewer:HookScript("OnSizeChanged", function()
-            -- LOW-LEVEL SAFETY: Debounce to prevent timer flooding.
-            -- Without this, rapid OnSizeChanged on empty viewers queues
-            -- unbounded C_Timer closures (each a no-op but still allocation overhead).
-            if pendingViewerGlowScan[viewer] then return end
-            pendingViewerGlowScan[viewer] = true
-            C_Timer.After(0.1, function()
-                pendingViewerGlowScan[viewer] = nil
-                HookViewerIcons(viewerName)
-            end)
-        end)
-        hookedGlowViewers[viewer] = true
     end
 end
 
@@ -376,8 +285,45 @@ end
 -- Hook into Blizzard's glow system
 -- ======================================================
 local function SetupGlowHooks()
-    -- Keep ActionButton hooks as backup for edge cases
-    -- These still work for some scenarios where CDM icon methods aren't available
+    -- TAINT-FIX: Hook ActionButtonSpellAlertManager (singleton) for CDM proc detection.
+    -- Previously hooked per-CDM-icon methods (OnSpellActivationOverlayGlowShowEvent,
+    -- OnSpellActivationOverlayGlowHideEvent, RefreshOverlayGlow) which rawset wrapper
+    -- functions on each CDM item frame's Lua table, tainting those tables.
+    -- Hooking the singleton manager only rawsets on the manager's table.
+    local mgr = _G.ActionButtonSpellAlertManager
+    if mgr then
+        if mgr.ShowAlert then
+            hooksecurefunc(mgr, "ShowAlert", function(self, button)
+                if not button then return end
+                if activeGlowIcons[button] then return end  -- Already glowing
+                local viewerType = GetViewerType(button)
+                if not viewerType then return end
+                -- Defer glow creation outside RefreshData secure chain
+                C_Timer.After(0, function()
+                    local settings = GetViewerSettings(viewerType)
+                    if settings then
+                        pcall(function()
+                            if button:IsShown() then
+                                StartGlow(button)
+                            end
+                        end)
+                    end
+                end)
+            end)
+        end
+        if mgr.HideAlert then
+            hooksecurefunc(mgr, "HideAlert", function(self, button)
+                if not button then return end
+                if not activeGlowIcons[button] then return end  -- No glow to remove
+                local viewerType = GetViewerType(button)
+                if viewerType then
+                    StopGlow(button)
+                end
+            end)
+        end
+    end
+
+    -- Keep ActionButton hooks as backup for non-CDM scenarios
     if type(ActionButton_ShowOverlayGlow) == "function" then
         hooksecurefunc("ActionButton_ShowOverlayGlow", function(button)
             if not button then return end
@@ -401,23 +347,13 @@ local function SetupGlowHooks()
         end)
     end
 
-    -- NEW: Setup CDM icon method hooks (more reliable than event-based spellID matching)
-    -- These hook directly into Blizzard's CDM icon methods for glow show/hide
-    C_Timer.After(0.5, function()
-        SetupViewerHooking("EssentialCooldownViewer", "Essential")
-        SetupViewerHooking("UtilityCooldownViewer", "Utility")
-    end)
+    -- Initial scan for existing proc glows + re-scan on zone changes
+    C_Timer.After(1.0, ScanForExistingGlows)
 
-    -- Event frame for ensuring hooks are set up when icons change
     local eventFrame = CreateFrame("Frame")
     eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-    eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
     eventFrame:SetScript("OnEvent", function(self, event)
-        -- Ensure all icons are hooked (new icons may have been created)
-        C_Timer.After(0.2, function()
-            SetupViewerHooking("EssentialCooldownViewer", "Essential")
-            SetupViewerHooking("UtilityCooldownViewer", "Utility")
-        end)
+        C_Timer.After(0.5, ScanForExistingGlows)
     end)
 end
 
@@ -482,9 +418,6 @@ SUI.CustomGlows = {
     RefreshAllGlows = RefreshAllGlows,
     GetViewerType = GetViewerType,
     activeGlowIcons = activeGlowIcons,
-    -- CDM icon hooking (for external trigger if needed)
-    HookCDMIcon = HookCDMIcon,
-    HookViewerIcons = HookViewerIcons,
 }
 
 -- Global function for config panel to call

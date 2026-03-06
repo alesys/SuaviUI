@@ -2,9 +2,9 @@
 local SUICore = ns.Addon
 local LSM = LibStub("LibSharedMedia-3.0")
 
--- EMERGENCY HOTFIX (session 4933): disable this module's CDM frame mutation paths
--- to stop live taint cascades (spellID/hasTotem/isActive/wasOnGCDLookup) immediately.
-local FORCE_DISABLE_CDM_BUFFBAR = true
+-- Session 4933 emergency hotfix lifted: CDM taint vectors fixed (sessions 4891-4927),
+-- remaining frame field writes moved to weak tables.
+local FORCE_DISABLE_CDM_BUFFBAR = false
 
 ---------------------------------------------------------------------------
 -- SUI Buff Bar Manager
@@ -63,6 +63,12 @@ local SUI_trackedBg         = setmetatable({}, {__mode = "k"})  -- [frame]  → 
 local SUI_trackedBorderCont = setmetatable({}, {__mode = "k"})  -- [frame]  → Frame
 local SUI_trackedBarStyled  = setmetatable({}, {__mode = "k"})  -- [frame]  → bool
 local SUI_overlayHooked     = setmetatable({}, {__mode = "k"})  -- [region] → bool
+-- TAINT-FIX: weak tables to avoid writing fields onto Blizzard CDM icon/texture objects
+local SUI_buffSetup         = setmetatable({}, {__mode = "k"})  -- [icon]   → bool
+local SUI_buffBorder        = setmetatable({}, {__mode = "k"})  -- [icon]   → Texture
+local SUI_buffBorderSize    = setmetatable({}, {__mode = "k"})  -- [icon]   → number
+local SUI_atlasDisabled     = setmetatable({}, {__mode = "k"})  -- [tex]    → bool
+local SUI_atlasHooked       = setmetatable({}, {__mode = "k"})  -- [tex]    → bool
 
 ---------------------------------------------------------------------------
 -- HELPER: Get font from general settings
@@ -289,8 +295,9 @@ local function GetOrCreateContainer()
 
     customContainer = CreateFrame("Frame", "SuaviBuffBarContainer", UIParent)
     customContainer:SetPoint("CENTER", viewer, "CENTER", 0, 0)
-    customContainer:SetSize(SafeViewerCall(viewer, "GetWidth") or 200,
-                            SafeViewerCall(viewer, "GetHeight") or 24)
+    -- TAINT-FIX (session 4986): Use settings defaults instead of querying viewer
+    local barSettings = GetTrackedBarSettings()
+    customContainer:SetSize(barSettings.barWidth or 200, barSettings.barHeight or 24)
     customContainer:Show()
     return customContainer
 end
@@ -314,6 +321,7 @@ local function CreateCustomBarFrame()
 
     -- Name text (on the StatusBar so ApplyBarStyle's FontString scan finds it)
     local nameText = bar:CreateFontString(nil, "OVERLAY")
+    nameText:SetFont(GetGeneralFont(), 11, GetGeneralFontOutline())
     nameText:SetPoint("LEFT", bar, "LEFT", 4, 0)
     nameText:SetJustifyH("LEFT")
     nameText:SetWordWrap(false)
@@ -321,6 +329,7 @@ local function CreateCustomBarFrame()
 
     -- Time text
     local timeText = bar:CreateFontString(nil, "OVERLAY")
+    timeText:SetFont(GetGeneralFont(), 11, GetGeneralFontOutline())
     timeText:SetPoint("RIGHT", bar, "RIGHT", -4, 0)
     timeText:SetJustifyH("RIGHT")
     frame._timeText = timeText
@@ -401,113 +410,25 @@ end
 
 -- Fetch active aura data using clean C APIs only (no Blizzard frame reads)
 local function FetchBuffBarData()
-    -- NEW PRIMARY: read active data directly from Blizzard BuffBar item frames.
-    -- This captures both aura-driven and totem-driven tracked bars and avoids
-    -- false-empty results when aura lookups don't map 1:1 to active CDM items.
-    local viewer = SafeGetViewer("BuffBarCooldownViewer")
-    if viewer and viewer.GetItemFrames then
-        local frameData = {}
-        local now = GetTime()
+    -- TAINT-FIX (session 4986): Paths 1+2 called Lua mixin methods on
+    -- BuffBarCooldownViewer (GetItemFrames) and accessed viewer.itemFramePool
+    -- (a forbidden table in WoW 12.x). Even pcall-wrapped, these accesses from
+    -- addon context taint the viewer's item frames, causing Blizzard's secure
+    -- RefreshData → SetIsActive to write tainted isActive values. Path 3 (C API
+    -- only) avoids ALL Lua-level viewer interaction and is the only safe path.
 
-        pcall(function()
-            local items = viewer:GetItemFrames() or {}
-            for _, item in ipairs(items) do
-                if item and item.IsShown and item:IsShown() then
-                    local cooldownID, layoutIndex, spellID, nameText
-                    local expirationTime, duration
-
-                    pcall(function()
-                        if item.GetCooldownID then cooldownID = item:GetCooldownID() end
-                        layoutIndex = item.layoutIndex
-                        if item.GetSpellID then spellID = item:GetSpellID() end
-                        if item.GetNameText then nameText = item:GetNameText() end
-                        if item.GetCooldownValues then
-                            expirationTime, duration = item:GetCooldownValues()
-                        end
-                    end)
-
-                    local remaining = (expirationTime or 0) - now
-                    if cooldownID and duration and duration > 0 and remaining > 0 then
-                        local texture = nil
-                        pcall(function()
-                            if item.Icon and item.Icon.Icon and item.Icon.Icon.GetTexture then
-                                texture = item.Icon.Icon:GetTexture()
-                            end
-                        end)
-                        if not texture and spellID then
-                            local texOk, tex = pcall(C_Spell.GetSpellTexture, spellID)
-                            if texOk then texture = tex end
-                        end
-
-                        frameData[#frameData + 1] = {
-                            cooldownID = cooldownID,
-                            spellID = spellID,
-                            layoutIndex = layoutIndex or #frameData,
-                            name = nameText or "",
-                            texture = texture,
-                            duration = duration,
-                            expirationTime = expirationTime,
-                        }
-                    end
-                end
-            end
-        end)
-
-        if #frameData > 0 then
-            table.sort(frameData, function(a, b) return (a.layoutIndex or 0) < (b.layoutIndex or 0) end)
-            return frameData
-        end
-    end
-
-    -- PRIMARY: Use BuffBarCooldownViewer.itemFramePool as authoritative active-spell source.
-    -- The viewer is still running (SetAlpha(0) hides it visually but keeps its logic alive),
-    -- so itemFramePool:EnumerateActive() gives exactly the frames Blizzard considers active.
-    -- This sidesteps GetViewerCooldownIDs() which can silently return {} if the settings
-    -- data provider hasn't built its display data yet (CheckBuildDisplayData() timing issue).
     local srcFrames = nil
-    viewer = SafeGetViewer("BuffBarCooldownViewer")
-    if viewer then
-        local poolFrames = {}
-        pcall(function()
-            local pool = viewer.itemFramePool
-            if not (pool and pool.EnumerateActive) then return end
-            for frame in pool:EnumerateActive() do
-                if not frame then return end
-                -- BUG-FIX: EnumerateActive() yields only active (acquired) frames.
-                -- Old code read frame.isActive and required it to be truthy. If the inner
-                -- pcall fails (e.g. forbidden frame), active stays nil and the frame is
-                -- silently dropped even though EnumerateActive already guarantees it's active.
-                -- Fix: only read the fields we actually need (cdID, layoutIdx).
-                local cdID, layoutIdx
-                pcall(function()
-                    cdID      = frame.cooldownID
-                    layoutIdx = frame.layoutIndex
-                end)
-                if cdID then
-                    poolFrames[#poolFrames + 1] = {
-                        cooldownID  = cdID,
-                        layoutIndex = layoutIdx or 0,
-                    }
-                end
-            end
-        end)
-        if #poolFrames > 0 then
-            srcFrames = poolFrames
-        end
-    end
 
-    -- FALLBACK: data provider API.  GetViewerCooldownIDs() returns ALL configured spell IDs
-    -- (active or not), so aura data below acts as the active filter.
-    if not srcFrames then
-        local cooldownIDs = GetViewerCooldownIDs()
-        if #cooldownIDs == 0 then return {} end
-        srcFrames = {}
-        for layoutIdx, cdID in ipairs(cooldownIDs) do
-            srcFrames[#srcFrames + 1] = {
-                cooldownID  = cdID,
-                layoutIndex = layoutIdx,
-            }
-        end
+    -- PRIMARY: C API data provider. GetViewerCooldownIDs() returns ALL configured
+    -- spell IDs (active or not), so aura data below acts as the active filter.
+    local cooldownIDs = GetViewerCooldownIDs()
+    if #cooldownIDs == 0 then return {} end
+    srcFrames = {}
+    for layoutIdx, cdID in ipairs(cooldownIDs) do
+        srcFrames[#srcFrames + 1] = {
+            cooldownID  = cdID,
+            layoutIndex = layoutIdx,
+        }
     end
 
     table.sort(srcFrames, function(a, b) return a.layoutIndex < b.layoutIndex end)
@@ -520,36 +441,53 @@ local function FetchBuffBarData()
     end)
 
     local results = {}
+    local now = GetTime()
     for _, src in ipairs(srcFrames) do
-        -- Correct API: GetCooldownViewerCooldownInfo (not GetCooldownInfoByCooldownID).
-        -- Returns CooldownViewerCooldown: { spellID, overrideSpellID, linkedSpellIDs (table), ... }
-        -- SecretArguments="AllowedWhenUntainted" → safe to call from addon (untainted) context.
+        -- GetCooldownViewerCooldownInfo returns CooldownViewerCooldown struct.
+        -- SecretArguments="AllowedWhenUntainted" → safe from addon (untainted) context.
         local ok, info = pcall(C_CooldownViewer.GetCooldownViewerCooldownInfo, src.cooldownID)
         if ok and info then
-            local spellID = info.overrideSpellID or info.spellID
-            -- linkedSpellIDs: table of alternate aura IDs (e.g. DoT aura ID differs from cast ID:
-            -- Moonfire cast=8921 but target DoT aura spellId=164812 is in linkedSpellIDs).
-            local linkedSpellIDs = {}
+            -- Collect ALL associated spell IDs (matches Blizzard's GetSpellID priority chain).
+            -- Blizzard checks: auraSpellID > linkedSpellID > overrideTooltipSpellID > overrideSpellID > spellID.
+            -- We don't have auraSpellID (runtime state), so start from linkedSpellIDs.
+            local primarySpellID = info.overrideSpellID or info.spellID
+            local allSpellIDs = {}
             pcall(function()
+                -- linkedSpellIDs first (highest priority for aura matching)
                 if type(info.linkedSpellIDs) == "table" then
-                    linkedSpellIDs = info.linkedSpellIDs
+                    for _, lID in ipairs(info.linkedSpellIDs) do
+                        allSpellIDs[#allSpellIDs + 1] = lID
+                    end
+                end
+                -- Then primary spell ID
+                if primarySpellID then
+                    allSpellIDs[#allSpellIDs + 1] = primarySpellID
+                end
+                -- Also base spellID if different from override
+                if info.overrideSpellID and info.spellID and info.spellID ~= info.overrideSpellID then
+                    allSpellIDs[#allSpellIDs + 1] = info.spellID
                 end
             end)
-            if spellID then
+            if #allSpellIDs == 0 and primarySpellID then
+                allSpellIDs[1] = primarySpellID
+            end
+
+            if #allSpellIDs > 0 then
                 local auraResult = {}
                 pcall(function()
-                    -- 1. Player aura (buffs/debuffs on the player)
-                    local auraData = C_UnitAuras.GetPlayerAuraBySpellID(spellID)
-                    -- 2. Fallback: target debuffs cast by the player (DoTs, etc.).
-                    --    Match by cast spellID OR any linked aura spellID.
+                    local auraData = nil
+
+                    -- 1. Player aura: try ALL associated spell IDs
+                    for _, sid in ipairs(allSpellIDs) do
+                        auraData = C_UnitAuras.GetPlayerAuraBySpellID(sid)
+                        if auraData then break end
+                    end
+
+                    -- 2. Target debuffs: match by ANY associated spell ID
                     if not auraData then
                         for _, aura in ipairs(targetAuras) do
-                            if aura.spellId == spellID then
-                                auraData = aura
-                                break
-                            end
-                            for _, lID in ipairs(linkedSpellIDs) do
-                                if aura.spellId == lID then
+                            for _, sid in ipairs(allSpellIDs) do
+                                if aura.spellId == sid then
                                     auraData = aura
                                     break
                                 end
@@ -557,21 +495,60 @@ local function FetchBuffBarData()
                             if auraData then break end
                         end
                     end
-                    if auraData and auraData.duration and auraData.duration > 0 then
-                        local texture = auraData.icon
-                        if not texture then
-                            local texOk, tex = pcall(C_Spell.GetSpellTexture, spellID)
-                            if texOk then texture = tex end
+
+                    -- 3. Totem detection (shaman totems have no aura on player/target)
+                    if not auraData and C_Totem then
+                        for slot = 1, 5 do
+                            local haveTotem, name, startTime, duration, icon = C_Totem.GetTotemInfo(slot)
+                            if haveTotem and duration and duration > 0 then
+                                -- C_Totem doesn't expose spellID directly; match by spell name
+                                for _, sid in ipairs(allSpellIDs) do
+                                    local spellName = C_Spell.GetSpellName(sid)
+                                    if spellName and spellName == name then
+                                        auraData = {
+                                            name = name,
+                                            icon = icon,
+                                            duration = duration,
+                                            expirationTime = startTime + duration,
+                                            spellId = sid,
+                                        }
+                                        break
+                                    end
+                                end
+                                if auraData then break end
+                            end
                         end
-                        auraResult = {
-                            cooldownID     = src.cooldownID,
-                            spellID        = spellID,
-                            layoutIndex    = src.layoutIndex,
-                            name           = auraData.name or "",
-                            texture        = texture,
-                            duration       = auraData.duration,
-                            expirationTime = auraData.expirationTime,
-                        }
+                    end
+
+                    -- Accept aura if active. Blizzard's ShouldBeActive logic:
+                    -- expirationTime == 0 (infinite) OR expirationTime > GetTime()
+                    if auraData then
+                        local isActive = (auraData.expirationTime == 0)
+                            or (auraData.expirationTime and auraData.expirationTime > now)
+                        if isActive then
+                            local displaySpellID = primarySpellID or allSpellIDs[1]
+                            local texture = auraData.icon
+                            if not texture and displaySpellID then
+                                local texOk, tex = pcall(C_Spell.GetSpellTexture, displaySpellID)
+                                if texOk then texture = tex end
+                            end
+                            -- For infinite auras (duration=0), use a large sentinel so bar renders full
+                            local dur = auraData.duration or 0
+                            local expTime = auraData.expirationTime or 0
+                            if dur == 0 and expTime == 0 then
+                                dur = 86400      -- 24h sentinel
+                                expTime = now + dur
+                            end
+                            auraResult = {
+                                cooldownID     = src.cooldownID,
+                                spellID        = displaySpellID,
+                                layoutIndex    = src.layoutIndex,
+                                name           = auraData.name or "",
+                                texture        = texture,
+                                duration       = dur,
+                                expirationTime = expTime,
+                            }
+                        end
                     end
                 end)
                 if auraResult.cooldownID then
@@ -679,8 +656,10 @@ local function GetOrCreateIconContainer()
 
     customIconContainer = CreateFrame("Frame", "SuaviBuffIconContainer", UIParent)
     customIconContainer:SetPoint("CENTER", viewer, "CENTER", 0, 0)
-    customIconContainer:SetSize(SafeViewerCall(viewer, "GetWidth") or 42,
-                                SafeViewerCall(viewer, "GetHeight") or 42)
+    -- TAINT-FIX (session 4986): Use settings defaults instead of querying viewer
+    local iconSettings = GetBuffSettings()
+    local iconSz = iconSettings.iconSize or 42
+    customIconContainer:SetSize(iconSz, iconSz)
     customIconContainer:Show()
     return customIconContainer
 end
@@ -719,7 +698,7 @@ local function CreateCustomIconFrame()
 
     -- Mark as custom (skip Blizzard-specific cleanup in SetupIconOnce)
     frame._isCustomIcon = true
-    frame._buffSetup = true  -- Skip SetupIconOnce's mask/overlay removal
+    SUI_buffSetup[frame] = true  -- Skip SetupIconOnce's mask/overlay removal
 
     frame:Hide()
     return frame
@@ -766,50 +745,18 @@ local function GetIconViewerCooldownIDs()
     return {}
 end
 
--- Fetch active aura data for icons
+-- Fetch active aura data for icons using clean C APIs only (no Blizzard frame reads)
 local function FetchBuffIconData()
-    -- PRIMARY: Use BuffIconCooldownViewer.itemFramePool as authoritative active-spell source.
-    -- Same pattern as FetchBuffBarData: the viewer runs with alpha=0 so its pool is live.
-    local srcFrames = nil
-    local viewer = SafeGetViewer("BuffIconCooldownViewer")
-    if viewer then
-        local poolFrames = {}
-        pcall(function()
-            local pool = viewer.itemFramePool
-            if not (pool and pool.EnumerateActive) then return end
-            for frame in pool:EnumerateActive() do
-                if not frame then return end
-                -- BUG-FIX: same as FetchBuffBarData — EnumerateActive guarantees active.
-                -- Drop the frame.isActive read so a pcall failure can't silently drop frames.
-                local cdID, layoutIdx
-                pcall(function()
-                    cdID      = frame.cooldownID
-                    layoutIdx = frame.layoutIndex
-                end)
-                if cdID then
-                    poolFrames[#poolFrames + 1] = {
-                        cooldownID  = cdID,
-                        layoutIndex = layoutIdx or 0,
-                    }
-                end
-            end
-        end)
-        if #poolFrames > 0 then
-            srcFrames = poolFrames
-        end
-    end
-
-    -- FALLBACK: data provider API.
-    if not srcFrames then
-        local cooldownIDs = GetIconViewerCooldownIDs()
-        if #cooldownIDs == 0 then return {} end
-        srcFrames = {}
-        for layoutIdx, cdID in ipairs(cooldownIDs) do
-            srcFrames[#srcFrames + 1] = {
-                cooldownID  = cdID,
-                layoutIndex = layoutIdx,
-            }
-        end
+    -- TAINT-FIX (session 4986): Same as FetchBuffBarData — removed viewer.itemFramePool
+    -- access (forbidden table in WoW 12.x). C API only path avoids all viewer interaction.
+    local cooldownIDs = GetIconViewerCooldownIDs()
+    if #cooldownIDs == 0 then return {} end
+    local srcFrames = {}
+    for layoutIdx, cdID in ipairs(cooldownIDs) do
+        srcFrames[#srcFrames + 1] = {
+            cooldownID  = cdID,
+            layoutIndex = layoutIdx,
+        }
     end
 
     table.sort(srcFrames, function(a, b) return a.layoutIndex < b.layoutIndex end)
@@ -821,43 +768,100 @@ local function FetchBuffIconData()
     end)
 
     local results = {}
+    local now = GetTime()
     for _, src in ipairs(srcFrames) do
-        local ok, info = pcall(C_CooldownViewer.GetCooldownInfoByCooldownID, src.cooldownID)
+        local ok, info = pcall(C_CooldownViewer.GetCooldownViewerCooldownInfo, src.cooldownID)
         if ok and info then
-            local spellID = info.overrideSpellID or info.spellID
-            local linkedSpellID
-            pcall(function() linkedSpellID = info.linkedSpellID end)
-            if spellID then
+            -- Collect ALL associated spell IDs (same pattern as FetchBuffBarData)
+            local primarySpellID = info.overrideSpellID or info.spellID
+            local allSpellIDs = {}
+            pcall(function()
+                if type(info.linkedSpellIDs) == "table" then
+                    for _, lID in ipairs(info.linkedSpellIDs) do
+                        allSpellIDs[#allSpellIDs + 1] = lID
+                    end
+                end
+                if primarySpellID then
+                    allSpellIDs[#allSpellIDs + 1] = primarySpellID
+                end
+                if info.overrideSpellID and info.spellID and info.spellID ~= info.overrideSpellID then
+                    allSpellIDs[#allSpellIDs + 1] = info.spellID
+                end
+            end)
+            if #allSpellIDs == 0 and primarySpellID then
+                allSpellIDs[1] = primarySpellID
+            end
+
+            if #allSpellIDs > 0 then
                 local auraResult = {}
                 pcall(function()
-                    -- 1. Player aura first
-                    local auraData = C_UnitAuras.GetPlayerAuraBySpellID(spellID)
-                    -- 2. Fallback: target debuffs (DoTs). Match cast spellID or linked aura ID.
+                    local auraData = nil
+
+                    -- 1. Player aura: try ALL associated spell IDs
+                    for _, sid in ipairs(allSpellIDs) do
+                        auraData = C_UnitAuras.GetPlayerAuraBySpellID(sid)
+                        if auraData then break end
+                    end
+
+                    -- 2. Target debuffs: match by ANY associated spell ID
                     if not auraData then
                         for _, aura in ipairs(targetAuras) do
-                            if aura.spellId == spellID
-                                or (linkedSpellID and aura.spellId == linkedSpellID) then
-                                auraData = aura
-                                break
+                            for _, sid in ipairs(allSpellIDs) do
+                                if aura.spellId == sid then
+                                    auraData = aura
+                                    break
+                                end
+                            end
+                            if auraData then break end
+                        end
+                    end
+
+                    -- 3. Totem detection
+                    if not auraData and C_Totem then
+                        for slot = 1, 5 do
+                            local haveTotem, name, startTime, duration, icon = C_Totem.GetTotemInfo(slot)
+                            if haveTotem and duration and duration > 0 then
+                                for _, sid in ipairs(allSpellIDs) do
+                                    local spellName = C_Spell.GetSpellName(sid)
+                                    if spellName and spellName == name then
+                                        auraData = {
+                                            name = name,
+                                            icon = icon,
+                                            duration = duration,
+                                            expirationTime = startTime + duration,
+                                            spellId = sid,
+                                            applications = 0,
+                                        }
+                                        break
+                                    end
+                                end
+                                if auraData then break end
                             end
                         end
                     end
+
+                    -- Accept if active (expirationTime == 0 for infinite, or > now)
                     if auraData then
-                        local texture = auraData.icon
-                        if not texture then
-                            local texOk, tex = pcall(C_Spell.GetSpellTexture, spellID)
-                            if texOk then texture = tex end
+                        local isActive = (auraData.expirationTime == 0)
+                            or (auraData.expirationTime and auraData.expirationTime > now)
+                        if isActive then
+                            local displaySpellID = primarySpellID or allSpellIDs[1]
+                            local texture = auraData.icon
+                            if not texture and displaySpellID then
+                                local texOk, tex = pcall(C_Spell.GetSpellTexture, displaySpellID)
+                                if texOk then texture = tex end
+                            end
+                            auraResult = {
+                                cooldownID     = src.cooldownID,
+                                spellID        = displaySpellID,
+                                layoutIndex    = src.layoutIndex,
+                                name           = auraData.name or "",
+                                texture        = texture,
+                                duration       = auraData.duration or 0,
+                                expirationTime = auraData.expirationTime or 0,
+                                applications   = auraData.applications or 0,
+                            }
                         end
-                        auraResult = {
-                            cooldownID     = src.cooldownID,
-                            spellID        = spellID,
-                            layoutIndex    = src.layoutIndex,
-                            name           = auraData.name or "",
-                            texture        = texture,
-                            duration       = auraData.duration or 0,
-                            expirationTime = auraData.expirationTime or 0,
-                            applications   = auraData.applications or 0,
-                        }
                     end
                 end)
                 if auraResult.cooldownID then
@@ -1094,8 +1098,8 @@ local function DisableAtlasBorder(tex)
     if tex.Hide then tex:Hide() end
 
     -- Hook to re-clear on future SetAtlas calls (Blizzard re-applies on buff updates)
-    if tex.SetAtlas and not tex._quiAtlasDisabled then
-        tex._quiAtlasDisabled = true
+    if tex.SetAtlas and not SUI_atlasDisabled[tex] then
+        SUI_atlasDisabled[tex] = true
         hooksecurefunc(tex, "SetAtlas", function(self)
             C_Timer.After(0, function()
                 -- Safety check in case texture was released before timer fires
@@ -1119,7 +1123,7 @@ end
 ---------------------------------------------------------------------------
 
 local function SetupIconOnce(icon)
-    if icon._buffSetup then return end
+    if SUI_buffSetup[icon] then return end
 
     -- Remove ALL of Blizzard's masks (they may have multiple)
     local textures = { icon.Icon, icon.icon, icon.texture, icon.Texture }
@@ -1149,7 +1153,7 @@ local function SetupIconOnce(icon)
     DisableAtlasBorder(icon.BuffBorder)
     DisableAtlasBorder(icon.TempEnchantBorder)
 
-    icon._buffSetup = true
+    SUI_buffSetup[icon] = true
 end
 
 ---------------------------------------------------------------------------
@@ -1187,21 +1191,21 @@ local function ApplyIconStyle(icon, settings)
     -- Create or update border (using BACKGROUND texture to avoid secret value errors during combat)
     -- BackdropTemplate causes "arithmetic on secret value" crashes when frame is resized during combat
     if borderSize > 0 then
-        if not icon._buffBorder then
-            icon._buffBorder = icon:CreateTexture(nil, "BACKGROUND", nil, -8)
-            icon._buffBorder:SetColorTexture(0, 0, 0, 1)
+        if not SUI_buffBorder[icon] then
+            SUI_buffBorder[icon] = icon:CreateTexture(nil, "BACKGROUND", nil, -8)
+            SUI_buffBorder[icon]:SetColorTexture(0, 0, 0, 1)
         end
 
-        icon._buffBorder:ClearAllPoints()
-        icon._buffBorder:SetPoint("TOPLEFT", icon, "TOPLEFT", -borderSize, borderSize)
-        icon._buffBorder:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", borderSize, -borderSize)
-        icon._buffBorder:Show()
-        icon._buffBorderSize = borderSize
+        SUI_buffBorder[icon]:ClearAllPoints()
+        SUI_buffBorder[icon]:SetPoint("TOPLEFT", icon, "TOPLEFT", -borderSize, borderSize)
+        SUI_buffBorder[icon]:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", borderSize, -borderSize)
+        SUI_buffBorder[icon]:Show()
+        SUI_buffBorderSize[icon] = borderSize
     else
-        if icon._buffBorder then
-            icon._buffBorder:Hide()
+        if SUI_buffBorder[icon] then
+            SUI_buffBorder[icon]:Hide()
         end
-        icon._buffBorderSize = 0
+        SUI_buffBorderSize[icon] = 0
     end
 
     -- Calculate texture coordinates (crop-based, no stretching)
@@ -1557,8 +1561,8 @@ local function ApplyBarStyle(frame, settings)
             end
 
             -- Step F: Hook SetAtlas on icon texture to prevent Blizzard re-applying borders (one-time hook)
-            if iconTexture and iconTexture.SetAtlas and not iconTexture._quiAtlasHooked then
-                iconTexture._quiAtlasHooked = true
+            if iconTexture and iconTexture.SetAtlas and not SUI_atlasHooked[iconTexture] then
+                SUI_atlasHooked[iconTexture] = true
                 hooksecurefunc(iconTexture, "SetAtlas", function(self)
                     -- Restore TexCoord after any atlas change
                     self:SetTexCoord(0.07, 0.93, 0.07, 0.93)
@@ -1856,23 +1860,11 @@ LayoutBuffIcons = function()
             icon:SetFrameLevel(frameLevel + 10)
         end
 
-        -- Update viewer size for Edit Mode selection overlay
-        if not InCombatLockdown() then
-            SuppressLayout()
-            pcall(function()
-                BuffIconCooldownViewer:SetSize(roundPixel(totalWidth), roundPixel(totalHeight))
-            end)
-            UnsuppressLayout()
-
-            pcall(function()
-                if BuffIconCooldownViewer.Selection then
-                    BuffIconCooldownViewer.Selection:ClearAllPoints()
-                    BuffIconCooldownViewer.Selection:SetPoint("TOPLEFT", BuffIconCooldownViewer, "TOPLEFT", 0, 0)
-                    BuffIconCooldownViewer.Selection:SetPoint("BOTTOMRIGHT", BuffIconCooldownViewer, "BOTTOMRIGHT", 0, 0)
-                    BuffIconCooldownViewer.Selection:SetFrameLevel(BuffIconCooldownViewer:GetFrameLevel())
-                end
-            end)
-        end
+        -- TAINT-FIX (session 4986): Removed BuffIconCooldownViewer:SetSize() and
+        -- .Selection manipulation — same taint vector as BuffBarCooldownViewer.
+        -- SetSize() triggers internal layout recalculation that taints the SHARED
+        -- CooldownViewerSettingsDataProvider singleton, cascading taint to ALL viewers
+        -- (including BuffBarCooldownViewer). Container size is all we need.
 
         isIconLayoutRunning = false
         return  -- Custom path complete; skip legacy code below
@@ -2107,7 +2099,8 @@ LayoutBuffBars = function()
         -- Settings
         local settings = GetTrackedBarSettings()
         local stylingEnabled = true
-        local barWidth = SafeViewerCall(BuffBarCooldownViewer, "GetWidth") or 200
+        -- TAINT-FIX (session 4986): Use settings value instead of querying viewer
+        local barWidth = settings.barWidth or 200
         local barHeight = stylingEnabled and settings.barHeight or 24
         local spacing = stylingEnabled and settings.spacing or 4
         local growFromBottom = (not stylingEnabled) or (settings.growUp ~= false)
@@ -2185,48 +2178,16 @@ LayoutBuffBars = function()
         end
         totalSize = roundPixel(totalSize)
 
-        -- Keep viewer at single-bar size (prevents Blizzard Layout drift)
-        SuppressLayout()
-        pcall(function() BuffBarCooldownViewer:SetSize(roundPixel(effectiveBarWidth), roundPixel(effectiveBarHeight)) end)
-        UnsuppressLayout()
+        -- TAINT-FIX (session 4986): Removed BuffBarCooldownViewer:SetSize() — any Lua-level
+        -- interaction with the viewer from addon context risks tainting its item frame fields.
+        -- Container size is all we need for custom bar anchoring.
 
-        -- Also set container size so bars can anchor against it
+        -- Set container size so bars can anchor against it
         container:SetSize(roundPixel(effectiveBarWidth), roundPixel(effectiveBarHeight))
 
-        -- Expand Edit Mode selection overlay to cover full stack
-        pcall(function()
-            if BuffBarCooldownViewer.Selection then
-                local selection = BuffBarCooldownViewer.Selection
-                local isEditMode = EditModeManagerFrame and EditModeManagerFrame.editModeActive
-                selection:ClearAllPoints()
-
-                if isEditMode and count > 1 then
-                    if isVertical then
-                        local extra = math.max(0, totalSize - effectiveBarWidth)
-                        if growFromBottom then
-                            selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", 0, 0)
-                            selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", extra, 0)
-                        else
-                            selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", -extra, 0)
-                            selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", 0, 0)
-                        end
-                    else
-                        local extra = math.max(0, totalSize - effectiveBarHeight)
-                        if growFromBottom then
-                            selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", 0, extra)
-                            selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", 0, 0)
-                        else
-                            selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", 0, 0)
-                            selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", 0, -extra)
-                        end
-                    end
-                else
-                    selection:SetPoint("TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", 0, 0)
-                    selection:SetPoint("BOTTOMRIGHT", BuffBarCooldownViewer, "BOTTOMRIGHT", 0, 0)
-                end
-                selection:SetFrameLevel(BuffBarCooldownViewer:GetFrameLevel())
-            end
-        end)
+        -- TAINT-FIX (session 4986): Removed Selection overlay manipulation on
+        -- BuffBarCooldownViewer — accessing .Selection and calling SetPoint/SetFrameLevel
+        -- on viewer children from addon context risks tainting viewer frame fields.
 
         isBarLayoutRunning = false
         return  -- Custom path complete; skip legacy code below
@@ -2285,20 +2246,13 @@ LayoutBuffBars = function()
     local orientation = stylingEnabled and settings.orientation or "horizontal"
     local isVertical = (orientation == "vertical")
 
-    -- CRITICAL: Tell Blizzard's GridLayoutFrameMixin which layout direction to use
-    -- When isHorizontal=true, Blizzard positions bars up/down (Y-axis)
-    -- When isHorizontal=false, Blizzard positions bars left/right (X-axis)
-    -- This prevents Blizzard's Layout() from overriding SUI's positioning with wrong axis
-    -- FEAT-007: Remove combat lockdown check - setting frame properties is safe during combat
-    BuffBarCooldownViewer.isHorizontal = not isVertical
-    -- Also update direction flags to match SUI's growth direction
-    if isVertical then
-        BuffBarCooldownViewer.layoutFramesGoingRight = growFromBottom  -- growUp becomes growRight
-        BuffBarCooldownViewer.layoutFramesGoingUp = false
-    else
-        BuffBarCooldownViewer.layoutFramesGoingRight = true
-        BuffBarCooldownViewer.layoutFramesGoingUp = growFromBottom
-    end
+    -- TAINT-FIX (session 4979): NEVER write isHorizontal / layoutFramesGoingRight /
+    -- layoutFramesGoingUp to BuffBarCooldownViewer. Writing these from addon context
+    -- taints the field. Blizzard's RefreshLayout reads it, calls into the SHARED
+    -- CooldownViewerSettingsDataProvider singleton, and if the provider is dirty it
+    -- rebuilds displayData in tainted context — infecting ALL viewers (Essential,
+    -- Utility, BuffIcon) with cascading taint on spellID, charges, isActive, etc.
+    -- Custom bars render in customContainer, so viewer layout direction is irrelevant.
 
     -- For vertical bars, swap dimensions (height setting becomes width)
     local effectiveBarWidth, effectiveBarHeight
@@ -2428,23 +2382,9 @@ LayoutBuffBars = function()
     -- overlay during Edit Mode instead so the full stack is selectable.
     local isEditMode = EditModeManagerFrame and EditModeManagerFrame.editModeActive
 
-    if isVertical then
-        SuppressLayout()
-
-        BuffBarCooldownViewer:SetSize(roundPixel(effectiveBarWidth), roundPixel(effectiveBarHeight))
-        BuffBarCooldownViewer.isHorizontal = false
-
-        UnsuppressLayout()
-    else
-        -- HORIZONTAL BARS: Fix BOTH dimensions to single bar size
-        SuppressLayout()
-
-        BuffBarCooldownViewer:SetSize(roundPixel(effectiveBarWidth), roundPixel(effectiveBarHeight))
-        BuffBarCooldownViewer.isHorizontal = true
-        BuffBarCooldownViewer.layoutFramesGoingUp = growFromBottom
-
-        UnsuppressLayout()
-    end
+    SuppressLayout()
+    BuffBarCooldownViewer:SetSize(roundPixel(effectiveBarWidth), roundPixel(effectiveBarHeight))
+    UnsuppressLayout()
 
     -- Expand selection overlay during Edit Mode to cover the full stack
     if BuffBarCooldownViewer.Selection then
@@ -2784,28 +2724,9 @@ local function Initialize()
         end
     end
 
-    ---------------------------------------------------------------------------
-    -- LEGACY BARS: Blizzard viewer property setup (only when not using custom bars)
-    ---------------------------------------------------------------------------
-    if not USE_CUSTOM_BARS then
-        -- Set isHorizontal IMMEDIATELY at login, before combat can start
-        pcall(function()
-            if BuffBarCooldownViewer and not InCombatLockdown() then
-                local settings = GetTrackedBarSettings()
-                local isVertical = (settings.orientation == "vertical")
-                local growFromBottom = (settings.growUp ~= false)
-
-                BuffBarCooldownViewer.isHorizontal = not isVertical
-                if isVertical then
-                    BuffBarCooldownViewer.layoutFramesGoingRight = growFromBottom
-                    BuffBarCooldownViewer.layoutFramesGoingUp = false
-                else
-                    BuffBarCooldownViewer.layoutFramesGoingRight = true
-                    BuffBarCooldownViewer.layoutFramesGoingUp = growFromBottom
-                end
-            end
-        end)
-    end
+    -- TAINT-FIX (session 4979): Removed legacy viewer property writes (isHorizontal,
+    -- layoutFramesGoingRight, layoutFramesGoingUp). Even in the legacy path these writes
+    -- taint the shared CooldownViewerSettingsDataProvider, cascading to all viewers.
 
     -- Force populate buff icons first (teaches the viewer what spells to show)
     ForcePopulateBuffIcons()
@@ -3031,23 +2952,7 @@ function SUI_BuffBar.Refresh()
     else
         SetViewerHidden(false)
         if customContainer then customContainer:Hide() end
-        -- Legacy: Update isHorizontal when settings change (pcall: viewer may be forbidden)
-        pcall(function()
-            if BuffBarCooldownViewer and not InCombatLockdown() then
-                local settings = GetTrackedBarSettings()
-                local isVertical = (settings.orientation == "vertical")
-                local growFromBottom = (settings.growUp ~= false)
-
-                BuffBarCooldownViewer.isHorizontal = not isVertical
-                if isVertical then
-                    BuffBarCooldownViewer.layoutFramesGoingRight = growFromBottom
-                    BuffBarCooldownViewer.layoutFramesGoingUp = false
-                else
-                    BuffBarCooldownViewer.layoutFramesGoingRight = true
-                    BuffBarCooldownViewer.layoutFramesGoingUp = growFromBottom
-                end
-            end
-        end)
+        -- TAINT-FIX (session 4979): Removed legacy viewer property writes.
     end
 
     UpdateOwnershipExports()

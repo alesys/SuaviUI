@@ -317,23 +317,24 @@ hooksecurefunc("StaticPopup_Show", function(which)
     local settings = GetSettings()
     if not settings or not settings.autoDeleteConfirm then return end
 
-    -- Find the popup frame that's showing this dialog
-    for i = 1, STATICPOPUP_NUMDIALOGS or 4 do
-        local frame = _G["StaticPopup" .. i]
-        if frame and frame.which == which and frame:IsShown() then
-            local editBox = frame.editBox or _G["StaticPopup" .. i .. "EditBox"]
-            if editBox then
-                editBox:SetText(DELETE_ITEM_CONFIRM_STRING or "DELETE")
-                -- Trigger OnTextChanged to enable the confirm button
-                local handler = editBox:GetScript("OnTextChanged")
-                if handler then
-                    handler(editBox)
+    -- Defer to next frame to isolate addon taint from StaticPopup_Show's
+    -- secure execution context. Without this, taint on the StaticPopup frame
+    -- can persist across frame reuse and block protected calls like UpgradeItem().
+    C_Timer.After(0, function()
+        for i = 1, STATICPOPUP_NUMDIALOGS or 4 do
+            local frame = _G["StaticPopup" .. i]
+            if frame and frame.which == which and frame:IsShown() then
+                local editBox = frame.editBox or _G["StaticPopup" .. i .. "EditBox"]
+                if editBox then
+                    -- SetText() triggers OnTextChanged through the C engine,
+                    -- no need to manually call the handler (which would run
+                    -- Blizzard's handler from addon context, tainting frame fields).
+                    editBox:SetText(DELETE_ITEM_CONFIRM_STRING or "DELETE")
                 end
-                -- Note: Cannot auto-click - DeleteCursorItem() is protected
+                break
             end
-            break
         end
-    end
+    end)
 end)
 
 ---------------------------------------------------------------------------

@@ -1,5 +1,77 @@
 # SuaviUI Changelog
 
+## [v0.3.11](https://github.com/alesys/SuaviUI/tree/v0.3.11) (2026-03-05)
+
+### CDM Taint Elimination — Complete Frame-Field Purge (Sessions 4979–4995)
+
+Completes the CDM taint hardening begun in v0.3.10. Every remaining direct field write on Blizzard CDM frames and viewers has been migrated to module-level weak tables. Action bar customization (disabled since session 4942) is re-enabled.
+
+---
+
+#### Cooldown Swipe — Polling Replaces Per-Icon Hooks (cooldownswipe.lua)
+
+`hooksecurefunc(icon.Cooldown, "SetCooldown", ...)` rawset a wrapper on each CDM Cooldown widget inside Blizzard's secure `RefreshData` chain. Replaced with a `C_Timer.NewTicker(0.2)` that applies swipe/edge settings via pcall-guarded reads — no per-icon hooks, no frame field writes.
+
+---
+
+#### Custom Glows — Singleton Manager Hook + Wrapper Frames (customglows.lua)
+
+Per-CDM-icon method hooks (`OnSpellActivationOverlayGlowShowEvent`, `OnSpellActivationOverlayGlowHideEvent`, `RefreshOverlayGlow`) rawset wrapper functions on each CDM item frame's Lua table. Replaced with a singleton `hooksecurefunc(ActionButtonSpellAlertManager, "ShowAlert/HideAlert", ...)` hook. LibCustomGlow calls now target a thin addon-owned wrapper frame (`GetOrCreateGlowWrapper(icon)`) instead of the CDM item frame, preventing `_PixelGlow_key` / `_AutoCastGlow_key` field taint.
+
+---
+
+#### Keybinds — Weak-Table Field Migration (keybinds.lua)
+
+`icon.keybindText` and `icon._rotationHelperOverlay` field writes migrated to `keybindFontStrings[icon]` and `rotationOverlays[icon]` weak tables.
+
+---
+
+#### Action Bars — Re-enabled with Full Weak-Table Migration (sui_actionbars.lua)
+
+`DISABLE_STANDARD_ACTIONBAR_CUSTOMIZATION` and `DISABLE_EXTRA_BUTTON_CUSTOMIZATION` set back to `false`. All 15+ Blizzard frame field writes (`_quiStripped`, `_quiSkinKey`, `_quiBackdrop`, `_quiNormal`, `_quiGloss`, `_quiHiddenEmpty`, `_quiTinted`, `_quiMouseoverHooked`, `_quiHooked`, `_suiVisibilityHooked`, `_quiBindingCommand`, `_quiKeybindMethods`) migrated to module-level weak tables.
+
+---
+
+#### Tracked Bars & Icons — C API Only Data Pipeline (sui_buffbar.lua)
+
+- Removed all Lua-level viewer interactions (`:SetSize()`, `.Selection` manipulation, `:GetItemFrames()`, `.itemFramePool:EnumerateActive()`) for both `BuffBarCooldownViewer` and `BuffIconCooldownViewer`. These tainted the shared `CooldownViewerSettingsDataProvider` singleton, cascading to all four CDM viewers.
+- `FetchBuffBarData()` and `FetchBuffIconData()` rewritten to use C API only path (`C_CooldownViewer.GetCooldownViewerCategorySet` + `C_CooldownViewer.GetCooldownViewerCooldownInfo`).
+- Comprehensive aura detection matching Blizzard's `ShouldBeActive()` logic: checks ALL associated spell IDs (`linkedSpellIDs`, `overrideSpellID`, base `spellID`), player aura AND target debuffs, totem detection via `C_Totem.GetTotemInfo`, infinite aura support (`expirationTime == 0`).
+
+---
+
+#### StaticPopup Taint Fix — Session 4995 (sui_qol.lua)
+
+`[ADDON_ACTION_FORBIDDEN] UpgradeItem()` caused by taint propagation through reused StaticPopup frames. The auto-delete-confirm hook called `editBox:GetScript("OnTextChanged")` handler from addon context, tainting frame fields that persisted across frame reuse. Fix: deferred auto-fill to next frame via `C_Timer.After(0, ...)` and removed the manual handler call (`SetText()` already triggers `OnTextChanged` through the C engine).
+
+---
+
+#### Settings Panel Polish (sui_gui.lua, sui_options.lua)
+
+- Tab layout dynamically calculates row count and container height
+- Content area gets subtle border and translucent background
+- Section headers: refined spacing and underline styling
+- CDM styling options use compact form layout
+- Bottom panel and button hover states refined
+
+---
+
+#### Files Changed
+
+| File | Change |
+|------|--------|
+| `utils/cooldownswipe.lua` | Replaced per-icon `SetCooldown` hooks with `NewTicker(0.2)` polling; all CDM reads pcall-guarded |
+| `utils/customglows.lua` | Singleton `ActionButtonSpellAlertManager` hooks; `GetOrCreateGlowWrapper()` for LibCustomGlow isolation |
+| `utils/keybinds.lua` | `keybindFontStrings[icon]` and `rotationOverlays[icon]` weak tables |
+| `utils/sui_actionbars.lua` | 15+ frame field writes → weak tables; re-enabled both customization flags |
+| `utils/sui_buffbar.lua` | Removed viewer SetSize/Selection/GetItemFrames/itemFramePool; C API only data pipeline; comprehensive aura detection |
+| `utils/sui_qol.lua` | Deferred auto-delete-confirm; removed manual OnTextChanged call |
+| `utils/sui_gui.lua` | Tab layout, content area, section header, bottom panel polish |
+| `utils/sui_options.lua` | Compact CDM styling form layout |
+| `utils/suicore_main.lua` | Minor taint-related cleanup |
+
+---
+
 ## [v0.3.10](https://github.com/alesys/SuaviUI/tree/v0.3.10) (2026-03-03)
 
 ### 🛡️ CDM Systemic Taint Elimination — Sessions 4891 / 4912 / 4924 / 4927

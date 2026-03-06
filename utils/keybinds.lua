@@ -26,6 +26,16 @@ local macroNameToIndex = {}
 -- Combat throttling
 local pendingRebuild = false
 
+-- TAINT-FIX: Store keybind FontStrings in a module-level weak table instead of writing
+-- keybindFontStrings[icon] directly on CDM item frames. Writing ANY field on a Blizzard-owned
+-- frame from addon context taints the frame, causing "secret value tainted by SuaviUI"
+-- errors on all CDM viewer field reads (isActive, charges, spellID, etc.).
+local keybindFontStrings = setmetatable({}, { __mode = "k" })
+
+-- TAINT-FIX: Store rotation helper overlays in module-level weak table instead of
+-- writing icon._rotationHelperOverlay directly on CDM item frames.
+local rotationOverlays = setmetatable({}, { __mode = "k" })  -- [icon] = overlay frame
+
 -- Rotation Helper state
 local rotationHelperEnabled = false
 local lastNextSpellID = nil
@@ -825,8 +835,8 @@ local function ApplyKeybindToIcon(icon, viewerName)
     
     -- Check if keybinds should be shown
     if not settings.showKeybinds then
-        if icon.keybindText then
-            icon.keybindText:Hide()
+        if keybindFontStrings[icon] then
+            keybindFontStrings[icon]:Hide()
         end
         return
     end
@@ -935,9 +945,9 @@ local function ApplyKeybindToIcon(icon, viewerName)
         if KEYBIND_DEBUG then
             print("|cFFFF0000[KB Debug] No keybind found, hiding|r")
         end
-        if icon.keybindText then
-            icon.keybindText:SetText("")
-            icon.keybindText:Hide()
+        if keybindFontStrings[icon] then
+            keybindFontStrings[icon]:SetText("")
+            keybindFontStrings[icon]:Hide()
         end
         return
     end
@@ -950,29 +960,29 @@ local function ApplyKeybindToIcon(icon, viewerName)
     local textColor = settings.keybindTextColor or { 1, 1, 1, 1 }
     
     -- Create keybind text if it doesn't exist
-    if not icon.keybindText then
-        icon.keybindText = icon:CreateFontString(nil, "OVERLAY")
-        icon.keybindText:SetShadowOffset(1, -1)
-        icon.keybindText:SetShadowColor(0, 0, 0, 1)
+    if not keybindFontStrings[icon] then
+        keybindFontStrings[icon] = icon:CreateFontString(nil, "OVERLAY")
+        keybindFontStrings[icon]:SetShadowOffset(1, -1)
+        keybindFontStrings[icon]:SetShadowColor(0, 0, 0, 1)
     end
     
     -- Update position (clear and re-anchor in case anchor changed)
-    icon.keybindText:ClearAllPoints()
-    icon.keybindText:SetPoint(anchor, icon, anchor, offsetX, offsetY)
+    keybindFontStrings[icon]:ClearAllPoints()
+    keybindFontStrings[icon]:SetPoint(anchor, icon, anchor, offsetX, offsetY)
     
     -- Set font size
-    icon.keybindText:SetFont(GetGeneralFont(), fontSize, GetGeneralFontOutline())
+    keybindFontStrings[icon]:SetFont(GetGeneralFont(), fontSize, GetGeneralFontOutline())
     
     -- Set text color
-    icon.keybindText:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4] or 1)
+    keybindFontStrings[icon]:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4] or 1)
     
     -- Set text
     if keybind then
-        icon.keybindText:SetText(keybind)
-        icon.keybindText:Show()
+        keybindFontStrings[icon]:SetText(keybind)
+        keybindFontStrings[icon]:Show()
     else
-        icon.keybindText:SetText("")
-        icon.keybindText:Hide()
+        keybindFontStrings[icon]:SetText("")
+        keybindFontStrings[icon]:Hide()
     end
 end
 
@@ -1000,10 +1010,15 @@ local function ClearStoredKeybinds(viewerName)
     local okC, container = pcall(function() return viewer.viewerFrame end)
     if not okC or not container then container = viewer end
     local children = { container:GetChildren() }
-    
+
     for _, child in ipairs(children) do
-        child._quiKeybind = nil
-        child._quiKeybindSpellID = nil
+        -- TAINT-FIX: Clear keybind FontString text via module-level table.
+        -- Do NOT write any fields (even nil) to CDM item frames from addon context.
+        local fs = keybindFontStrings[child]
+        if fs then
+            fs:SetText("")
+            fs:Hide()
+        end
     end
 end
 
@@ -1635,8 +1650,8 @@ end
 -- when icons are resized during combat (GetWidth/GetHeight return secret values)
 -- Border renders INSIDE the icon frame, above glow effects (frame level +15)
 local function GetRotationHelperOverlay(icon)
-    if icon._rotationHelperOverlay then
-        return icon._rotationHelperOverlay
+    if rotationOverlays[icon] then
+        return rotationOverlays[icon]
     end
 
     -- Create a simple frame for the overlay (no BackdropTemplate)
@@ -1694,7 +1709,7 @@ local function GetRotationHelperOverlay(icon)
     end
 
     overlay:Hide()
-    icon._rotationHelperOverlay = overlay
+    rotationOverlays[icon] = overlay
     return overlay
 end
 
@@ -1706,8 +1721,8 @@ local function ApplyRotationHelperToIcon(icon, viewerName, nextSpellID)
     local settings = SUICore.db.profile.viewers[viewerName]
     if not settings or not settings.showRotationHelper then
         -- Hide overlay if disabled
-        if icon._rotationHelperOverlay then
-            icon._rotationHelperOverlay:Hide()
+        if rotationOverlays[icon] then
+            rotationOverlays[icon]:Hide()
         end
         return
     end
@@ -1735,8 +1750,8 @@ local function ApplyRotationHelperToIcon(icon, viewerName, nextSpellID)
     end
     
     if not iconSpellID then
-        if icon._rotationHelperOverlay then
-            icon._rotationHelperOverlay:Hide()
+        if rotationOverlays[icon] then
+            rotationOverlays[icon]:Hide()
         end
         return
     end

@@ -7,7 +7,11 @@
       "Bash(git tag:*)",
       "Bash(git push:*)",
       "Bash(powershell:*)",
-      "Bash(awk 'NR>=2060 && NR<=2085' \"e:/Games/World of Warcraft/_retail_/Interface/AddOns/SuaviUI/utils/sui_buffbar.lua\")"
+      "Bash(awk 'NR>=2060 && NR<=2085' \"e:/Games/World of Warcraft/_retail_/Interface/AddOns/SuaviUI/utils/sui_buffbar.lua\")",
+      "Bash(grep -E \"\\(button|item|frame|child|region\\)\\\\.__[a-zA-Z_]+ = |\\\\.button\\\\.__[a-zA-Z_]+ = |\\\\.item\\\\.__[a-zA-Z_]+ = \" *.lua)",
+      "Bash(grep -r \"SafeSetBackdrop\" *.lua)",
+      "Bash(grep -E \"\\(BuffIconCooldownViewer|BuffBarCooldownViewer|EssentialCooldownViewer|UtilityCooldownViewer|item\\\\.|child\\\\.\\)\" *.lua)",
+      "Bash(grep -E \"GetChildren|itemFramePool|EnumerateActive\" *.lua)"
     ]
   }
 }

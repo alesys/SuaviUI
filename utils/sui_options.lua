@@ -18,7 +18,7 @@ local ROW_GAP = 28
 local SECTION_GAP = 38
 local SECTION_HEADER_GAP = 46  -- Section header height + spacing below underline
 local PADDING = 15  -- Standard left/right padding for all content
-local SLIDER_HEIGHT = 65  -- Standard height for slider widgets
+local SLIDER_HEIGHT = 34  -- Compact spacing for form slider rows
 
 -- Nine-point anchor options (used for UI element positioning)
 local NINE_POINT_ANCHOR_OPTIONS = {
@@ -5470,105 +5470,84 @@ local function CreateCooldownViewersPage(parent)
     -- =====================================================
     -- CDM STYLING
     -- =====================================================
+    local CDM_FORM_LEFT = PADDING + 10
+    local CDM_FORM_RIGHT = PADDING + 55
+    local CDM_ROW_HEIGHT = 30
+    local CDM_SLIDER_ROW_HEIGHT = 34
+    local CDM_GROUP_TITLE_GAP = 22
+    local CDM_GROUP_SPACING = 10
+
     y = y - 10 -- Section spacing
     local squareHeader = GUI:CreateSectionHeader(content, "CDM STYLING")
     squareHeader:SetPoint("TOPLEFT", PADDING, y)
     y = y - squareHeader.gap
 
     local cdmStyleDesc = GUI:CreateLabel(content, "Controls centering (dynamic alignment) and square icon styling for CDM viewers.", 11, C.textMuted)
-    cdmStyleDesc:SetPoint("TOPLEFT", PADDING, y)
-    cdmStyleDesc:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+    cdmStyleDesc:SetPoint("TOPLEFT", CDM_FORM_LEFT, y)
+    cdmStyleDesc:SetPoint("RIGHT", content, "RIGHT", -CDM_FORM_RIGHT, 0)
     cdmStyleDesc:SetJustifyH("LEFT")
-    y = y - 24
+    y = y - 20
 
     local centeredMasterCheck = GUI:CreateFormCheckbox(content, "Use Centered Styling", "cooldownManager_useCenteredStyling", db, RefreshIcons)
-    centeredMasterCheck:SetPoint("TOPLEFT", PADDING, y)
-    centeredMasterCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
+    centeredMasterCheck:SetPoint("TOPLEFT", CDM_FORM_LEFT, y)
+    centeredMasterCheck:SetPoint("RIGHT", content, "RIGHT", -CDM_FORM_RIGHT, 0)
+    y = y - CDM_ROW_HEIGHT
 
-    -- Essential Cooldowns
-    y = y - 10
-    local essentialSubHeader = GUI:CreateLabel(content, "Essential Cooldowns", 12, C.textMuted)
-    essentialSubHeader:SetPoint("TOPLEFT", PADDING, y)
-    y = y - 25
+    local function AddCDMStyleGroup(title, toggleLabel, borderKey, overlapKey, zoomKey, toggleKey)
+        y = y - CDM_GROUP_SPACING
+        local subHeader = GUI:CreateLabel(content, title, 12, C.textMuted)
+        subHeader:SetPoint("TOPLEFT", CDM_FORM_LEFT, y)
+        y = y - CDM_GROUP_TITLE_GAP
 
-    local essentialSquareCheck = GUI:CreateFormCheckbox(content, "Enable Square Essential Icons", "cooldownManager_squareIcons_Essential", db, RefreshIcons)
-    essentialSquareCheck:SetPoint("TOPLEFT", PADDING, y)
-    essentialSquareCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
+        local squareCheck = GUI:CreateFormCheckbox(content, toggleLabel, toggleKey, db, RefreshIcons)
+        squareCheck:SetPoint("TOPLEFT", CDM_FORM_LEFT, y)
+        squareCheck:SetPoint("RIGHT", content, "RIGHT", -CDM_FORM_RIGHT, 0)
+        y = y - CDM_ROW_HEIGHT
 
-    local essentialBorderSlider = GUI:CreateFormSlider(content, "Border Thickness", 1, 6, 1, "cooldownManager_squareIconsBorder_Essential", db, RefreshIcons, { deferOnDrag = true })
-    essentialBorderSlider:SetPoint("TOPLEFT", PADDING, y)
-    essentialBorderSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    essentialBorderSlider.SetFormattedValue = function(value) return string.format("%.0fpx", value) end
-    y = y - SLIDER_HEIGHT
+        local borderSlider = GUI:CreateFormSlider(content, "Border Thickness", 1, 6, 1, borderKey, db, RefreshIcons, { deferOnDrag = true })
+        borderSlider:SetPoint("TOPLEFT", CDM_FORM_LEFT, y)
+        borderSlider:SetPoint("RIGHT", content, "RIGHT", -CDM_FORM_RIGHT, 0)
+        borderSlider.SetFormattedValue = function(value) return string.format("%.0fpx", value) end
+        y = y - CDM_SLIDER_ROW_HEIGHT
 
-    local essentialOverlapCheck = GUI:CreateFormCheckbox(content, "Border Overlap", "cooldownManager_squareIconsBorder_Essential_Overlap", db, RefreshIcons)
-    essentialOverlapCheck:SetPoint("TOPLEFT", PADDING, y)
-    essentialOverlapCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
+        local overlapCheck = GUI:CreateFormCheckbox(content, "Border Overlap", overlapKey, db, RefreshIcons)
+        overlapCheck:SetPoint("TOPLEFT", CDM_FORM_LEFT, y)
+        overlapCheck:SetPoint("RIGHT", content, "RIGHT", -CDM_FORM_RIGHT, 0)
+        y = y - CDM_ROW_HEIGHT
 
-    local essentialZoomSlider = GUI:CreateFormSlider(content, "Icon Zoom", 0, 0.5, 0.05, "cooldownManager_squareIconsZoom_Essential", db, RefreshIcons, { deferOnDrag = true })
-    essentialZoomSlider:SetPoint("TOPLEFT", PADDING, y)
-    essentialZoomSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    essentialZoomSlider.SetFormattedValue = function(value) return string.format("%.0f%%", value * 100) end
-    y = y - SLIDER_HEIGHT
+        local zoomSlider = GUI:CreateFormSlider(content, "Icon Zoom", 0, 0.5, 0.05, zoomKey, db, RefreshIcons, { deferOnDrag = true })
+        zoomSlider:SetPoint("TOPLEFT", CDM_FORM_LEFT, y)
+        zoomSlider:SetPoint("RIGHT", content, "RIGHT", -CDM_FORM_RIGHT, 0)
+        zoomSlider.SetFormattedValue = function(value) return string.format("%.0f%%", value * 100) end
+        y = y - CDM_SLIDER_ROW_HEIGHT
+    end
 
-    -- Utility Cooldowns
-    y = y - 10
-    local utilitySubHeader = GUI:CreateLabel(content, "Utility Cooldowns", 12, C.textMuted)
-    utilitySubHeader:SetPoint("TOPLEFT", PADDING, y)
-    y = y - 25
+    AddCDMStyleGroup(
+        "Essential Cooldowns",
+        "Enable Square Essential Icons",
+        "cooldownManager_squareIconsBorder_Essential",
+        "cooldownManager_squareIconsBorder_Essential_Overlap",
+        "cooldownManager_squareIconsZoom_Essential",
+        "cooldownManager_squareIcons_Essential"
+    )
 
-    local utilitySquareCheck = GUI:CreateFormCheckbox(content, "Enable Square Utility Icons", "cooldownManager_squareIcons_Utility", db, RefreshIcons)
-    utilitySquareCheck:SetPoint("TOPLEFT", PADDING, y)
-    utilitySquareCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
+    AddCDMStyleGroup(
+        "Utility Cooldowns",
+        "Enable Square Utility Icons",
+        "cooldownManager_squareIconsBorder_Utility",
+        "cooldownManager_squareIconsBorder_Utility_Overlap",
+        "cooldownManager_squareIconsZoom_Utility",
+        "cooldownManager_squareIcons_Utility"
+    )
 
-    local utilityBorderSlider = GUI:CreateFormSlider(content, "Border Thickness", 1, 6, 1, "cooldownManager_squareIconsBorder_Utility", db, RefreshIcons, { deferOnDrag = true })
-    utilityBorderSlider:SetPoint("TOPLEFT", PADDING, y)
-    utilityBorderSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    utilityBorderSlider.SetFormattedValue = function(value) return string.format("%.0fpx", value) end
-    y = y - SLIDER_HEIGHT
-
-    local utilityOverlapCheck = GUI:CreateFormCheckbox(content, "Border Overlap", "cooldownManager_squareIconsBorder_Utility_Overlap", db, RefreshIcons)
-    utilityOverlapCheck:SetPoint("TOPLEFT", PADDING, y)
-    utilityOverlapCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
-
-    local utilityZoomSlider = GUI:CreateFormSlider(content, "Icon Zoom", 0, 0.5, 0.05, "cooldownManager_squareIconsZoom_Utility", db, RefreshIcons, { deferOnDrag = true })
-    utilityZoomSlider:SetPoint("TOPLEFT", PADDING, y)
-    utilityZoomSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    utilityZoomSlider.SetFormattedValue = function(value) return string.format("%.0f%%", value * 100) end
-    y = y - SLIDER_HEIGHT
-
-    -- Buff Icons
-    y = y - 10
-    local buffSubHeader = GUI:CreateLabel(content, "Buff Icons", 12, C.textMuted)
-    buffSubHeader:SetPoint("TOPLEFT", PADDING, y)
-    y = y - 25
-
-    local buffSquareCheck = GUI:CreateFormCheckbox(content, "Enable Square Buff Icons", "cooldownManager_squareIcons_BuffIcons", db, RefreshIcons)
-    buffSquareCheck:SetPoint("TOPLEFT", PADDING, y)
-    buffSquareCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
-
-    local buffBorderSlider = GUI:CreateFormSlider(content, "Border Thickness", 1, 6, 1, "cooldownManager_squareIconsBorder_BuffIcons", db, RefreshIcons, { deferOnDrag = true })
-    buffBorderSlider:SetPoint("TOPLEFT", PADDING, y)
-    buffBorderSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    buffBorderSlider.SetFormattedValue = function(value) return string.format("%.0fpx", value) end
-    y = y - SLIDER_HEIGHT
-
-    local buffOverlapCheck = GUI:CreateFormCheckbox(content, "Border Overlap", "cooldownManager_squareIconsBorder_BuffIcons_Overlap", db, RefreshIcons)
-    buffOverlapCheck:SetPoint("TOPLEFT", PADDING, y)
-    buffOverlapCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    y = y - FORM_ROW
-
-    local buffZoomSlider = GUI:CreateFormSlider(content, "Icon Zoom", 0, 0.5, 0.05, "cooldownManager_squareIconsZoom_BuffIcons", db, RefreshIcons, { deferOnDrag = true })
-    buffZoomSlider:SetPoint("TOPLEFT", PADDING, y)
-    buffZoomSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-    buffZoomSlider.SetFormattedValue = function(value) return string.format("%.0f%%", value * 100) end
-    y = y - SLIDER_HEIGHT
+    AddCDMStyleGroup(
+        "Buff Icons",
+        "Enable Square Buff Icons",
+        "cooldownManager_squareIconsBorder_BuffIcons",
+        "cooldownManager_squareIconsBorder_BuffIcons_Overlap",
+        "cooldownManager_squareIconsZoom_BuffIcons",
+        "cooldownManager_squareIcons_BuffIcons"
+    )
 
     -- =====================================================
     -- COOLDOWN SETTINGS

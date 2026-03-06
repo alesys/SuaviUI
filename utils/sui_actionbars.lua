@@ -12,12 +12,12 @@ local LSM = LibStub("LibSharedMedia-3.0")
 
 local IS_MIDNIGHT = select(4, GetBuildInfo()) >= 120000
 
--- Safety fallback: extra action/zone ability frame reparenting is taint-prone
--- on recent client builds during Edit Mode/action bar updates.
-local DISABLE_EXTRA_BUTTON_CUSTOMIZATION = true
--- Emergency safety mode (session 4942): standard actionbar button/object mutation
--- is disabled to avoid protected ActionBar/EditMode taint until refactor to weak tables.
-local DISABLE_STANDARD_ACTIONBAR_CUSTOMIZATION = true
+-- Extra action/zone ability frame reparenting. Previously disabled (session 4942)
+-- due to taint from frame field writes. Field writes now on weak tables — safe to enable.
+local DISABLE_EXTRA_BUTTON_CUSTOMIZATION = false
+-- TAINT-FIX (session 4942 → refactored): all Blizzard frame field writes moved to
+-- module-level weak tables below.  Safe to enable.
+local DISABLE_STANDARD_ACTIONBAR_CUSTOMIZATION = false
 
 ---------------------------------------------------------------------------
 -- CONSTANTS
@@ -104,6 +104,25 @@ local ActionBars = {
     fadeFrame = nil,            -- OnUpdate frame for smooth fading
 }
 
+-- Weak tables for tracking state on Blizzard frames (avoids field-write taint).
+-- Writing any field onto a Blizzard-owned frame taints it; using weak tables keyed
+-- by frame object keeps tracking data in addon-owned memory instead.
+local weakMeta = { __mode = "k" }
+local strippedButtons        = setmetatable({}, weakMeta)
+local skinKeys               = setmetatable({}, weakMeta)
+local buttonBackdrops        = setmetatable({}, weakMeta)
+local buttonNormals          = setmetatable({}, weakMeta)
+local buttonGlosses          = setmetatable({}, weakMeta)
+local hiddenEmptyButtons     = setmetatable({}, weakMeta)
+local tintedButtons          = setmetatable({}, weakMeta)
+local mouseoverHookedFrames  = setmetatable({}, weakMeta)
+local onEnterHookedButtons   = setmetatable({}, weakMeta)
+local visibilityHookedFrames = setmetatable({}, weakMeta)
+local positionHookedFrames   = setmetatable({}, weakMeta)
+local showHookedFrames       = setmetatable({}, weakMeta)
+local bindingCommands        = setmetatable({}, weakMeta)
+local keybindMethodsAdded    = setmetatable({}, weakMeta)
+
 ---------------------------------------------------------------------------
 -- HELPER FUNCTIONS
 ---------------------------------------------------------------------------
@@ -174,7 +193,7 @@ end
 
 -- Add LibKeyBound methods to a button for mousewheel binding support
 local function AddKeybindMethods(button, barKey)
-    if not button or button._quiKeybindMethods then return end
+    if not button or keybindMethodsAdded[button] then return end
 
     local bindingPrefix = BINDING_COMMANDS[barKey]
     if not bindingPrefix then return end
@@ -183,12 +202,14 @@ local function AddKeybindMethods(button, barKey)
     if not buttonIndex then return end
 
     local bindingCommand = bindingPrefix .. buttonIndex
-    button._quiBindingCommand = bindingCommand
-    button._quiKeybindMethods = true
+    bindingCommands[button] = bindingCommand
+    keybindMethodsAdded[button] = true
 
     -- Required method: Returns current keybind text
     function button:GetHotkey()
-        local key = GetBindingKey(self._quiBindingCommand)
+        local cmd = bindingCommands[self]
+        if not cmd then return nil end
+        local key = GetBindingKey(cmd)
         if key then
             local LibKeyBound = LibStub("LibKeyBound-1.0", true)
             return LibKeyBound and LibKeyBound:ToShortKey(key) or key
@@ -199,14 +220,17 @@ local function AddKeybindMethods(button, barKey)
     -- Required method: Binds a key to this button
     function button:SetKey(key)
         if InCombatLockdown() then return end
-        SetBinding(key, self._quiBindingCommand)
+        local cmd = bindingCommands[self]
+        if cmd then SetBinding(key, cmd) end
     end
 
     -- Optional method: Returns all bindings as comma-separated string
     function button:GetBindings()
+        local cmd = bindingCommands[self]
+        if not cmd then return nil end
         local keys = {}
-        for i = 1, select("#", GetBindingKey(self._quiBindingCommand)) do
-            local key = select(i, GetBindingKey(self._quiBindingCommand))
+        for i = 1, select("#", GetBindingKey(cmd)) do
+            local key = select(i, GetBindingKey(cmd))
             if key then
                 table.insert(keys, key)
             end
@@ -217,14 +241,16 @@ local function AddKeybindMethods(button, barKey)
     -- Optional method: Clears all bindings from this button
     function button:ClearBindings()
         if InCombatLockdown() then return end
-        while GetBindingKey(self._quiBindingCommand) do
-            SetBinding(GetBindingKey(self._quiBindingCommand), nil)
+        local cmd = bindingCommands[self]
+        if not cmd then return end
+        while GetBindingKey(cmd) do
+            SetBinding(GetBindingKey(cmd), nil)
         end
     end
 
     -- Optional method: Returns display name for what we're binding
     function button:GetActionName()
-        return self._quiBindingCommand
+        return bindingCommands[self]
     end
 end
 
@@ -584,8 +610,8 @@ local function ApplyExtraButtonSettings(buttonType)
     end
     
     -- Setup visibility tracking hook (only once per button)
-    if blizzFrame and not blizzFrame._suiVisibilityHooked then
-        blizzFrame._suiVisibilityHooked = true
+    if blizzFrame and not visibilityHookedFrames[blizzFrame] then
+        visibilityHookedFrames[blizzFrame] = true
         
         -- Mirror Blizzard frame visibility changes to our holder
         -- But only show if button actually has content
@@ -659,8 +685,8 @@ HookExtraButtonPositioning = function()
     if DISABLE_EXTRA_BUTTON_CUSTOMIZATION then return end
 
     -- Hook ExtraActionBarFrame
-    if ExtraActionBarFrame and not ExtraActionBarFrame._quiHooked then
-        ExtraActionBarFrame._quiHooked = true
+    if ExtraActionBarFrame and not positionHookedFrames[ExtraActionBarFrame] then
+        positionHookedFrames[ExtraActionBarFrame] = true
         pcall(hooksecurefunc, ExtraActionBarFrame, "SetPoint", function(self)
             if hookingSetPoint or InCombatLockdown() then return end
             -- Don't interfere during Edit Mode - let LEM handle positioning
@@ -679,8 +705,8 @@ HookExtraButtonPositioning = function()
     end
 
     -- Hook ZoneAbilityFrame
-    if ZoneAbilityFrame and not ZoneAbilityFrame._quiHooked then
-        ZoneAbilityFrame._quiHooked = true
+    if ZoneAbilityFrame and not positionHookedFrames[ZoneAbilityFrame] then
+        positionHookedFrames[ZoneAbilityFrame] = true
         pcall(hooksecurefunc, ZoneAbilityFrame, "SetPoint", function(self)
             if hookingSetPoint or InCombatLockdown() then return end
             -- Don't interfere during Edit Mode - let LEM handle positioning
@@ -811,8 +837,8 @@ end
 
 -- Remove Blizzard's default textures and masks
 local function StripBlizzardArtwork(button)
-    if button._quiStripped then return end
-    button._quiStripped = true
+    if strippedButtons[button] then return end
+    strippedButtons[button] = true
 
     -- Hide NormalTexture (Blizzard's border)
     local normalTex = button:GetNormalTexture()
@@ -867,8 +893,8 @@ local function SkinButton(button, settings)
         tostring(settings.showGloss),
         settings.glossAlpha or 0.6
     )
-    if button._quiSkinKey == settingsKey then return end
-    button._quiSkinKey = settingsKey
+    if skinKeys[button] == settingsKey then return end
+    skinKeys[button] = settingsKey
 
     -- Strip Blizzard artwork first
     StripBlizzardArtwork(button)
@@ -886,45 +912,45 @@ local function SkinButton(button, settings)
 
     -- Create or update backdrop (behind icon, configurable opacity)
     if settings.showBackdrop then
-        if not button._quiBackdrop then
-            button._quiBackdrop = button:CreateTexture(nil, "BACKGROUND", nil, -8)
-            button._quiBackdrop:SetColorTexture(0, 0, 0, 1)
+        if not buttonBackdrops[button] then
+            buttonBackdrops[button] = button:CreateTexture(nil, "BACKGROUND", nil, -8)
+            buttonBackdrops[button]:SetColorTexture(0, 0, 0, 1)
         end
-        button._quiBackdrop:SetAlpha(settings.backdropAlpha or 0.8)
-        button._quiBackdrop:ClearAllPoints()
-        button._quiBackdrop:SetAllPoints(button)  -- Same size as button, not extending beyond
-        button._quiBackdrop:Show()
-    elseif button._quiBackdrop then
-        button._quiBackdrop:Hide()
+        buttonBackdrops[button]:SetAlpha(settings.backdropAlpha or 0.8)
+        buttonBackdrops[button]:ClearAllPoints()
+        buttonBackdrops[button]:SetAllPoints(button)
+        buttonBackdrops[button]:Show()
+    elseif buttonBackdrops[button] then
+        buttonBackdrops[button]:Hide()
     end
 
     -- Create or update Normal overlay (border frame texture)
     if settings.showBorders ~= false then
-        if not button._quiNormal then
-            button._quiNormal = button:CreateTexture(nil, "OVERLAY", nil, 1)
-            button._quiNormal:SetTexture(TEXTURES.normal)
-            button._quiNormal:SetVertexColor(0, 0, 0, 1)
+        if not buttonNormals[button] then
+            buttonNormals[button] = button:CreateTexture(nil, "OVERLAY", nil, 1)
+            buttonNormals[button]:SetTexture(TEXTURES.normal)
+            buttonNormals[button]:SetVertexColor(0, 0, 0, 1)
         end
-        button._quiNormal:SetSize(iconSize, iconSize)
-        button._quiNormal:ClearAllPoints()
-        button._quiNormal:SetAllPoints(button)
-        button._quiNormal:Show()
-    elseif button._quiNormal then
-        button._quiNormal:Hide()
+        buttonNormals[button]:SetSize(iconSize, iconSize)
+        buttonNormals[button]:ClearAllPoints()
+        buttonNormals[button]:SetAllPoints(button)
+        buttonNormals[button]:Show()
+    elseif buttonNormals[button] then
+        buttonNormals[button]:Hide()
     end
 
     -- Create or update Gloss overlay (ADD blend shine)
     if settings.showGloss then
-        if not button._quiGloss then
-            button._quiGloss = button:CreateTexture(nil, "OVERLAY", nil, 2)
-            button._quiGloss:SetTexture(TEXTURES.gloss)
-            button._quiGloss:SetBlendMode("ADD")
+        if not buttonGlosses[button] then
+            buttonGlosses[button] = button:CreateTexture(nil, "OVERLAY", nil, 2)
+            buttonGlosses[button]:SetTexture(TEXTURES.gloss)
+            buttonGlosses[button]:SetBlendMode("ADD")
         end
-        button._quiGloss:SetVertexColor(1, 1, 1, settings.glossAlpha or 0.6)
-        button._quiGloss:SetAllPoints(button)
-        button._quiGloss:Show()
-    elseif button._quiGloss then
-        button._quiGloss:Hide()
+        buttonGlosses[button]:SetVertexColor(1, 1, 1, settings.glossAlpha or 0.6)
+        buttonGlosses[button]:SetAllPoints(button)
+        buttonGlosses[button]:Show()
+    elseif buttonGlosses[button] then
+        buttonGlosses[button]:Hide()
     end
 
     -- Fix Cooldown frame positioning
@@ -1168,9 +1194,9 @@ local function UpdateEmptySlotVisibility(button, settings)
 
     if not settings.hideEmptySlots then
         -- Restore visibility if setting is off (respect fade state)
-        if button._quiHiddenEmpty then
+        if hiddenEmptyButtons[button] then
             button:SetAlpha(targetAlpha)
-            button._quiHiddenEmpty = nil
+            hiddenEmptyButtons[button] = nil
         end
         return
     end
@@ -1180,10 +1206,10 @@ local function UpdateEmptySlotVisibility(button, settings)
         local hasAction = SafeHasAction(button.action)
         if hasAction then
             button:SetAlpha(targetAlpha)
-            button._quiHiddenEmpty = nil
+            hiddenEmptyButtons[button] = nil
         else
             button:SetAlpha(0)
-            button._quiHiddenEmpty = true
+            hiddenEmptyButtons[button] = true
         end
     end
 end
@@ -1269,10 +1295,10 @@ local function UpdateButtonUsability(button, settings)
 
     -- Reset state if both features disabled
     if not settings.rangeIndicator and not settings.usabilityIndicator then
-        if button._quiTinted then
+        if tintedButtons[button] then
             icon:SetVertexColor(1, 1, 1, 1)
             icon:SetDesaturated(false)
-            button._quiTinted = nil
+            tintedButtons[button] = nil
         end
         return
     end
@@ -1288,7 +1314,7 @@ local function UpdateButtonUsability(button, settings)
             local a = c and c[4] or 1
             icon:SetVertexColor(r, g, b, a)
             icon:SetDesaturated(false)
-            button._quiTinted = "range"
+            tintedButtons[button] = "range"
             return
         end
     end
@@ -1306,7 +1332,7 @@ local function UpdateButtonUsability(button, settings)
             local a = c and c[4] or 1
             icon:SetVertexColor(r, g, b, a)
             icon:SetDesaturated(false)
-            button._quiTinted = "mana"
+            tintedButtons[button] = "mana"
             return
         elseif not isUsable then
             -- Not usable - desaturate or apply grey tint
@@ -1322,16 +1348,16 @@ local function UpdateButtonUsability(button, settings)
                 icon:SetVertexColor(r, g, b, a)
                 icon:SetDesaturated(false)
             end
-            button._quiTinted = "unusable"
+            tintedButtons[button] = "unusable"
             return
         end
     end
 
     -- Normal state - reset to full brightness
-    if button._quiTinted then
+    if tintedButtons[button] then
         icon:SetVertexColor(1, 1, 1, 1)
         icon:SetDesaturated(false)
-        button._quiTinted = nil
+        tintedButtons[button] = nil
     end
 end
 
@@ -1371,10 +1397,10 @@ local function ResetAllButtonTints()
         local buttons = GetBarButtons(barKey)
         for _, button in ipairs(buttons) do
             local icon = button.icon or button.Icon
-            if icon and button._quiTinted then
+            if icon and tintedButtons[button] then
                 icon:SetVertexColor(1, 1, 1, 1)
                 icon:SetDesaturated(false)
-                button._quiTinted = nil
+                tintedButtons[button] = nil
             end
         end
     end
@@ -1487,7 +1513,7 @@ local function SetBarAlpha(barKey, alpha)
 
     for _, button in ipairs(buttons) do
         -- Respect hide empty slots setting - keep empty buttons hidden
-        if hideEmptyEnabled and button._quiHiddenEmpty then
+        if hideEmptyEnabled and hiddenEmptyButtons[button] then
             button:SetAlpha(0)
         else
             button:SetAlpha(alpha)
@@ -1784,8 +1810,8 @@ end
 
 -- Hook OnEnter/OnLeave on a frame for bar mouseover detection
 local function HookFrameForMouseover(frame, barKey)
-    if not frame or frame._quiMouseoverHooked then return end
-    frame._quiMouseoverHooked = true
+    if not frame or mouseoverHookedFrames[frame] then return end
+    mouseoverHookedFrames[frame] = true
 
     frame:HookScript("OnEnter", function()
         OnBarMouseEnter(barKey)
@@ -1942,8 +1968,8 @@ local function SkinBar(barKey)
         -- Hook OnEnter to register with LibKeyBound when in keybind mode
         -- Use HookScript to avoid tainting Blizzard's secure execution context
         -- (SetScript + calling old handler causes ADDON_ACTION_BLOCKED during combat)
-        if not button._quiOnEnterHooked then
-            button._quiOnEnterHooked = true
+        if not onEnterHookedButtons[button] then
+            onEnterHookedButtons[button] = true
             button:HookScript("OnEnter", function(self)
                 local LibKeyBound = LibStub("LibKeyBound-1.0", true)
                 if LibKeyBound and LibKeyBound:IsShown() then
@@ -1982,8 +2008,8 @@ local function ApplyPageArrowVisibility(hide)
 
     if hide then
         pageNum:Hide()
-        if not pageNum._SUI_ShowHooked then
-            pageNum._SUI_ShowHooked = true
+        if not showHookedFrames[pageNum] then
+            showHookedFrames[pageNum] = true
             hooksecurefunc(pageNum, "Show", function(self)
                 local db = GetDB()
                 if db and db.bars and db.bars.bar1 and db.bars.bar1.hidePageArrow then
@@ -2013,7 +2039,7 @@ function ActionBars:Refresh()
 
     -- Clear skinned cache to force re-skin
     for button, _ in pairs(ActionBars.skinnedButtons) do
-        button._quiSkinKey = nil
+        skinKeys[button] = nil
     end
 
     SkinAllBars()
