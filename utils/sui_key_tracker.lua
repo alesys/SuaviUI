@@ -617,7 +617,7 @@ end
 KeyTrackerFrame:SetScript("OnMouseUp", function(self, button)
     if button == "RightButton" and not InCombatLockdown() then
         RequestKeystones()
-        print("|cFF56D1FFSuaviUI:|r Refreshing party keys...")
+        print("|cFFFF6AC1SuaviUI:|r Refreshing party keys...")
     end
 end)
 

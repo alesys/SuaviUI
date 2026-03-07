@@ -1160,7 +1160,7 @@ end
 
 -- Debug function to see what's in the cache
 local function DebugPrintCache()
-    print("|cFF56D1FF[SUI Keybinds]|r Cache contents:")
+    print("|cFFFF6AC1[SUI Keybinds]|r Cache contents:")
     
     -- Print spell ID cache
     print("|cFF00FF00Spell ID Cache:|r")
@@ -1234,7 +1234,7 @@ local function DebugMacro(macroName)
     end
     
     local name, iconTexture, body = GetMacroInfo(macroIndex)
-    print("|cFF56D1FF[SUI Keybinds]|r Macro Debug: " .. name)
+    print("|cFFFF6AC1[SUI Keybinds]|r Macro Debug: " .. name)
     print("  Index: " .. macroIndex)
     print("  Body:")
     for line in body:gmatch("[^\r\n]+") do
@@ -1280,7 +1280,7 @@ local function DebugFindMacro(macroName)
         return
     end
     
-    print("|cFF56D1FF[SUI Keybinds]|r Searching for macro '" .. macroName .. "' (index " .. targetMacroIndex .. ") on action buttons...")
+    print("|cFFFF6AC1[SUI Keybinds]|r Searching for macro '" .. macroName .. "' (index " .. targetMacroIndex .. ") on action buttons...")
     
     -- Scan ALL action buttons in _G
     local foundButtons = {}
@@ -1352,7 +1352,7 @@ end
 
 -- Debug function to check what a specific key is bound to
 local function DebugKey(keyName)
-    print("|cFF56D1FF[SUI Keybinds]|r Checking what '" .. keyName .. "' is bound to...")
+    print("|cFFFF6AC1[SUI Keybinds]|r Checking what '" .. keyName .. "' is bound to...")
     
     -- GetBindingAction returns the action bound to a key
     local action = GetBindingAction(keyName)
@@ -1444,11 +1444,11 @@ SlashCmdList["SUIKEYBINDS"] = function(msg)
         DebugPrintCache()
     elseif msg == "refresh" then
         UpdateAllKeybinds()
-        print("|cFF56D1FF[SUI Keybinds]|r Refreshed keybinds")
+        print("|cFFFF6AC1[SUI Keybinds]|r Refreshed keybinds")
     elseif msg == "rebuild" then
         ForceRebuildButtonCache()
         RebuildCache()
-        print("|cFF56D1FF[SUI Keybinds]|r Force rebuilt button and spell caches")
+        print("|cFFFF6AC1[SUI Keybinds]|r Force rebuilt button and spell caches")
         print("  Button count: " .. #cachedActionButtons)
     elseif msg:match("^macro%s+") then
         local macroName = msg:match("^macro%s+(.+)")
@@ -1462,7 +1462,7 @@ SlashCmdList["SUIKEYBINDS"] = function(msg)
         end
     elseif msg == "buttons" then
         -- Show how many action buttons we have cached
-        print("|cFF56D1FF[SUI Keybinds]|r Action button cache:")
+        print("|cFFFF6AC1[SUI Keybinds]|r Action button cache:")
         print("  Cached: " .. (actionButtonsCached and "YES" or "NO"))
         print("  Button count: " .. #cachedActionButtons)
         local sample = {}
@@ -1480,7 +1480,7 @@ SlashCmdList["SUIKEYBINDS"] = function(msg)
         end
     elseif msg == "dominos" then
         -- Scan all Dominos buttons and show macros
-        print("|cFF56D1FF[SUI Keybinds]|r Scanning Dominos buttons for macros...")
+        print("|cFFFF6AC1[SUI Keybinds]|r Scanning Dominos buttons for macros...")
         local found = 0
         for i = 1, 180 do
             local btn = _G["DominosActionButton" .. i]
@@ -1500,7 +1500,7 @@ SlashCmdList["SUIKEYBINDS"] = function(msg)
         print("  Found " .. found .. " macros on Dominos buttons")
     elseif msg == "bartender" then
         -- Scan all Bartender4 buttons and show macros
-        print("|cFF56D1FF[SUI Keybinds]|r Scanning Bartender4 buttons for macros...")
+        print("|cFFFF6AC1[SUI Keybinds]|r Scanning Bartender4 buttons for macros...")
         local found = 0
         for i = 1, 120 do
             local btn = _G["BT4Button" .. i]
@@ -1530,7 +1530,7 @@ SlashCmdList["SUIKEYBINDS"] = function(msg)
             print("|cFFFF0000Button '" .. btnName .. "' not found!|r")
             return
         end
-        print("|cFF56D1FF[SUI Keybinds]|r Tracing button: " .. btnName)
+        print("|cFFFF6AC1[SUI Keybinds]|r Tracing button: " .. btnName)
         
         -- Check if in cache
         local inCache = false
@@ -1620,12 +1620,12 @@ SlashCmdList["SUIKEYBINDS"] = function(msg)
     elseif msg == "proctest" then
         -- Toggle proc debug mode
         KEYBIND_DEBUG = not KEYBIND_DEBUG
-        print("|cFF56D1FF[SUI Keybinds]|r Proc debug mode: " .. (KEYBIND_DEBUG and "|cFF00FF00ON|r" or "|cFFFF0000OFF|r"))
+        print("|cFFFF6AC1[SUI Keybinds]|r Proc debug mode: " .. (KEYBIND_DEBUG and "|cFF00FF00ON|r" or "|cFFFF0000OFF|r"))
         if KEYBIND_DEBUG then
             print("  Watch chat for keybind tracking messages when spells proc")
         end
     else
-        print("|cFF56D1FF[SUI Keybinds]|r Commands:")
+        print("|cFFFF6AC1[SUI Keybinds]|r Commands:")
         print("  /quikeybinds debug - Show cache contents")
         print("  /quikeybinds refresh - Force refresh keybinds")
         print("  /quikeybinds rebuild - Force rebuild button cache")

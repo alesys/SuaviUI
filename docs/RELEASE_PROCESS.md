@@ -215,6 +215,12 @@ if (Test-Path "SuaviUI-vX.X.X.zip") {
 
 ## Version History
 
+### v0.3.13 - Edit Mode Settings Edition (March 6, 2026)
+- Settings migrated from Options GUI to Edit Mode panels (CDM, Action Bars, Minimap, Unit Frames)
+- GUI builder pattern refactor (WrapBuilder, lazy page builders)
+- New Pill/Circle UI widgets, character panel accent pips and section backgrounds
+- Size: ~2 MB
+
 ### v0.3.12 - Legacy Skinning Edition (March 6, 2026)
 - Tracked bars: legacy path (USE_CUSTOM_BARS=false), skin Blizzard viewers in place
 - Tracked icons: legacy path (USE_CUSTOM_ICONS=false), remove ForcePopulate taint, show stack counts

@@ -410,7 +410,7 @@ function SuaviUI:SlashCommandOpen(input)
         if _G.SuaviUI_ToggleUnitFrameEditMode then
             _G.SuaviUI_ToggleUnitFrameEditMode()
         else
-            print("|cFF56D1FFSuaviUI:|r Unit Frames module not loaded.")
+            print("|cFFFF6AC1SuaviUI:|r Unit Frames module not loaded.")
         end
         return
     end
@@ -419,13 +419,13 @@ function SuaviUI:SlashCommandOpen(input)
     if self.GUI then
         self.GUI:Toggle()
     else
-        print("|cFF56D1FFSuaviUI:|r GUI not loaded yet. Try again in a moment.")
+        print("|cFFFF6AC1SuaviUI:|r GUI not loaded yet. Try again in a moment.")
     end
 end
 
 function SuaviUI:SafeReload()
     if InCombatLockdown() then
-        print("|cFF56D1FFSuaviUI:|r Cannot reload during combat.")
+        print("|cFFFF6AC1SuaviUI:|r Cannot reload during combat.")
         return
     end
     ReloadUI()
@@ -442,11 +442,7 @@ function SuaviUI:OnEnable()
     if self.SUICore then
         -- Show intro message if enabled (defaults to true)
         if self.db.profile.chat.showIntroMessage ~= false then
-            print("|cFF30D1FFSuaviUI|r loaded. |cFFFFFF00/sui|r to setup.")
-            print("|cFF30D1FFSUI QUICK START:|r")
-            print("|cFF34D3991.|r Action Bars & Menu Bar |cFFFFFF00HIDDEN|r on mouseover |cFFFFFF00by default|r. Go to |cFFFFFF00'Actionbars'|r tab in |cFFFFFF00/sui|r to unhide.")
-            print("|cFF34D3992.|r Use |cFFFFFF00100% Icon Size|r on CDM Essential & Utility bars via |cFFFFFF00Edit Mode|r for best results.")
-            print("|cFF34D3993.|r Position your |cFFFFFF00CDM bars|r in |cFFFFFF00Edit Mode|r and click |cFFFFFF00Save|r before exiting.")
+            print("|cFFFF6AC1Suavi UI|r ready. Type |cFFFFFF00/sui|r to open settings.")
         end
     end
 end

@@ -1899,7 +1899,7 @@ local function CreateDebugWindow()
     -- Title
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint(ns.Constants and ns.Constants.ANCHOR_POINTS and ns.Constants.ANCHOR_POINTS.TOPLEFT or "TOPLEFT", 10, -10)
-    title:SetText("|cFF56D1FFSuaviUI|r Castbar Debug")
+    title:SetText("|cFFFF6AC1SuaviUI|r Castbar Debug")
     
     -- Close button
     local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")

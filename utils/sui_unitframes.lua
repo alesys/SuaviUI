@@ -4070,7 +4070,7 @@ end
 
 function SUI_UF:EnableEditMode()
     if InCombatLockdown() then
-        print("|cFF56D1FFSuaviUI|r: Cannot enter Edit Mode during combat.")
+        print("|cFFFF6AC1SuaviUI|r: Cannot enter Edit Mode during combat.")
         return
     end
 
@@ -4362,7 +4362,7 @@ function SUI_UF:EnableEditMode()
         self:ShowPreview(unitKey)
     end
     
-    print("|cFF56D1FFSuaviUI|r: Edit Mode |cff00ff00ENABLED|r - Drag frames to reposition.")
+    print("|cFFFF6AC1SuaviUI|r: Edit Mode |cff00ff00ENABLED|r - Drag frames to reposition.")
 end
 
 function SUI_UF:DisableEditMode()
@@ -4425,7 +4425,7 @@ function SUI_UF:DisableEditMode()
         end
     end
     
-    print("|cFF56D1FFSuaviUI|r: Edit Mode |cffff0000DISABLED|r - Positions saved.")
+    print("|cFFFF6AC1SuaviUI|r: Edit Mode |cffff0000DISABLED|r - Positions saved.")
 end
 
 function SUI_UF:ToggleEditMode()

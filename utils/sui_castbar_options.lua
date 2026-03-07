@@ -510,7 +510,7 @@ local function BuildCastbarOptions_LEGACY(tabContent, unitKey, y, PAD, FORM_ROW,
                     UpdateCastbarSliders()
                     RefreshUnit()
                 else
-                    print("|cFF56D1FFSuaviUI:|r Essential Cooldowns viewer not visible.")
+                    print("|cFFFF6AC1SuaviUI:|r Essential Cooldowns viewer not visible.")
                 end
             end)
         end
@@ -527,7 +527,7 @@ local function BuildCastbarOptions_LEGACY(tabContent, unitKey, y, PAD, FORM_ROW,
                     UpdateCastbarSliders()
                     RefreshUnit()
                 else
-                    print("|cFF56D1FFSuaviUI:|r Utility Cooldowns viewer not visible.")
+                    print("|cFFFF6AC1SuaviUI:|r Utility Cooldowns viewer not visible.")
                 end
             end)
         end

@@ -12,7 +12,7 @@ local function OpenSuaviUI()
         SUI.GUI:Toggle()
         return true
     end
-    print("|cFF56D1FFSuaviUI:|r GUI not loaded yet. Try /sui instead.")
+    print("|cFFFF6AC1SuaviUI:|r GUI not loaded yet. Try /sui instead.")
     return false
 end
 

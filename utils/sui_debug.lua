@@ -79,7 +79,7 @@ local function CreateDebugWindow()
     -- Title bar with prominent styling
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 15, -10)
-    title:SetText("|cFF56D1FFSuaviUI Debug Window|r")
+    title:SetText("|cFFFF6AC1SuaviUI Debug Window|r")
     title:SetFont(title:GetFont(), 14, "OUTLINE")
     
     -- Close button
@@ -229,13 +229,13 @@ SlashCmdList["SUICDEBUG"] = function(msg)
     
     if msg == "clear" then
         DebugWindow:ClearLog()
-        print("|cFF56D1FFSuaviUI:|r Debug log cleared")
+        print("|cFFFF6AC1SuaviUI:|r Debug log cleared")
     elseif msg == "hide" then
         DebugWindow:Hide()
-        print("|cFF56D1FFSuaviUI:|r Debug window hidden")
+        print("|cFFFF6AC1SuaviUI:|r Debug window hidden")
     else
         -- Default: show window
         DebugWindow:Show()
-        print("|cFF56D1FFSuaviUI:|r Debug window opened. Use |cFFFFFF00/suidebug clear|r or |cFFFFFF00/suidebug hide|r")
+        print("|cFFFF6AC1SuaviUI:|r Debug window opened. Use |cFFFFFF00/suidebug clear|r or |cFFFFFF00/suidebug hide|r")
     end
 end

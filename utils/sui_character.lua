@@ -32,14 +32,17 @@ local EQUIPMENT_SLOTS = {
     { name = "Trinket1", id = INVSLOT_TRINKET2, side = "right" },
 }
 
--- Color palette (SuaviUI brand colors)
+-- Color palette (Snazzy theme)
 local C = {
-    bg = { 0.067, 0.094, 0.153, 0.95 },        -- Deep Cool Grey
-    bgLight = { 0.122, 0.161, 0.216, 1 },      -- Dark Slate
-    accent = { 0.204, 0.827, 0.6, 1 },         -- Soft Mint
-    text = { 0.953, 0.957, 0.965, 1 },         -- Off-White
-    textMuted = { 0.6, 0.65, 0.7, 1 },         -- Grey
-    border = { 0.2, 0.25, 0.3, 1 },            -- Cool Grey
+    bg = { 0.157, 0.165, 0.212, 0.97 },        -- #282A36 Snazzy Background
+    bgLight = { 0.188, 0.196, 0.247, 1 },      -- #303040 Slightly lighter
+    bgDark = { 0.133, 0.141, 0.188, 1 },       -- #222430 Darker
+    bgCard = { 0.170, 0.178, 0.228, 0.85 },    -- Card/container bg
+    accent = { 1.0, 0.416, 0.757, 1 },         -- #FF6AC1 Snazzy Magenta
+    text = { 0.937, 0.941, 0.922, 1 },         -- #EFF0EB Snazzy Foreground
+    textBright = { 0.945, 0.945, 0.941, 1 },   -- #F1F1F0 Bright white
+    textMuted = { 0.502, 0.502, 0.518, 1 },    -- #808084 Muted
+    border = { 0.220, 0.227, 0.275, 1 },       -- #383A46 Snazzy Border
 
     -- Stat bar colors
     health = { 0.937, 0.267, 0.267, 1 },       -- Soft Red
@@ -50,8 +53,8 @@ local C = {
     versatility = { 0.024, 0.714, 0.831, 1 },  -- Cyan
 
     -- Status colors
-    enchanted = { 0.204, 0.827, 0.6, 1 },      -- Green/Mint (enchanted)
-    missing = { 0.6, 0.6, 0.6, 0.7 },          -- Muted grey (missing enchant)
+    enchanted = { 0.604, 0.922, 0.624, 1 },    -- #9AEDFE-ish Snazzy green
+    missing = { 0.502, 0.502, 0.518, 0.7 },    -- Muted grey (missing enchant)
 }
 
 -- Gem type colors (standard WoW gem socket colors)
@@ -1413,8 +1416,14 @@ CreateStatsPanel = function(parent, unit)
     local panel = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     panel:SetSize(200, 400)
 
-    -- No backdrop - let customBg show through (avoids double-layered background)
-    panel:SetBackdrop(nil)
+    -- Snazzy card-style container backdrop
+    panel:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+    })
+    panel:SetBackdropColor(C.bgCard[1], C.bgCard[2], C.bgCard[3], C.bgCard[4])
+    panel:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 0.6)
 
     -- Create scroll frame for stats
     local scrollFrame = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
@@ -1436,7 +1445,20 @@ end
 ---------------------------------------------------------------------------
 local trackedFontStrings = {}
 local trackedUnderlines = {}
+local trackedAccentPips = {}
+local trackedSectionBgs = {}
 -- Note: trackedEnchantFonts is declared earlier (before CreateSlotOverlay)
+
+-- Create a subtle background texture behind a stat section
+local function CreateSectionBg(parent, yTop, yBottom)
+    local bg = parent:CreateTexture(nil, "BACKGROUND")
+    bg:SetColorTexture(C.bgDark[1], C.bgDark[2], C.bgDark[3], 0.35)
+    bg:SetPoint("TOPLEFT", parent, "TOPLEFT", 2, yTop + 2)
+    bg:SetPoint("RIGHT", parent, "RIGHT", -2, 0)
+    bg:SetHeight(math.abs(yTop - yBottom) + 4)
+    table.insert(trackedSectionBgs, bg)
+    return bg
+end
 
 local function TrackFontString(fontString, category)
     table.insert(trackedFontStrings, { fs = fontString, cat = category })
@@ -1503,7 +1525,7 @@ local function RefreshCharacterPanelFonts()
     if trackedUnderlines then
         for _, line in ipairs(trackedUnderlines) do
             if line and line.SetColorTexture then
-                line:SetColorTexture(headerColor[1], headerColor[2], headerColor[3], 0.3)
+                line:SetColorTexture(headerColor[1], headerColor[2], headerColor[3], 0.2)
             end
         end
     end
@@ -1641,7 +1663,7 @@ local function CreateStatRow(parent, yOffset)
     row.value = row:CreateFontString(nil, "OVERLAY")
     row.value:SetFont(font, fontSize, "")
     row.value:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-    row.value:SetTextColor(1, 1, 1, 1)
+    row.value:SetTextColor(C.textBright[1], C.textBright[2], C.textBright[3], 1)
     row.value:SetShadowOffset(0, 0)
     TrackFontString(row.value, "statValue")
 
@@ -1679,12 +1701,19 @@ local function CreateSectionHeader(parent, text, yOffset)
     header:SetShadowOffset(0, 0)
     TrackFontString(header, "sectionHeader")
 
-    -- Underline (uses headerColor)
+    -- Snazzy Magenta accent pip (short highlight on the left)
+    local accentPip = parent:CreateTexture(nil, "ARTWORK")
+    accentPip:SetSize(24, 2)
+    accentPip:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -2)
+    accentPip:SetColorTexture(1.0, 0.416, 0.757, 0.85) -- #FF6AC1 Snazzy Magenta
+    table.insert(trackedAccentPips, accentPip)
+
+    -- Underline (extends from accent pip to the right, subtle)
     local line = parent:CreateTexture(nil, "ARTWORK")
     line:SetHeight(1)
-    line:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -2)
+    line:SetPoint("LEFT", accentPip, "RIGHT", 0, 0)
     line:SetPoint("RIGHT", parent, "RIGHT", -5, 0)
-    line:SetColorTexture(headerColor[1], headerColor[2], headerColor[3], 0.3)
+    line:SetColorTexture(headerColor[1], headerColor[2], headerColor[3], 0.2)
     table.insert(trackedUnderlines, line)
 
     local spacingAfterHeader = 4
@@ -1730,7 +1759,7 @@ local function CreateStatBar(parent, yOffset, color)
     row.value = row:CreateFontString(nil, "OVERLAY")
     row.value:SetFont(font, barTextSize, "")
     row.value:SetPoint("RIGHT", row, "RIGHT", 0, labelOffset)
-    row.value:SetTextColor(1, 1, 1, 1)
+    row.value:SetTextColor(C.textBright[1], C.textBright[2], C.textBright[3], 1)
     row.value:SetShadowOffset(0, 0)
     TrackFontString(row.value, "barValue")
 
@@ -1746,7 +1775,7 @@ local function CreateStatBar(parent, yOffset, color)
     -- Bar background
     local barBg = row.bar:CreateTexture(nil, "BACKGROUND")
     barBg:SetAllPoints()
-    barBg:SetColorTexture(0, 0, 0, 0.4)
+    barBg:SetColorTexture(C.bg[1], C.bg[2], C.bg[3], 0.5)
 
     return row
 end
@@ -1775,16 +1804,28 @@ local function UpdateStatsPanel(panel, unit)
             end
         end
 
-        -- Hide all tracked underlines (Textures)
+        -- Hide all tracked underlines and accent pips (Textures)
         for _, line in ipairs(trackedUnderlines) do
             if line and line.Hide then
                 line:Hide()
+            end
+        end
+        for _, pip in ipairs(trackedAccentPips) do
+            if pip and pip.Hide then
+                pip:Hide()
+            end
+        end
+        for _, bg in ipairs(trackedSectionBgs) do
+            if bg and bg.Hide then
+                bg:Hide()
             end
         end
 
         -- Clear the tracking tables
         wipe(trackedFontStrings)
         wipe(trackedUnderlines)
+        wipe(trackedAccentPips)
+        wipe(trackedSectionBgs)
 
         -- Clear child frames (stat rows, stat bars)
         local children = {scrollChild:GetChildren()}
@@ -1825,6 +1866,7 @@ local function UpdateStatsPanel(panel, unit)
     end
 
     -- HEALTH & RESOURCE
+    local sectionStart = y
     local healthMax = SafeGetStat(UnitHealthMax, unit)
     local row = CreateStatRow(scrollChild, y)
     row.label:SetText("Health")
@@ -1861,9 +1903,11 @@ local function UpdateStatsPanel(panel, unit)
     end
     y = y - ROW_HEIGHT
 
+    CreateSectionBg(scrollChild, sectionStart, y)
     y = y - 5
 
     -- ATTRIBUTES
+    sectionStart = y
     local _, headerHeight = CreateSectionHeader(scrollChild, "Attributes", y)
     y = y - headerHeight
 
@@ -1977,9 +2021,11 @@ local function UpdateStatsPanel(panel, unit)
         end
     end
 
+    CreateSectionBg(scrollChild, sectionStart, y)
     y = y - 5
 
     -- SECONDARY STATS
+    sectionStart = y
     _, headerHeight = CreateSectionHeader(scrollChild, "Secondary", y)
     y = y - headerHeight
 
@@ -2057,9 +2103,11 @@ local function UpdateStatsPanel(panel, unit)
         y = y - BAR_HEIGHT
     end
 
+    CreateSectionBg(scrollChild, sectionStart, y)
     y = y - 5
 
     -- ATTACK
+    sectionStart = y
     _, headerHeight = CreateSectionHeader(scrollChild, "Attack", y)
     y = y - headerHeight
 
@@ -2101,9 +2149,11 @@ local function UpdateStatsPanel(panel, unit)
         end
     end
 
+    CreateSectionBg(scrollChild, sectionStart, y)
     y = y - 5
 
     -- DEFENSE
+    sectionStart = y
     _, headerHeight = CreateSectionHeader(scrollChild, "Defense", y)
     y = y - headerHeight
 
@@ -2164,9 +2214,11 @@ local function UpdateStatsPanel(panel, unit)
         y = y - ROW_HEIGHT
     end
 
+    CreateSectionBg(scrollChild, sectionStart, y)
     y = y - 5
 
     -- GENERAL
+    sectionStart = y
     _, headerHeight = CreateSectionHeader(scrollChild, "General", y)
     y = y - headerHeight
 
@@ -2196,6 +2248,7 @@ local function UpdateStatsPanel(panel, unit)
         
         y = y - ROW_HEIGHT
     end
+    CreateSectionBg(scrollChild, sectionStart, y)
 
     -- Set scroll child height
     local contentHeight = math.abs(y) + 20
@@ -2352,6 +2405,9 @@ ScheduleUpdate = function()
     end)
 end
 
+-- Expose globally for /sui options panel
+_G.SuaviUI_ScheduleCharacterUpdate = ScheduleUpdate
+
 ---------------------------------------------------------------------------
 -- Create floating Equipment Manager container (positioning only - skinning in skinning/character.lua)
 ---------------------------------------------------------------------------
@@ -2443,9 +2499,6 @@ local function HookCharacterFrame()
     if not CharacterFrame then return end
     if characterFrameHooked then return end
     characterFrameHooked = true
-
-    -- Forward declarations for settings button and panel (used by HideCustomElements)
-    local gearBtn, settingsPanel
 
     -- Initialize when character frame first shows
     CharacterFrame:HookScript("OnShow", function()
@@ -2705,11 +2758,9 @@ local function HookCharacterFrame()
         end
         -- Hide Equipment Manager popup when leaving Character tab
         if equipMgrPopup then equipMgrPopup:Hide() end
-        -- Hide ilvl display, center ilvl, and settings button on non-Character tabs
+        -- Hide ilvl display and center ilvl on non-Character tabs
         if CharacterFrame._suiILvlDisplay then CharacterFrame._suiILvlDisplay:Hide() end
         if CharacterFrame._quiCenterILvl then CharacterFrame._quiCenterILvl:Hide() end
-        if CharacterFrame._quiGearBtn then CharacterFrame._quiGearBtn:Hide() end
-        if CharacterFrame._quiSettingsPanel then CharacterFrame._quiSettingsPanel:Hide() end
 
         -- Handle background and decorations based on skinning state
         if IsSkinningHandlingBackground() then
@@ -2786,10 +2837,9 @@ local function HookCharacterFrame()
                 for _, overlay in pairs(slotOverlays) do
                     if overlay then overlay:Show() end
                 end
-                -- Show ilvl display, center ilvl, and settings button on Character tab
+                -- Show ilvl display and center ilvl on Character tab
                 if CharacterFrame._suiILvlDisplay then CharacterFrame._suiILvlDisplay:Show() end
                 if CharacterFrame._quiCenterILvl then CharacterFrame._quiCenterILvl:Show() end
-                if CharacterFrame._quiGearBtn then CharacterFrame._quiGearBtn:Show() end
                 ScheduleUpdate()
                 -- Refresh equipment slot borders (may be reset by Blizzard on reopen)
                 if #allEquipmentSlots > 0 and UpdateEquipmentSlotBorder then
@@ -2809,386 +2859,6 @@ local function HookCharacterFrame()
         end)
     end
 
-    ---------------------------------------------------------------------------
-    -- Settings gear icon and mini-panel (in-pane customization)
-    ---------------------------------------------------------------------------
-
-    -- Only create settings button if module is enabled
-    local settings = GetSettings()
-    if not settings.enabled then
-        -- Hide existing button if module was disabled
-        if CharacterFrame._quiGearBtn then
-            CharacterFrame._quiGearBtn:Hide()
-        end
-        if CharacterFrame._quiSettingsPanel then
-            CharacterFrame._quiSettingsPanel:Hide()
-        end
-        return
-    end
-
-    -- Create gear icon (more prominent position in title bar)
-    if not CharacterFrame._quiGearBtn then
-        gearBtn = CreateFrame("Button", "SUI_CharacterSettingsBtn", CharacterFrame, "BackdropTemplate")
-        gearBtn:SetSize(70, 20)
-        gearBtn:SetPoint("TOPRIGHT", CharacterFrame, "TOPRIGHT", 20, -5)
-        gearBtn:SetBackdrop({
-            bgFile = "Interface\\Buttons\\WHITE8x8",
-            edgeFile = "Interface\\Buttons\\WHITE8x8",
-            edgeSize = 1,
-        })
-        gearBtn:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
-        gearBtn:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
-        gearBtn:SetFrameStrata("HIGH")
-        gearBtn:SetFrameLevel(100)
-
-        -- Gear icon inside button
-        local gearIcon = gearBtn:CreateTexture(nil, "ARTWORK")
-        gearIcon:SetSize(14, 14)
-        gearIcon:SetPoint("LEFT", gearBtn, "LEFT", 5, 0)
-        gearIcon:SetTexture("Interface\\Buttons\\UI-OptionsButton")
-
-        -- "Settings" label
-        local gearLabel = gearBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        gearLabel:SetPoint("LEFT", gearIcon, "RIGHT", 4, 0)
-        gearLabel:SetText("Settings")
-        gearLabel:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
-
-        -- Hover effect
-        gearBtn:SetScript("OnEnter", function(self)
-            self:SetBackdropBorderColor(C.accent[1], C.accent[2], C.accent[3], 1)
-        end)
-        gearBtn:SetScript("OnLeave", function(self)
-            self:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
-        end)
-
-        CharacterFrame._quiGearBtn = gearBtn
-
-        -- Settings panel (positioned to the right of CharacterFrame)
-        settingsPanel = CreateFrame("Frame", "SuaviUI_CharSettingsPanel", CharacterFrame, "BackdropTemplate")
-        settingsPanel:SetSize(450, 600)
-        settingsPanel:SetPoint("TOPLEFT", CharacterFrame, "TOPRIGHT", 53, 0)
-        settingsPanel:SetBackdrop({
-            bgFile = "Interface\\Buttons\\WHITE8x8",
-            edgeFile = "Interface\\Buttons\\WHITE8x8",
-            edgeSize = 1,
-        })
-        settingsPanel:SetBackdropColor(C.bg[1], C.bg[2], C.bg[3], 0.98)
-        settingsPanel:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
-        settingsPanel:SetFrameStrata("DIALOG")
-        settingsPanel:SetFrameLevel(200)
-        settingsPanel:EnableMouse(true)
-        settingsPanel:Hide()
-        CharacterFrame._quiSettingsPanel = settingsPanel
-
-        -- Title
-        local title = settingsPanel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        title:SetPoint("TOP", settingsPanel, "TOP", 0, -8)
-        title:SetText("SUI Character Panel")
-        title:SetTextColor(C.accent[1], C.accent[2], C.accent[3], 1)
-
-        -- Close button (X)
-        local closeBtn = CreateFrame("Button", nil, settingsPanel, "UIPanelCloseButton")
-        closeBtn:SetPoint("TOPRIGHT", -3, -3)
-        closeBtn:SetScript("OnClick", function() settingsPanel:Hide() end)
-
-        -- Scroll frame for settings
-        local scrollFrame = CreateFrame("ScrollFrame", nil, settingsPanel, "UIPanelScrollFrameTemplate")
-        scrollFrame:SetPoint("TOPLEFT", settingsPanel, "TOPLEFT", 5, -28)
-        scrollFrame:SetPoint("BOTTOMRIGHT", settingsPanel, "BOTTOMRIGHT", -26, 40)
-
-        local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-        scrollChild:SetWidth(419)  -- settingsPanel(450) - left(5) - right(26)
-        scrollChild:SetHeight(1)  -- Will be updated after adding widgets
-        scrollFrame:SetScrollChild(scrollChild)
-
-        -- Style the scroll bar
-        local scrollBar = scrollFrame.ScrollBar
-        if scrollBar then
-            scrollBar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", 2, -16)
-            scrollBar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 2, 16)
-        end
-
-        -- Get GUI reference and settings
-        local GUI = _G.SuaviUI and _G.SuaviUI.GUI
-        if not GUI then return end
-        local settings = GetSettings()
-        local charDB = settings
-
-        -- Layout constants
-        local PAD = 8
-        local FORM_ROW = 28
-        local y = -5
-
-        -- Refresh callback for overlay toggles
-        local function RefreshAll()
-            if _G.SuaviUI_RefreshCharacterPanelFonts then
-                _G.SuaviUI_RefreshCharacterPanelFonts()
-            end
-            ScheduleUpdate()
-        end
-
-        -- Widget references for conditional disable
-        local widgetRefs = {}
-
-        ---------------------------------------------------------------------------
-        -- APPEARANCE Section
-        ---------------------------------------------------------------------------
-        local appearHeader = GUI:CreateSectionHeader(scrollChild, "Appearance")
-        appearHeader:SetPoint("TOPLEFT", PAD, y)
-        y = y - appearHeader.gap
-
-        -- Scale slider (multiplier on base 1.30 scale, range 0.75-1.5)
-        local BASE_SCALE = 1.30
-        local scaleSlider = GUI:CreateFormSlider(scrollChild, "Panel Scale", 0.75, 1.5, 0.05, "panelScale", charDB, function()
-            local multiplier = charDB.panelScale or 1.0
-            CharacterFrame:SetScale(BASE_SCALE * multiplier)
-        end, { deferOnDrag = true })
-        scaleSlider:SetPoint("TOPLEFT", PAD, y)
-        scaleSlider:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        -- Background color (uses shared skinning background color)
-        local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
-        local generalDB = SUICore and SUICore.db and SUICore.db.profile and SUICore.db.profile.general
-        local bgColorPicker = nil
-        if generalDB then
-            bgColorPicker = GUI:CreateFormColorPicker(scrollChild, "Background Color", "skinBgColor", generalDB, function()
-                -- Update local customBg if we own it
-                if customBg and not IsSkinningHandlingBackground() then
-                    local col = generalDB.skinBgColor or C.bg
-                    customBg:SetBackdropColor(col[1], col[2], col[3], col[4] or 0.95)
-                end
-                -- Also refresh skinning module if it's active
-                if _G.SuaviUI_RefreshCharacterFrameColors then
-                    _G.SuaviUI_RefreshCharacterFrameColors()
-                end
-            end)
-            bgColorPicker:SetPoint("TOPLEFT", PAD, y)
-            bgColorPicker:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            -- Refresh color picker when panel shows (in case color changed in main SUI options)
-            settingsPanel:HookScript("OnShow", function()
-                if bgColorPicker and bgColorPicker.swatch and generalDB and generalDB.skinBgColor then
-                    local col = generalDB.skinBgColor
-                    bgColorPicker.swatch:SetBackdropColor(col[1], col[2], col[3], col[4] or 1)
-                end
-            end)
-        end
-
-        y = y - 10
-
-        ---------------------------------------------------------------------------
-        -- SLOT OVERLAYS Section
-        ---------------------------------------------------------------------------
-        local overlayHeader = GUI:CreateSectionHeader(scrollChild, "Slot Overlays")
-        overlayHeader:SetPoint("TOPLEFT", PAD, y)
-        y = y - overlayHeader.gap
-
-        local showItemName = GUI:CreateFormCheckbox(scrollChild, "Show Equipment Name", "showItemName", charDB, RefreshAll)
-        showItemName:SetPoint("TOPLEFT", PAD, y)
-        showItemName:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local showIlvl = GUI:CreateFormCheckbox(scrollChild, "Show Item Level & Track", "showItemLevel", charDB, RefreshAll)
-        showIlvl:SetPoint("TOPLEFT", PAD, y)
-        showIlvl:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local showEnchants = GUI:CreateFormCheckbox(scrollChild, "Show Enchant Status", "showEnchants", charDB, RefreshAll)
-        showEnchants:SetPoint("TOPLEFT", PAD, y)
-        showEnchants:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local showGems = GUI:CreateFormCheckbox(scrollChild, "Show Gem Indicators", "showGems", charDB, RefreshAll)
-        showGems:SetPoint("TOPLEFT", PAD, y)
-        showGems:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local showDura = GUI:CreateFormCheckbox(scrollChild, "Show Durability Bars", "showDurability", charDB, RefreshAll)
-        showDura:SetPoint("TOPLEFT", PAD, y)
-        showDura:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        y = y - 10
-
-        ---------------------------------------------------------------------------
-        -- STATS PANEL Section
-        ---------------------------------------------------------------------------
-        local statsPanelHeader = GUI:CreateSectionHeader(scrollChild, "Stats Panel")
-        statsPanelHeader:SetPoint("TOPLEFT", PAD, y)
-        y = y - statsPanelHeader.gap
-
-        local showTooltips = GUI:CreateFormCheckbox(scrollChild, "Show Stat Tooltips", "showTooltips", charDB, function()
-            RefreshAll()
-            -- Force update stats panel to apply tooltip changes
-            if statsPanel then
-                UpdateStatsPanel(statsPanel, "player")
-            end
-        end)
-        showTooltips:SetPoint("TOPLEFT", PAD, y)
-        showTooltips:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        y = y - 10
-
-        ---------------------------------------------------------------------------
-        -- SECONDARY STATS Section
-        ---------------------------------------------------------------------------
-        local secondaryStatsHeader = GUI:CreateSectionHeader(scrollChild, "Secondary Stats")
-        secondaryStatsHeader:SetPoint("TOPLEFT", PAD, y)
-        y = y - secondaryStatsHeader.gap
-
-        local formatOptions = {
-            { value = "percent", text = "Percentage (19.52%)" },
-            { value = "rating", text = "Rating (1,234)" },
-            { value = "both", text = "Both (1,234 (19.5%))" },
-        }
-        local secondaryFormat = GUI:CreateFormDropdown(scrollChild, "Display Format", formatOptions, "secondaryStatFormat", charDB, RefreshAll)
-        secondaryFormat:SetPoint("TOPLEFT", PAD, y)
-        secondaryFormat:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        y = y - 10
-
-        ---------------------------------------------------------------------------
-        -- TEXT SIZES Section
-        ---------------------------------------------------------------------------
-        local textSizeHeader = GUI:CreateSectionHeader(scrollChild, "Text Sizes")
-        textSizeHeader:SetPoint("TOPLEFT", PAD, y)
-        y = y - textSizeHeader.gap
-
-        local slotTextSize = GUI:CreateFormSlider(scrollChild, "Slot Text Size", 6, 40, 1, "slotTextSize", charDB, RefreshAll)
-        slotTextSize:SetPoint("TOPLEFT", PAD, y)
-        slotTextSize:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local headerTextSize = GUI:CreateFormSlider(scrollChild, "Header Text Size", 6, 40, 1, "headerTextSize", charDB, RefreshAll)
-        headerTextSize:SetPoint("TOPLEFT", PAD, y)
-        headerTextSize:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local statsTextSize = GUI:CreateFormSlider(scrollChild, "Stats Text Size", 6, 40, 1, "statsTextSize", charDB, RefreshAll)
-        statsTextSize:SetPoint("TOPLEFT", PAD, y)
-        statsTextSize:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        y = y - 10
-
-        ---------------------------------------------------------------------------
-        -- TEXT COLORS Section
-        ---------------------------------------------------------------------------
-        local textColorHeader = GUI:CreateSectionHeader(scrollChild, "Text Colors")
-        textColorHeader:SetPoint("TOPLEFT", PAD, y)
-        y = y - textColorHeader.gap
-
-        local statsTextColor = GUI:CreateFormColorPicker(scrollChild, "Stats Text Color", "statsTextColor", charDB, RefreshAll)
-        statsTextColor:SetPoint("TOPLEFT", PAD, y)
-        statsTextColor:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        -- Header Class Color toggle
-        local headerClassColor = GUI:CreateFormCheckbox(scrollChild, "Header Class Color", "headerClassColor", charDB, function()
-            RefreshAll()
-            if widgetRefs.headerColor then
-                local alpha = charDB.headerClassColor and 0.4 or 1.0
-                widgetRefs.headerColor:SetAlpha(alpha)
-            end
-        end)
-        headerClassColor:SetPoint("TOPLEFT", PAD, y)
-        headerClassColor:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local headerColor = GUI:CreateFormColorPicker(scrollChild, "Header Color", "headerColor", charDB, RefreshAll)
-        headerColor:SetPoint("TOPLEFT", PAD, y)
-        headerColor:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-        widgetRefs.headerColor = headerColor
-        headerColor:SetAlpha(charDB.headerClassColor and 0.4 or 1.0)
-        y = y - FORM_ROW
-
-        -- Enchant Class Color toggle
-        local enchantClassColor = GUI:CreateFormCheckbox(scrollChild, "Enchant Class Color", "enchantClassColor", charDB, function()
-            RefreshAll()
-            if widgetRefs.enchantColor then
-                local alpha = charDB.enchantClassColor and 0.4 or 1.0
-                widgetRefs.enchantColor:SetAlpha(alpha)
-            end
-        end)
-        enchantClassColor:SetPoint("TOPLEFT", PAD, y)
-        enchantClassColor:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local enchantColor = GUI:CreateFormColorPicker(scrollChild, "Enchant Text Color", "enchantTextColor", charDB, RefreshAll)
-        enchantColor:SetPoint("TOPLEFT", PAD, y)
-        enchantColor:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-        widgetRefs.enchantColor = enchantColor
-        enchantColor:SetAlpha(charDB.enchantClassColor and 0.4 or 1.0)
-        y = y - FORM_ROW
-
-        local noEnchantColor = GUI:CreateFormColorPicker(scrollChild, "No Enchant Color", "noEnchantTextColor", charDB, RefreshAll)
-        noEnchantColor:SetPoint("TOPLEFT", PAD, y)
-        noEnchantColor:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local upgradeTrackColor = GUI:CreateFormColorPicker(scrollChild, "Upgrade Track Color", "upgradeTrackColor", charDB, RefreshAll)
-        upgradeTrackColor:SetPoint("TOPLEFT", PAD, y)
-        upgradeTrackColor:SetPoint("RIGHT", scrollChild, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        y = y - 10
-
-        -- Update scroll child height
-        scrollChild:SetHeight(math.abs(y) + 20)
-
-        ---------------------------------------------------------------------------
-        -- Reset Button (at bottom of panel, outside scroll)
-        ---------------------------------------------------------------------------
-        local resetBtn = GUI:CreateButton(settingsPanel, "Reset", 80, 24, function()
-            -- Reset all settings to defaults (background color is shared via Skinning tab)
-            charDB.panelScale = 1.0
-            charDB.showItemName = true
-            charDB.showItemLevel = true
-            charDB.showEnchants = true
-            charDB.showGems = true
-            charDB.showDurability = false
-            charDB.secondaryStatFormat = "both"
-            charDB.slotTextSize = 12
-            charDB.headerTextSize = 12
-            charDB.statsTextSize = 12
-            charDB.statsTextColor = {0.953, 0.957, 0.965}
-            charDB.headerClassColor = true
-            charDB.headerColor = {0.204, 0.827, 0.6}
-            charDB.enchantClassColor = true
-            charDB.enchantTextColor = {0.204, 0.827, 0.6}
-            charDB.noEnchantTextColor = {0.5, 0.5, 0.5}
-            charDB.upgradeTrackColor = {0.98, 0.60, 0.35, 1}
-
-            -- Apply scale (base 1.30 * multiplier 1.0)
-            CharacterFrame:SetScale(1.30)
-
-            -- Refresh and reload the settings panel to reflect reset values
-            RefreshAll()
-
-            -- Reload the settings panel to update widget states
-            settingsPanel:Hide()
-            C_Timer.After(0.1, function()
-                settingsPanel:Show()
-            end)
-        end)
-        resetBtn:SetPoint("BOTTOM", settingsPanel, "BOTTOM", 0, 10)
-
-        -- Toggle panel on gear click
-        gearBtn:SetScript("OnClick", function()
-            settingsPanel:SetShown(not settingsPanel:IsShown())
-        end)
-    end
-
-    -- Hide settings panel when character frame closes (outside creation block)
-    CharacterFrame:HookScript("OnHide", function()
-        if CharacterFrame._quiSettingsPanel then
-            CharacterFrame._quiSettingsPanel:Hide()
-        end
-    end)
 end
 
 ---------------------------------------------------------------------------

@@ -211,7 +211,7 @@ local function CreateScrollableContent(parent)
         -- Style the thumb (safe operation)
         local thumb = scrollBar:GetThumbTexture()
         if thumb then
-            thumb:SetColorTexture(0.35, 0.45, 0.5, 0.8)  -- Subtle grey-blue
+            thumb:SetColorTexture(0.502, 0.502, 0.518, 0.5)  -- Snazzy muted
         end
 
         -- Hide arrow buttons (modern best practice)
@@ -232,6 +232,17 @@ local function CreateScrollableContent(parent)
     end
 
     return scrollFrame, content
+end
+
+---------------------------------------------------------------------------
+-- HELPER: Wrap a sub-tab builder into a standalone page builder
+-- Each wrapped builder creates its own scrollable content frame
+---------------------------------------------------------------------------
+local function WrapBuilder(builderFn)
+    return function(parent)
+        local scroll, content = CreateScrollableContent(parent)
+        builderFn(content)
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -362,8 +373,7 @@ end
 ---------------------------------------------------------------------------
 -- PAGE: General & QoL
 ---------------------------------------------------------------------------
-local function CreateGeneralQoLPage(parent)
-    local scroll, content = CreateScrollableContent(parent)
+local function CreateGeneralQoLBuilders()
     local db = GetDB()
 
     -- Refresh callback for crosshair
@@ -2642,7 +2652,6 @@ local function CreateGeneralQoLPage(parent)
     local function BuildCharacterPaneTab(tabContent)
         local y = -10
 
-        -- Set search context for auto-registration
         GUI:SetSearchContext({tabIndex = 1, tabName = "General & QoL", subTabIndex = 7, subTabName = "Character Pane"})
 
         local char = db and db.character
@@ -2650,91 +2659,247 @@ local function CreateGeneralQoLPage(parent)
 
         local FORM_ROW = 30
 
+        local function RefreshCharPanel()
+            if _G.SuaviUI_RefreshCharacterPanelFonts then
+                _G.SuaviUI_RefreshCharacterPanelFonts()
+            end
+            -- Schedule overlay update
+            if _G.SuaviUI_ScheduleCharacterUpdate then
+                _G.SuaviUI_ScheduleCharacterUpdate()
+            end
+        end
+
+        -- Widget references for conditional disable
+        local widgetRefs = {}
+
+        -- ═══════════════════════════════════════════════════════════════
         -- SECTION: Enable/Disable
-        local enableHeader = GUI:CreateSectionHeader(tabContent, "Enable/Disable SUI Character Module")
+        -- ═══════════════════════════════════════════════════════════════
+        GUI:SetSearchSection("Enable/Disable")
+        local enableHeader = GUI:CreateSectionHeader(tabContent, "Enable/Disable")
         enableHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - enableHeader.gap
 
-        local enableCheck = GUI:CreateFormCheckbox(tabContent, "SUI Character Module",
-            "enabled", char, function(val)
+        local enableCheck = GUI:CreateFormToggle(tabContent, "Character Module",
+            "enabled", char, function()
                 GUI:ShowConfirmation({
                     title = "Reload Required",
                     message = "Character Pane styling requires a UI reload to take effect.",
                     acceptText = "Reload Now",
                     cancelText = "Later",
                     isDestructive = false,
-                    onAccept = function()
-                        SuaviUI:SafeReload()
-                    end,
+                    onAccept = function() SuaviUI:SafeReload() end,
                 })
             end)
         enableCheck:SetPoint("TOPLEFT", PADDING, y)
         enableCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        local enableInfo = GUI:CreateLabel(tabContent, "If you are using a dedicated character stats addon, toggle this off.", 10, C.textMuted)
+        local enableInfo = GUI:CreateLabel(tabContent, "If you use a dedicated character stats addon, toggle this off.", 10, C.textMuted)
         enableInfo:SetPoint("TOPLEFT", PADDING, y)
         enableInfo:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         enableInfo:SetJustifyH("LEFT")
         y = y - 20
 
-        -- Section Header
-        local header = GUI:CreateSectionHeader(tabContent, "Character Pane Settings")
-        header:SetPoint("TOPLEFT", PADDING, y)
-        y = y - header.gap
+        -- ═══════════════════════════════════════════════════════════════
+        -- SECTION: Appearance
+        -- ═══════════════════════════════════════════════════════════════
+        GUI:SetSearchSection("Appearance")
+        local appearHeader = GUI:CreateSectionHeader(tabContent, "Appearance")
+        appearHeader:SetPoint("TOPLEFT", PADDING, y)
+        y = y - appearHeader.gap
 
-        -- Description
-        local desc = GUI:CreateLabel(tabContent, "Character Pane settings are now accessed from the Character Panel itself.\n\nOpen your Character Frame (C) and click the gear icon to access all settings.", 11, C.textMuted)
-        desc:SetPoint("TOPLEFT", PADDING, y)
-        desc:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        desc:SetJustifyH("LEFT")
-        desc:SetWordWrap(true)
-        desc:SetHeight(50)
-        y = y - 60
+        local BASE_SCALE = 1.30
+        local scaleSlider = GUI:CreateFormSlider(tabContent, "Panel Scale", 0.75, 1.5, 0.05, "panelScale", char, function()
+            local multiplier = char.panelScale or 1.0
+            if CharacterFrame then CharacterFrame:SetScale(BASE_SCALE * multiplier) end
+        end, { deferOnDrag = true })
+        scaleSlider:SetPoint("TOPLEFT", PADDING, y)
+        scaleSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
 
-        -- ───────────────────────────────────────────────────────────────
-        -- INSPECT FRAME Section
-        -- ───────────────────────────────────────────────────────────────
+        local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
+        local generalDB = SUICore and SUICore.db and SUICore.db.profile and SUICore.db.profile.general
+        if generalDB then
+            local bgColorPicker = GUI:CreateFormColorPicker(tabContent, "Background Color", "skinBgColor", generalDB, function()
+                if _G.SuaviUI_RefreshCharacterFrameColors then
+                    _G.SuaviUI_RefreshCharacterFrameColors()
+                end
+            end)
+            bgColorPicker:SetPoint("TOPLEFT", PADDING, y)
+            bgColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+            y = y - FORM_ROW
+        end
+
+        local showModel = GUI:CreateFormToggle(tabContent, "Model Background", "showModelBackground", char, RefreshCharPanel)
+        showModel:SetPoint("TOPLEFT", PADDING, y)
+        showModel:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        y = y - 10
+
+        -- ═══════════════════════════════════════════════════════════════
+        -- SECTION: Slot Overlays
+        -- ═══════════════════════════════════════════════════════════════
+        GUI:SetSearchSection("Slot Overlays")
+        local overlayHeader = GUI:CreateSectionHeader(tabContent, "Slot Overlays")
+        overlayHeader:SetPoint("TOPLEFT", PADDING, y)
+        y = y - overlayHeader.gap
+
+        local showItemName = GUI:CreateFormToggle(tabContent, "Equipment Name", "showItemName", char, RefreshCharPanel)
+        showItemName:SetPoint("TOPLEFT", PADDING, y)
+        showItemName:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        local showIlvl = GUI:CreateFormToggle(tabContent, "Item Level & Track", "showItemLevel", char, RefreshCharPanel)
+        showIlvl:SetPoint("TOPLEFT", PADDING, y)
+        showIlvl:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        local showEnchants = GUI:CreateFormToggle(tabContent, "Enchant Status", "showEnchants", char, RefreshCharPanel)
+        showEnchants:SetPoint("TOPLEFT", PADDING, y)
+        showEnchants:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        local showGems = GUI:CreateFormToggle(tabContent, "Gem Indicators", "showGems", char, RefreshCharPanel)
+        showGems:SetPoint("TOPLEFT", PADDING, y)
+        showGems:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        local showDura = GUI:CreateFormToggle(tabContent, "Durability Bars", "showDurability", char, RefreshCharPanel)
+        showDura:SetPoint("TOPLEFT", PADDING, y)
+        showDura:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        y = y - 10
+
+        -- ═══════════════════════════════════════════════════════════════
+        -- SECTION: Stats Panel
+        -- ═══════════════════════════════════════════════════════════════
+        GUI:SetSearchSection("Stats Panel")
+        local statsHeader = GUI:CreateSectionHeader(tabContent, "Stats Panel")
+        statsHeader:SetPoint("TOPLEFT", PADDING, y)
+        y = y - statsHeader.gap
+
+        local showTooltips = GUI:CreateFormToggle(tabContent, "Stat Tooltips", "showTooltips", char, RefreshCharPanel)
+        showTooltips:SetPoint("TOPLEFT", PADDING, y)
+        showTooltips:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        local formatOptions = {
+            { value = "percent", text = "Percentage (19.52%)" },
+            { value = "rating", text = "Rating (1,234)" },
+            { value = "both", text = "Both (1,234 (19.5%))" },
+        }
+        local secondaryFormat = GUI:CreateFormDropdown(tabContent, "Stat Format", formatOptions, "secondaryStatFormat", char, RefreshCharPanel)
+        secondaryFormat:SetPoint("TOPLEFT", PADDING, y)
+        secondaryFormat:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        y = y - 10
+
+        -- ═══════════════════════════════════════════════════════════════
+        -- SECTION: Text Sizes
+        -- ═══════════════════════════════════════════════════════════════
+        GUI:SetSearchSection("Text Sizes")
+        local textSizeHeader = GUI:CreateSectionHeader(tabContent, "Text Sizes")
+        textSizeHeader:SetPoint("TOPLEFT", PADDING, y)
+        y = y - textSizeHeader.gap
+
+        local slotTextSize = GUI:CreateFormSlider(tabContent, "Slot Text Size", 6, 40, 1, "slotTextSize", char, RefreshCharPanel)
+        slotTextSize:SetPoint("TOPLEFT", PADDING, y)
+        slotTextSize:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        local headerTextSize = GUI:CreateFormSlider(tabContent, "Header Text Size", 6, 40, 1, "headerTextSize", char, RefreshCharPanel)
+        headerTextSize:SetPoint("TOPLEFT", PADDING, y)
+        headerTextSize:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        local statsTextSize = GUI:CreateFormSlider(tabContent, "Stats Text Size", 6, 40, 1, "statsTextSize", char, RefreshCharPanel)
+        statsTextSize:SetPoint("TOPLEFT", PADDING, y)
+        statsTextSize:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        y = y - 10
+
+        -- ═══════════════════════════════════════════════════════════════
+        -- SECTION: Text Colors
+        -- ═══════════════════════════════════════════════════════════════
+        GUI:SetSearchSection("Text Colors")
+        local textColorHeader = GUI:CreateSectionHeader(tabContent, "Text Colors")
+        textColorHeader:SetPoint("TOPLEFT", PADDING, y)
+        y = y - textColorHeader.gap
+
+        local statsTextColor = GUI:CreateFormColorPicker(tabContent, "Stats Text Color", "statsTextColor", char, RefreshCharPanel)
+        statsTextColor:SetPoint("TOPLEFT", PADDING, y)
+        statsTextColor:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        local headerClassColor = GUI:CreateFormToggle(tabContent, "Header Class Color", "headerClassColor", char, function()
+            RefreshCharPanel()
+            if widgetRefs.headerColor then
+                widgetRefs.headerColor:SetAlpha(char.headerClassColor and 0.4 or 1.0)
+            end
+        end)
+        headerClassColor:SetPoint("TOPLEFT", PADDING, y)
+        headerClassColor:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        local headerColor = GUI:CreateFormColorPicker(tabContent, "Header Color", "headerColor", char, RefreshCharPanel)
+        headerColor:SetPoint("TOPLEFT", PADDING, y)
+        headerColor:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        widgetRefs.headerColor = headerColor
+        headerColor:SetAlpha(char.headerClassColor and 0.4 or 1.0)
+        y = y - FORM_ROW
+
+        local enchantClassColor = GUI:CreateFormToggle(tabContent, "Enchant Class Color", "enchantClassColor", char, function()
+            RefreshCharPanel()
+            if widgetRefs.enchantColor then
+                widgetRefs.enchantColor:SetAlpha(char.enchantClassColor and 0.4 or 1.0)
+            end
+        end)
+        enchantClassColor:SetPoint("TOPLEFT", PADDING, y)
+        enchantClassColor:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        local enchantColor = GUI:CreateFormColorPicker(tabContent, "Enchant Text Color", "enchantTextColor", char, RefreshCharPanel)
+        enchantColor:SetPoint("TOPLEFT", PADDING, y)
+        enchantColor:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        widgetRefs.enchantColor = enchantColor
+        enchantColor:SetAlpha(char.enchantClassColor and 0.4 or 1.0)
+        y = y - FORM_ROW
+
+        local noEnchantColor = GUI:CreateFormColorPicker(tabContent, "No Enchant Color", "noEnchantTextColor", char, RefreshCharPanel)
+        noEnchantColor:SetPoint("TOPLEFT", PADDING, y)
+        noEnchantColor:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        local upgradeTrackColor = GUI:CreateFormColorPicker(tabContent, "Upgrade Track Color", "upgradeTrackColor", char, RefreshCharPanel)
+        upgradeTrackColor:SetPoint("TOPLEFT", PADDING, y)
+        upgradeTrackColor:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
+
+        y = y - 10
+
+        -- ═══════════════════════════════════════════════════════════════
+        -- SECTION: Inspect Frame
+        -- ═══════════════════════════════════════════════════════════════
+        GUI:SetSearchSection("Inspect Frame")
         local inspectHeader = GUI:CreateSectionHeader(tabContent, "Inspect Frame")
         inspectHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - inspectHeader.gap
 
-        local inspectDesc = GUI:CreateLabel(tabContent, "Apply the same overlays and stats panel to the Inspect frame when inspecting other players.", 11, C.textMuted)
-        inspectDesc:SetPoint("TOPLEFT", PADDING, y)
-        inspectDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        inspectDesc:SetJustifyH("LEFT")
-        inspectDesc:SetWordWrap(true)
-        inspectDesc:SetHeight(20)
-        y = y - 28
-
         if char.inspectEnabled == nil then char.inspectEnabled = true end
 
-        local inspectEnabled = GUI:CreateFormCheckbox(tabContent, "Enable Inspect Overlays", "inspectEnabled", char, function()
-            print("|cFF56D1FFSuaviUI:|r Inspect overlay change requires /reload to take effect.")
+        local inspectEnabled = GUI:CreateFormToggle(tabContent, "Inspect Overlays", "inspectEnabled", char, function()
+            print("|cFFFF6AC1SuaviUI:|r Inspect overlay change requires /reload to take effect.")
         end)
         inspectEnabled:SetPoint("TOPLEFT", PADDING, y)
         inspectEnabled:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        y = y - 10
-
-        -- Open Character Panel button
-        local openBtn = GUI:CreateButton(tabContent, "Open Character Panel", 200, 32, function()
-            -- Open character frame if not open
-            if not CharacterFrame:IsShown() then
-                ToggleCharacter("PaperDollFrame")
-            end
-            -- Show settings panel after a short delay
-            C_Timer.After(0.1, function()
-                local settingsPanel = _G["SuaviUI_CharSettingsPanel"]
-                if settingsPanel then
-                    settingsPanel:Show()
-                end
-            end)
-        end)
-        openBtn:SetPoint("TOPLEFT", PADDING, y)
-
-        tabContent:SetHeight(math.abs(y) + 50)
+        tabContent:SetHeight(math.abs(y) + 30)
     end
 
     -- =====================================================
@@ -2894,31 +3059,22 @@ local function CreateGeneralQoLPage(parent)
         tabContent:SetHeight(math.abs(y) + 50)
     end
 
-    -- =====================================================
-    -- CREATE SUB-TABS
-    -- =====================================================
-    local subTabs = GUI:CreateSubTabs(content, {
-        {name = "General", builder = BuildGeneralTab},
-        {name = "HUD Visibility", builder = BuildHUDVisibilityTab},
-        {name = "Cursor & Crosshair", builder = BuildCrosshairTab},
-        {name = "Buff & Debuff", builder = BuildBuffDebuffTab},
-        {name = "Chat", builder = BuildChatTab},
-        {name = "Tooltip", builder = BuildTooltipTab},
-        {name = "Character Pane", builder = BuildCharacterPaneTab},
-        {name = "Skyriding", builder = BuildSkyridingTab},
-    }, { rows = 2, perRow = 4 })
-    subTabs:SetPoint("TOPLEFT", 5, -5)
-    subTabs:SetPoint("TOPRIGHT", -5, -5)
-    subTabs:SetHeight(600)
-
-    content:SetHeight(650)
+    return {
+        {name = "General",            builder = WrapBuilder(BuildGeneralTab)},
+        {name = "HUD Visibility",     builder = WrapBuilder(BuildHUDVisibilityTab)},
+        {name = "Cursor & Crosshair", builder = WrapBuilder(BuildCrosshairTab)},
+        {name = "Buff & Debuff",      builder = WrapBuilder(BuildBuffDebuffTab)},
+        {name = "Chat",               builder = WrapBuilder(BuildChatTab)},
+        {name = "Tooltip",            builder = WrapBuilder(BuildTooltipTab)},
+        {name = "Character Pane",     builder = WrapBuilder(BuildCharacterPaneTab)},
+        {name = "Skyriding",          builder = WrapBuilder(BuildSkyridingTab)},
+    }
 end
 
 ---------------------------------------------------------------------------
--- PAGE: Autohide & Skinning (with sub-tabs)
+-- PAGE BUILDERS: Autohide & Skinning
 ---------------------------------------------------------------------------
-local function CreateAutohidesPage(parent)
-    local scroll, content = CreateScrollableContent(parent)
+local function CreateAutohideBuilders()
     local db = GetDB()
 
     -- Build Autohide sub-tab
@@ -3255,7 +3411,7 @@ local function CreateAutohidesPage(parent)
             local rcResetBtn = GUI:CreateButton(tabContent, "Reset Position", 140, 28, function()
                 if _G.SuaviUI_ResetReadyCheckPosition then
                     _G.SuaviUI_ResetReadyCheckPosition()
-                    print("|cFF56D1FF[SUI]|r Ready Check position reset to default.")
+                    print("|cFFFF6AC1[SUI]|r Ready Check position reset to default.")
                 end
             end)
             rcResetBtn:SetPoint("LEFT", rcMoveBtn, "RIGHT", 10, 0)
@@ -3977,23 +4133,16 @@ local function CreateAutohidesPage(parent)
         tabContent:SetHeight(math.abs(y) + 50)
     end
 
-    -- Create sub-tabs
-    local subTabs = GUI:CreateSubTabs(content, {
-        {name = "Autohide", builder = BuildAutohideTab},
-        {name = "Skinning", builder = BuildSkinningTab},
-    })
-    subTabs:SetPoint("TOPLEFT", 5, -5)
-    subTabs:SetPoint("TOPRIGHT", -5, -5)
-    subTabs:SetHeight(600)
-
-    content:SetHeight(650)
+    return {
+        {name = "Autohide", builder = WrapBuilder(BuildAutohideTab)},
+        {name = "Skinning", builder = WrapBuilder(BuildSkinningTab)},
+    }
 end
 
 ---------------------------------------------------------------------------
--- PAGE: Minimap & Datatext (with sub-tabs like old GUI)
+-- PAGE BUILDERS: Minimap & Datatext
 ---------------------------------------------------------------------------
-local function CreateMinimapPage(parent)
-    local scroll, content = CreateScrollableContent(parent)
+local function CreateMinimapBuilders()
     local db = GetDB()
     
     -- Build Minimap sub-tab
@@ -4796,16 +4945,10 @@ local function CreateMinimapPage(parent)
         tabContent:SetHeight(math.abs(y) + 50)
     end
     
-    -- Create sub-tabs
-    local subTabs = GUI:CreateSubTabs(content, {
-        {name = "Minimap", builder = BuildMinimapTab},
-        {name = "Datatext", builder = BuildDatatextTab},
-    })
-    subTabs:SetPoint("TOPLEFT", 5, -5)
-    subTabs:SetPoint("TOPRIGHT", -5, -5)
-    subTabs:SetHeight(700)
-    
-    content:SetHeight(750)
+    return {
+        {name = "Minimap",  builder = WrapBuilder(BuildMinimapTab)},
+        {name = "Datatext", builder = WrapBuilder(BuildDatatextTab)},
+    }
 end
 
 ---------------------------------------------------------------------------
@@ -7974,8 +8117,7 @@ end
 ---------------------------------------------------------------------------
 -- PAGE: UnitFrames (New Implementation with suiUnitFrames database)
 ---------------------------------------------------------------------------
-local function CreateUnitFramesPage(parent)
-    local scroll, content = CreateScrollableContent(parent)
+local function CreateUnitFrameBuilders()
     local db = GetDB()
     
     -- Get the new unit frames database
@@ -9134,21 +9276,15 @@ local function CreateUnitFramesPage(parent)
         tabContent:SetHeight(math.abs(y) + 30)
     end
 
-    -- Create sub-tabs
-    local subTabs = GUI:CreateSubTabs(content, {
-        {name = "General", builder = BuildGeneralTab},
-        {name = "Player", builder = function(c) BuildUnitTab(c, "player") end},
-        {name = "Target", builder = function(c) BuildUnitTab(c, "target") end},
-        {name = "ToT", builder = function(c) BuildUnitTab(c, "targettarget") end},
-        {name = "Pet", builder = function(c) BuildUnitTab(c, "pet") end},
-        {name = "Focus", builder = function(c) BuildUnitTab(c, "focus") end},
-        {name = "Boss", builder = function(c) BuildUnitTab(c, "boss") end},
-    })
-    subTabs:SetPoint("TOPLEFT", 5, -5)
-    subTabs:SetPoint("TOPRIGHT", -5, -5)
-    subTabs:SetHeight(600)
-    
-    content:SetHeight(650)
+    return {
+        {name = "General", builder = WrapBuilder(BuildGeneralTab)},
+        {name = "Player",  builder = WrapBuilder(function(c) BuildUnitTab(c, "player") end)},
+        {name = "Target",  builder = WrapBuilder(function(c) BuildUnitTab(c, "target") end)},
+        {name = "ToT",     builder = WrapBuilder(function(c) BuildUnitTab(c, "targettarget") end)},
+        {name = "Pet",     builder = WrapBuilder(function(c) BuildUnitTab(c, "pet") end)},
+        {name = "Focus",   builder = WrapBuilder(function(c) BuildUnitTab(c, "focus") end)},
+        {name = "Boss",    builder = WrapBuilder(function(c) BuildUnitTab(c, "boss") end)},
+    }
 end
 
 ---------------------------------------------------------------------------
@@ -9158,16 +9294,22 @@ end
 ---------------------------------------------------------------------------
 -- PAGE: Action Bars
 ---------------------------------------------------------------------------
-local function CreateActionBarsPage(parent)
-    local scroll, content = CreateScrollableContent(parent)
+local function CreateActionBarBuilders()
     local db = GetDB()
 
     -- Safety check
     if not db or not db.actionBars then
-        local errorLabel = GUI:CreateLabel(content, "Action Bars settings not available. Please reload UI.", 12, C.text)
-        errorLabel:SetPoint("TOPLEFT", PADDING, -15)
-        content:SetHeight(100)
-        return scroll, content
+        local errorBuilder = WrapBuilder(function(tabContent)
+            local errorLabel = GUI:CreateLabel(tabContent, "Action Bars settings not available. Please reload UI.", 12, C.text)
+            errorLabel:SetPoint("TOPLEFT", PADDING, -15)
+            tabContent:SetHeight(100)
+        end)
+        return {
+            {name = "Master Settings",   builder = errorBuilder},
+            {name = "Mouseover Hide",    builder = errorBuilder},
+            {name = "Per-Bar Overrides", builder = errorBuilder},
+            {name = "Extra Buttons",     builder = errorBuilder},
+        }
     end
 
     local actionBars = db.actionBars
@@ -9335,7 +9477,7 @@ local function CreateActionBarsPage(parent)
                     SetCVar("lockActionBars", "1")
                     SetModifiedClick("PICKUPACTION", queued)
                     SaveBindings(GetCurrentBindingSet())
-                    print("|cFF56D1FFSuaviUI|r: Action button lock modifier applied after combat.")
+                    print("|cFFFF6AC1SuaviUI|r: Action button lock modifier applied after combat.")
                 end
             end)
             _G.SuaviUI_ActionBarLockQueueFrame = lockQueueFrame
@@ -9368,7 +9510,7 @@ local function CreateActionBarsPage(parent)
                         if InCombatLockdown and InCombatLockdown() then
                             _G.SuaviUI_ActionBarLockQueuedModifier = modifier
                             SetCVar("lockActionBars", "1")
-                            print("|cFF56D1FFSuaviUI|r: Action button lock modifier queued; will apply after combat.")
+                            print("|cFFFF6AC1SuaviUI|r: Action button lock modifier queued; will apply after combat.")
                             return
                         end
                         SetCVar("lockActionBars", "1")
@@ -10022,21 +10164,12 @@ local function CreateActionBarsPage(parent)
         tabContent:SetHeight(math.abs(y) + 50)
     end  -- End BuildExtraButtonsTab
 
-    ---------------------------------------------------------
-    -- Create Sub-Tabs
-    ---------------------------------------------------------
-    local subTabs = GUI:CreateSubTabs(content, {
-        {name = "Master Settings", builder = BuildMasterSettingsTab},
-        {name = "Mouseover Hide", builder = BuildMouseoverHideTab},
-        {name = "Per-Bar Overrides", builder = BuildPerBarOverridesTab},
-        {name = "Extra Buttons", builder = BuildExtraButtonsTab},
-    })
-    subTabs:SetPoint("TOPLEFT", 5, -5)
-    subTabs:SetPoint("TOPRIGHT", -5, -5)
-    subTabs:SetHeight(700)
-
-    content:SetHeight(750)
-    return scroll, content
+    return {
+        {name = "Master Settings",   builder = WrapBuilder(BuildMasterSettingsTab)},
+        {name = "Mouseover Hide",    builder = WrapBuilder(BuildMouseoverHideTab)},
+        {name = "Per-Bar Overrides", builder = WrapBuilder(BuildPerBarOverridesTab)},
+        {name = "Extra Buttons",     builder = WrapBuilder(BuildExtraButtonsTab)},
+    }
 end
 
 ---------------------------------------------------------------------------
@@ -11019,20 +11152,13 @@ local function BuildProfileManagementTab(tabContent)
 end
 
 ---------------------------------------------------------------------------
--- PAGE: Spec Profiles (with subtabs for Profile Management and Import/Export)
+-- PAGE BUILDERS: Spec Profiles
 ---------------------------------------------------------------------------
-local function CreateSpecProfilesPage(parent)
-    local scroll, content = CreateScrollableContent(parent)
-
-    local subTabs = GUI:CreateSubTabs(content, {
-        {name = "Profile Management", builder = BuildProfileManagementTab},
-        {name = "Import/Export", builder = BuildImportExportTab},
-    })
-    subTabs:SetPoint("TOPLEFT", 5, -5)
-    subTabs:SetPoint("TOPRIGHT", -5, -5)
-    subTabs:SetHeight(550)
-
-    content:SetHeight(600)
+local function CreateProfileBuilders()
+    return {
+        {name = "Profile Management", builder = WrapBuilder(BuildProfileManagementTab)},
+        {name = "Import/Export",      builder = WrapBuilder(BuildImportExportTab)},
+    }
 end
 
 ---------------------------------------------------------------------------
@@ -11547,33 +11673,54 @@ local function CreateHUDLayeringPage(parent)
 end
 
 ---------------------------------------------------------------------------
--- INITIALIZE OPTIONS - Main tabs
+-- INITIALIZE OPTIONS - Sidebar Navigation
 ---------------------------------------------------------------------------
 function GUI:InitializeOptions()
     local frame = self:CreateMainFrame()
 
-    -- Row 1: Core UI Elements
-    GUI:AddTab(frame, "General", CreateGeneralQoLPage)
-    GUI:AddTab(frame, "Unit Frames", CreateUnitFramesPage)
-    GUI:AddTab(frame, "Minimap", CreateMinimapPage)
-    GUI:AddTab(frame, "Action Bars", CreateActionBarsPage)
-    GUI:AddTab(frame, "Autohide", CreateAutohidesPage)
+    -- Helper: register a group of builders under a category
+    local function RegisterBuilders(catName, builders)
+        GUI:AddCategory(frame, catName)
+        for _, page in ipairs(builders) do
+            GUI:AddPage(frame, catName, page.name, page.builder)
+        end
+    end
 
-    -- Row 2: Cooldown System (CDM removed - see CDM_SETTINGS_REFERENCE.md)
-    GUI:AddTab(frame, "Effects", CreateCDEffectsPage)
-    GUI:AddTab(frame, "CDM Settings", CreateCooldownViewersPage)
-    GUI:AddTab(frame, "Keybinds", CreateCDKeybindsPage)
-    GUI:AddTab(frame, "Custom Trackers", CreateCustomTrackersPage)
+    -- General & QoL (8 sub-pages)
+    RegisterBuilders("General", CreateGeneralQoLBuilders())
 
-    -- Row 3: Utilities + Action Buttons
-    GUI:AddTab(frame, "HUD Layers", CreateHUDLayeringPage)
-    GUI:AddTab(frame, "Profiles", CreateSpecProfilesPage)
-    GUI:AddTab(frame, "Search", CreateSearchPage)
-    GUI._searchTabIndex = #frame.tabs  -- Store Search tab index for ForceLoadAllTabs trigger
-    GUI:AddTab(frame, "Credits", CreateCreditsPage)
+    -- Cooldowns
+    GUI:AddCategory(frame, "Cooldowns")
+    GUI:AddPage(frame, "Cooldowns", "CDM Settings", CreateCooldownViewersPage)
+    GUI:AddPage(frame, "Cooldowns", "Effects & Glows", CreateCDEffectsPage)
+    GUI:AddPage(frame, "Cooldowns", "Keybinds & Rotation", CreateCDKeybindsPage)
 
-    -- Mark that all tabs have been added (for search indexing)
-    GUI._allTabsAdded = true
+    -- Custom Trackers (keeps internal sub-tabs — dynamic content)
+    GUI:AddCategory(frame, "Custom Trackers")
+    GUI:AddPage(frame, "Custom Trackers", "Custom Trackers", CreateCustomTrackersPage)
+
+    -- Unit Frames (7 sub-pages)
+    RegisterBuilders("Unit Frames", CreateUnitFrameBuilders())
+
+    -- Action Bars (4 sub-pages)
+    RegisterBuilders("Action Bars", CreateActionBarBuilders())
+
+    -- Minimap (2 sub-pages)
+    RegisterBuilders("Minimap", CreateMinimapBuilders())
+
+    -- Visibility
+    RegisterBuilders("Visibility", CreateAutohideBuilders())
+    GUI:AddPage(frame, "Visibility", "HUD Layers", CreateHUDLayeringPage)
+
+    -- Profiles (2 sub-pages)
+    RegisterBuilders("Profiles", CreateProfileBuilders())
+
+    -- Credits (standalone leaf)
+    GUI:AddCategory(frame, "Credits")
+    GUI:AddPage(frame, "Credits", "Credits", CreateCreditsPage)
+
+    -- Finalize sidebar (render nav + select first page)
+    GUI:FinalizeSidebar(frame)
 
     return frame
 end

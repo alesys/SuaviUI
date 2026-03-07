@@ -2198,16 +2198,16 @@ SlashCmdList["SUIUFEDITMODE"] = function(msg)
     
     if cmd == "register" then
         UF_EditMode:RegisterAllFrames()
-        print("|cFF56D1FFSuaviUI|r: Unit frames registered with Edit Mode")
+        print("|cFFFF6AC1SuaviUI|r: Unit frames registered with Edit Mode")
     elseif cmd == "status" then
-        print("|cFF56D1FFSuaviUI|r: Unit Frames Edit Mode Status")
+        print("|cFFFF6AC1SuaviUI|r: Unit Frames Edit Mode Status")
         print("  LibEQOLEditMode: " .. (LEM and "Loaded" or "NOT LOADED"))
         print("  Registered frames:")
         for unitKey, frame in pairs(UF_EditMode.registeredFrames) do
             print("    - " .. unitKey .. ": " .. (frame:GetName() or "unnamed"))
         end
     else
-        print("|cFF56D1FFSuaviUI|r: Unit Frames Edit Mode Commands:")
+        print("|cFFFF6AC1SuaviUI|r: Unit Frames Edit Mode Commands:")
         print("  /suiufeditmode register - Manually register all unit frames")
         print("  /suiufeditmode status - Show registration status")
     end
@@ -2218,7 +2218,7 @@ SLASH_SUIEMDEBUG1 = "/suiemdebug"
 SlashCmdList["SUIEMDEBUG"] = function(msg)
     local isEditModeShown = EditModeManagerFrame and EditModeManagerFrame:IsShown()
     local isLemEdit = (LEM and LEM.IsInEditMode) and LEM:IsInEditMode() or false
-    print(string.format("|cFF56D1FFSuaviUI|r EditMode: managerShown=%s lemIsEditing=%s", tostring(isEditModeShown), tostring(isLemEdit)))
+    print(string.format("|cFFFF6AC1SuaviUI|r EditMode: managerShown=%s lemIsEditing=%s", tostring(isEditModeShown), tostring(isLemEdit)))
 
     local total = 0
     for unitKey, frame in pairs(UF_EditMode.registeredFrames) do
