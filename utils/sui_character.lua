@@ -2497,80 +2497,74 @@ end
 ---------------------------------------------------------------------------
 local flyoutHooked = false
 
--- Build the ITEM_LEVEL tooltip-match pattern once
-local function GetIlvlPattern()
-    if ITEM_LEVEL then
-        return ITEM_LEVEL:gsub("%%d", "(%%d+)")
-    end
-    return "Item Level (%d+)"
-end
+local function GetFlyoutButtonIlvl(button)
+    local location = button.location
+    if not location then return nil end
+    -- Skip special action buttons (Ignore Slot, Place in Bags, Unignore Slot)
+    if location >= 0xFFFFFFFD then return nil end
 
-local function GetFlyoutItemLevel(location)
-    -- Packed location: high byte = bag index, low byte = bag slot
-    -- (matching ITEM_INVENTORY_BAG_BIT_OFFSET = 8)
+    -- Decode packed location: high byte = bag, low byte = slot
+    -- Defined by ITEM_INVENTORY_BAG_BIT_OFFSET = 8 in Blizzard source
     local bag  = math.floor(location / 256)
     local slot = location % 256
     if slot <= 0 then return nil end
 
-    -- Use C_TooltipInfo (same authoritative source as slot overlays)
-    if C_TooltipInfo and C_TooltipInfo.GetBagItem then
-        local tooltipData = C_TooltipInfo.GetBagItem(bag, slot)
-        if tooltipData and tooltipData.lines then
-            local pattern = GetIlvlPattern()
-            for _, line in ipairs(tooltipData.lines) do
-                local text = line.leftText or ""
-                local ilvl = tonumber(text:match(pattern))
-                if ilvl then return ilvl end
-            end
-        end
-    end
+    -- GetContainerItemInfo returns a table including .hyperlink in TWW
+    local info = C_Container and C_Container.GetContainerItemInfo and
+                 C_Container.GetContainerItemInfo(bag, slot)
+    local link = (info and info.hyperlink) or
+                 (C_Container and C_Container.GetContainerItemLink and
+                  C_Container.GetContainerItemLink(bag, slot))
+    if not link then return nil end
 
-    -- Fallback: item link → C_Item.GetItemInfo (returns base ilvl, may be nil if uncached)
-    if C_Container and C_Container.GetContainerItemLink then
-        local link = C_Container.GetContainerItemLink(bag, slot)
-        if link and C_Item and C_Item.GetItemInfo then
-            local _, _, _, ilvl = C_Item.GetItemInfo(link)
-            if ilvl and ilvl > 0 then return ilvl end
-        end
-    end
+    -- GetItemInfo(link) pos 4 = effective ilvl (bonus IDs from link are considered)
+    local _, _, _, ilvl = GetItemInfo(link)
+    if ilvl and ilvl > 0 then return ilvl end
 
     return nil
 end
 
+local function UpdateFlyoutIlvls()
+    local flyout = EquipmentFlyoutFrame
+    if not flyout or not flyout:IsShown() then return end
+    local buttons = flyout.buttons
+    if not buttons then return end
+
+    local fontPath = GetGlobalFont()
+
+    for _, button in ipairs(buttons) do
+        if button:IsShown() then
+            -- Create the FontString once per button
+            if not button._suiIlvlText then
+                local fs = button:CreateFontString(nil, "OVERLAY")
+                fs:SetFont(fontPath, 10, "OUTLINE")
+                fs:SetTextColor(1, 1, 1, 1)
+                fs:SetJustifyH("CENTER")
+                fs:SetPoint("BOTTOM", button, "BOTTOM", 0, 1)
+                fs:SetWordWrap(false)
+                button._suiIlvlText = fs
+            end
+
+            local ilvl = GetFlyoutButtonIlvl(button)
+            if ilvl then
+                button._suiIlvlText:SetText(tostring(ilvl))
+                button._suiIlvlText:Show()
+            else
+                button._suiIlvlText:SetText("")
+                button._suiIlvlText:Hide()
+            end
+        end
+    end
+end
+
 local function HookEquipmentFlyout()
     if flyoutHooked then return end
-    if not EquipmentFlyout_DisplayButton then return end
+    if not EquipmentFlyoutFrame then return end
     flyoutHooked = true
 
-    hooksecurefunc("EquipmentFlyout_DisplayButton", function(button)
-        -- Skip special action buttons (Ignore Slot / Place in Bags / etc.)
-        local location = button.location
-        if not location then return end
-        if location >= (EQUIPMENTFLYOUT_FIRST_SPECIAL_LOCATION or 0xFFFFFFFD) then
-            if button._suiIlvlText then button._suiIlvlText:Hide() end
-            return
-        end
-
-        -- Create the FontString overlay once per button
-        if not button._suiIlvlText then
-            local fontPath = GetGlobalFont()
-            local fs = button:CreateFontString(nil, "OVERLAY")
-            fs:SetFont(fontPath, 10, "OUTLINE")
-            fs:SetTextColor(1, 1, 1, 1)
-            -- Anchor to bottom-center of the icon, inside its bounds
-            fs:SetPoint("BOTTOM", button, "BOTTOM", 0, 1)
-            fs:SetWordWrap(false)
-            button._suiIlvlText = fs
-        end
-
-        local ilvl = GetFlyoutItemLevel(location)
-        if ilvl and ilvl > 0 then
-            button._suiIlvlText:SetText(tostring(ilvl))
-            button._suiIlvlText:Show()
-        else
-            button._suiIlvlText:SetText("")
-            button._suiIlvlText:Hide()
-        end
+    -- Hook UpdateItems (called on show AND on bag/inventory updates while open)
+    hooksecurefunc("EquipmentFlyout_UpdateItems", function()
+        C_Timer.After(0, UpdateFlyoutIlvls)
     end)
 end
 
