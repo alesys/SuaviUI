@@ -2497,20 +2497,43 @@ end
 ---------------------------------------------------------------------------
 local flyoutHooked = false
 
+-- Build the ITEM_LEVEL tooltip-match pattern once
+local function GetIlvlPattern()
+    if ITEM_LEVEL then
+        return ITEM_LEVEL:gsub("%%d", "(%%d+)")
+    end
+    return "Item Level (%d+)"
+end
+
 local function GetFlyoutItemLevel(location)
-    -- Decode bag + slot from the packed location value (location = bag*256 + slot)
+    -- Packed location: high byte = bag index, low byte = bag slot
+    -- (matching ITEM_INVENTORY_BAG_BIT_OFFSET = 8)
     local bag  = math.floor(location / 256)
     local slot = location % 256
     if slot <= 0 then return nil end
 
-    local link = C_Container and C_Container.GetContainerItemLink(bag, slot)
-    if not link then return nil end
-
-    -- C_Item.GetItemInfo position 4 is base ilvl; good enough for bag items
-    if C_Item and C_Item.GetItemInfo then
-        local _, _, _, ilvl = C_Item.GetItemInfo(link)
-        if ilvl and ilvl > 0 then return ilvl end
+    -- Use C_TooltipInfo (same authoritative source as slot overlays)
+    if C_TooltipInfo and C_TooltipInfo.GetBagItem then
+        local tooltipData = C_TooltipInfo.GetBagItem(bag, slot)
+        if tooltipData and tooltipData.lines then
+            local pattern = GetIlvlPattern()
+            for _, line in ipairs(tooltipData.lines) do
+                local text = line.leftText or ""
+                local ilvl = tonumber(text:match(pattern))
+                if ilvl then return ilvl end
+            end
+        end
     end
+
+    -- Fallback: item link → C_Item.GetItemInfo (returns base ilvl, may be nil if uncached)
+    if C_Container and C_Container.GetContainerItemLink then
+        local link = C_Container.GetContainerItemLink(bag, slot)
+        if link and C_Item and C_Item.GetItemInfo then
+            local _, _, _, ilvl = C_Item.GetItemInfo(link)
+            if ilvl and ilvl > 0 then return ilvl end
+        end
+    end
+
     return nil
 end
 
@@ -2530,18 +2553,19 @@ local function HookEquipmentFlyout()
 
         -- Create the FontString overlay once per button
         if not button._suiIlvlText then
-            local fontPath = (GetGlobalFont and GetGlobalFont()) or "Fonts\\FRIZQT__.TTF"
+            local fontPath = GetGlobalFont()
             local fs = button:CreateFontString(nil, "OVERLAY")
-            fs:SetFont(fontPath, 9, "OUTLINE")
+            fs:SetFont(fontPath, 10, "OUTLINE")
             fs:SetTextColor(1, 1, 1, 1)
-            fs:SetPoint("BOTTOM", button, "BOTTOM", 0, 2)
+            -- Anchor to bottom-center of the icon, inside its bounds
+            fs:SetPoint("BOTTOM", button, "BOTTOM", 0, 1)
             fs:SetWordWrap(false)
             button._suiIlvlText = fs
         end
 
         local ilvl = GetFlyoutItemLevel(location)
         if ilvl and ilvl > 0 then
-            button._suiIlvlText:SetText(ilvl)
+            button._suiIlvlText:SetText(tostring(ilvl))
             button._suiIlvlText:Show()
         else
             button._suiIlvlText:SetText("")
