@@ -2491,6 +2491,66 @@ local function CreateTitlesPopup()
 end
 
 ---------------------------------------------------------------------------
+-- Equipment Flyout Item Level Overlay
+-- Adds ilvl numbers to the Alt-hover flyout bar shown when hovering a
+-- character slot while holding Alt (Blizzard's EquipmentFlyoutFrame).
+---------------------------------------------------------------------------
+local flyoutHooked = false
+
+local function GetFlyoutItemLevel(location)
+    -- Decode bag + slot from the packed location value (location = bag*256 + slot)
+    local bag  = math.floor(location / 256)
+    local slot = location % 256
+    if slot <= 0 then return nil end
+
+    local link = C_Container and C_Container.GetContainerItemLink(bag, slot)
+    if not link then return nil end
+
+    -- C_Item.GetItemInfo position 4 is base ilvl; good enough for bag items
+    if C_Item and C_Item.GetItemInfo then
+        local _, _, _, ilvl = C_Item.GetItemInfo(link)
+        if ilvl and ilvl > 0 then return ilvl end
+    end
+    return nil
+end
+
+local function HookEquipmentFlyout()
+    if flyoutHooked then return end
+    if not EquipmentFlyout_DisplayButton then return end
+    flyoutHooked = true
+
+    hooksecurefunc("EquipmentFlyout_DisplayButton", function(button)
+        -- Skip special action buttons (Ignore Slot / Place in Bags / etc.)
+        local location = button.location
+        if not location then return end
+        if location >= (EQUIPMENTFLYOUT_FIRST_SPECIAL_LOCATION or 0xFFFFFFFD) then
+            if button._suiIlvlText then button._suiIlvlText:Hide() end
+            return
+        end
+
+        -- Create the FontString overlay once per button
+        if not button._suiIlvlText then
+            local fontPath = (GetGlobalFont and GetGlobalFont()) or "Fonts\\FRIZQT__.TTF"
+            local fs = button:CreateFontString(nil, "OVERLAY")
+            fs:SetFont(fontPath, 9, "OUTLINE")
+            fs:SetTextColor(1, 1, 1, 1)
+            fs:SetPoint("BOTTOM", button, "BOTTOM", 0, 2)
+            fs:SetWordWrap(false)
+            button._suiIlvlText = fs
+        end
+
+        local ilvl = GetFlyoutItemLevel(location)
+        if ilvl and ilvl > 0 then
+            button._suiIlvlText:SetText(ilvl)
+            button._suiIlvlText:Show()
+        else
+            button._suiIlvlText:SetText("")
+            button._suiIlvlText:Hide()
+        end
+    end)
+end
+
+---------------------------------------------------------------------------
 -- Hook character frame
 ---------------------------------------------------------------------------
 local characterFrameHooked = false  -- Prevent duplicate hook registration
@@ -2499,6 +2559,9 @@ local function HookCharacterFrame()
     if not CharacterFrame then return end
     if characterFrameHooked then return end
     characterFrameHooked = true
+
+    -- Hook equipment flyout ilvl overlays (Alt-hover bar on character slots)
+    HookEquipmentFlyout()
 
     -- Initialize when character frame first shows
     CharacterFrame:HookScript("OnShow", function()
