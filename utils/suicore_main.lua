@@ -765,6 +765,7 @@ local defaults = {
             statsTextColor = {1, 1, 1, 1},  -- Stats text color (white)
             ilvlTextSize = 8,               -- Item level text size in pixels (8 - 16)
             headerTextSize = 16,            -- Header text size in pixels (10 - 18)
+            showTooltips = false,           -- Show stat tooltips on hover
             secondaryStatFormat = "both",   -- Secondary stat format: "percent", "rating", "both"
             compactStats = true,            -- Compact stats mode (reduced spacing)
             headerClassColor = true,        -- Use class color for headers (default on)

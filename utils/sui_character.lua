@@ -485,6 +485,14 @@ local function CreateSlotOverlay(slotFrame, slotInfo, unit)
     local TEXT_WIDTH = math.floor(140 * scale)
     local FONT_FLAGS = "OUTLINE"  -- Thin black outline for readability
 
+    -- Icon ilvl (small number inside slot icon, top-left corner)
+    overlay.iconIlvl = overlay:CreateFontString(nil, "OVERLAY")
+    overlay.iconIlvl:SetFont(slotFont, 10, "OUTLINE")
+    overlay.iconIlvl:SetTextColor(1, 1, 1, 1)
+    overlay.iconIlvl:SetJustifyH("LEFT")
+    overlay.iconIlvl:SetPoint("TOPLEFT", overlay, "TOPLEFT", 2, -2)
+    overlay.iconIlvl:SetWordWrap(false)
+
     -- Line 1: Item Name
     overlay.itemName = overlay:CreateFontString(nil, "OVERLAY")
     overlay.itemName:SetFont(slotFont, slotTextSize, FONT_FLAGS)
@@ -691,29 +699,30 @@ local function UpdateSlotOverlay(overlay, unit)
                     math.floor(trackColor[1] * 255),
                     math.floor(trackColor[2] * 255),
                     math.floor(trackColor[3] * 255))
-                -- Mirror format based on column side
-                -- Text on right side of slot = ilvl (Track)
-                -- Text on left side of slot = (Track) ilvl
-                local slotSide = overlay.slotInfo and overlay.slotInfo.side
-                local slotId = overlay.slotInfo and overlay.slotInfo.id
-                if slotSide == "right" or slotId == INVSLOT_MAINHAND then
-                    -- Right column & MainHand (text on left): (Track) ilvl
-                    ilvlText = string.format("|cff%s(%s %s/%s)|r %d", trackHex, track, current, max, itemLevel)
-                else
-                    -- Left column & SecondaryHand (text on right): ilvl (Track)
-                    ilvlText = string.format("%d |cff%s(%s %s/%s)|r", itemLevel, trackHex, track, current, max)
-                end
+                -- Show only upgrade track (ilvl is now inside the icon)
+                ilvlText = string.format("|cff%s(%s %s/%s)|r", trackHex, track, current, max)
             else
-                ilvlText = tostring(itemLevel)
+                ilvlText = nil
             end
-            overlay.itemLevel:SetText(ilvlText)
-            overlay.itemLevel:SetTextColor(1, 1, 1, 1)  -- Always white base
-            overlay.itemLevel:Show()
+            if ilvlText then
+                overlay.itemLevel:SetText(ilvlText)
+                overlay.itemLevel:SetTextColor(1, 1, 1, 1)
+                overlay.itemLevel:Show()
+            else
+                overlay.itemLevel:Hide()
+            end
+            -- Icon ilvl (inside slot)
+            if overlay.iconIlvl then
+                overlay.iconIlvl:SetText(tostring(itemLevel))
+                overlay.iconIlvl:Show()
+            end
         else
             overlay.itemLevel:Hide()
+            if overlay.iconIlvl then overlay.iconIlvl:Hide() end
         end
     else
         overlay.itemLevel:Hide()
+        if overlay.iconIlvl then overlay.iconIlvl:Hide() end
     end
 
     -- Update enchant text (shows actual enchant name)
@@ -1642,16 +1651,10 @@ local function CreateStatRow(parent, yOffset)
     row:SetSize(parent:GetWidth() - 10, rowHeight)
     row:SetPoint("TOPLEFT", 5, yOffset)
 
-    -- Enable mouse for tooltips (only if setting is enabled)
-    if settings.showTooltips then
-        row:EnableMouse(true)
-        row:SetScript("OnEnter", ShowStatTooltip)
-        row:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    else
-        row:EnableMouse(false)
-        row:SetScript("OnEnter", nil)
-        row:SetScript("OnLeave", nil)
-    end
+    -- Always enable mouse — ShowStatTooltip checks the setting at hover time
+    row:EnableMouse(true)
+    row:SetScript("OnEnter", ShowStatTooltip)
+    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     row.label = row:CreateFontString(nil, "OVERLAY")
     row.label:SetFont(font, fontSize, "")
@@ -1738,16 +1741,10 @@ local function CreateStatBar(parent, yOffset, color)
     row:SetSize(parent:GetWidth() - 10, rowHeight)
     row:SetPoint("TOPLEFT", 5, yOffset)
 
-    -- Enable mouse for tooltips (only if setting is enabled)
-    if settings.showTooltips then
-        row:EnableMouse(true)
-        row:SetScript("OnEnter", ShowStatTooltip)
-        row:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    else
-        row:EnableMouse(false)
-        row:SetScript("OnEnter", nil)
-        row:SetScript("OnLeave", nil)
-    end
+    -- Always enable mouse — ShowStatTooltip checks the setting at hover time
+    row:EnableMouse(true)
+    row:SetScript("OnEnter", ShowStatTooltip)
+    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     row.label = row:CreateFontString(nil, "OVERLAY")
     row.label:SetFont(font, barTextSize, "")
@@ -2500,25 +2497,33 @@ local flyoutHooked = false
 local function GetFlyoutButtonIlvl(button)
     local location = button.location
     if not location then return nil end
-    -- Skip special action buttons (Ignore Slot, Place in Bags, Unignore Slot)
-    if location >= 0xFFFFFFFD then return nil end
 
-    -- Decode packed location: high byte = bag, low byte = slot
-    -- Defined by ITEM_INVENTORY_BAG_BIT_OFFSET = 8 in Blizzard source
-    local bag  = math.floor(location / 256)
-    local slot = location % 256
-    if slot <= 0 then return nil end
+    local link
+    -- ItemLocation path (useItemLocation flyouts — location is a userdata/table)
+    if type(location) ~= "number" then
+        if C_Item and C_Item.GetItemLink then
+            local ok, result = pcall(C_Item.GetItemLink, location)
+            link = ok and result
+        end
+    else
+        -- Skip special action buttons (Ignore Slot, Place in Bags, Unignore Slot)
+        if location >= (EQUIPMENTFLYOUT_FIRST_SPECIAL_LOCATION or 0xFFFFFFFD) then return nil end
 
-    -- GetContainerItemInfo returns a table including .hyperlink in TWW
-    local info = C_Container and C_Container.GetContainerItemInfo and
-                 C_Container.GetContainerItemInfo(bag, slot)
-    local link = (info and info.hyperlink) or
-                 (C_Container and C_Container.GetContainerItemLink and
-                  C_Container.GetContainerItemLink(bag, slot))
+        -- Use Blizzard's own decoder for the packed location bit flags
+        local locData = EquipmentManager_GetLocationData and EquipmentManager_GetLocationData(location)
+        if not locData then return nil end
+
+        if locData.isBags and locData.bag and locData.slot then
+            link = C_Container.GetContainerItemLink(locData.bag, locData.slot)
+        elseif (locData.isPlayer or locData.isBank) and locData.slot then
+            link = GetInventoryItemLink("player", locData.slot)
+        end
+    end
+
     if not link then return nil end
 
-    -- GetItemInfo(link) pos 4 = effective ilvl (bonus IDs from link are considered)
-    local _, _, _, ilvl = GetItemInfo(link)
+    -- GetDetailedItemLevelInfo returns effective ilvl (considers upgrades, bonus IDs)
+    local ilvl = GetDetailedItemLevelInfo(link)
     if ilvl and ilvl > 0 then return ilvl end
 
     return nil
@@ -2539,8 +2544,8 @@ local function UpdateFlyoutIlvls()
                 local fs = button:CreateFontString(nil, "OVERLAY")
                 fs:SetFont(fontPath, 10, "OUTLINE")
                 fs:SetTextColor(1, 1, 1, 1)
-                fs:SetJustifyH("CENTER")
-                fs:SetPoint("BOTTOM", button, "BOTTOM", 0, 1)
+                fs:SetJustifyH("LEFT")
+                fs:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
                 fs:SetWordWrap(false)
                 button._suiIlvlText = fs
             end

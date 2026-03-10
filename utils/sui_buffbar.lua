@@ -778,12 +778,16 @@ local function SetViewerHidden(hide)
     if not viewer then return end
     if hide then
         pcall(function() viewer:SetAlpha(0) end)
-        pcall(function() viewer:EnableMouse(false) end)
+        if not InCombatLockdown() then
+            pcall(function() viewer:EnableMouse(false) end)
+        end
     else
         pcall(function() viewer:SetAlpha(1) end)
         -- Do NOT enable mouse here — that makes the viewer block camera-drag clicks
         -- when empty/invisible (Bug 2). Mouse is re-enabled explicitly in EditMode.Enter.
-        pcall(function() viewer:EnableMouse(false) end)
+        if not InCombatLockdown() then
+            pcall(function() viewer:EnableMouse(false) end)
+        end
     end
 end
 
@@ -1201,13 +1205,17 @@ local function SetIconViewerHidden(hide)
     if not viewer then return end
     if hide then
         pcall(function() viewer:SetAlpha(0) end)
-        pcall(function() viewer:EnableMouse(false) end)
+        if not InCombatLockdown() then
+            pcall(function() viewer:EnableMouse(false) end)
+        end
     else
         pcall(function() viewer:SetAlpha(1) end)
         -- Do NOT enable mouse here — that makes the viewer block camera-drag clicks
         -- when empty/invisible (Bug 2). BuffIconCooldownViewer Edit Mode interaction
         -- is handled by the Blizzard edit mode system (UIParentBottomManagedFrameTemplate).
-        pcall(function() viewer:EnableMouse(false) end)
+        if not InCombatLockdown() then
+            pcall(function() viewer:EnableMouse(false) end)
+        end
     end
 end
 

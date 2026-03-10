@@ -2197,6 +2197,7 @@ function GUI:CreateFormToggle(parent, label, dbKey, dbTable, onChange, registryI
     SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Option")
     text:SetPoint("LEFT", 0, 0); text:SetPoint("RIGHT", container, "LEFT", 210, 0)  -- Constrain label width to avoid overlap
+    text:SetJustifyH("LEFT")
 
     -- Toggle track (pill-shaped)
     local track = CreateFrame("Button", nil, container)
@@ -2314,6 +2315,7 @@ function GUI:CreateFormToggleInverted(parent, label, dbKey, dbTable, onChange)
     SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Option")
     text:SetPoint("LEFT", 0, 0); text:SetPoint("RIGHT", container, "LEFT", 210, 0)
+    text:SetJustifyH("LEFT")
 
     -- Toggle track (pill-shaped)
     local track = CreateFrame("Button", nil, container)
@@ -2413,6 +2415,7 @@ function GUI:CreateFormCheckboxOriginal(parent, label, dbKey, dbTable, onChange)
     SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Option")
     text:SetPoint("LEFT", 0, 0); text:SetPoint("RIGHT", container, "LEFT", 210, 0)  -- Constrain label width to avoid overlap
+    text:SetJustifyH("LEFT")
 
     -- Checkbox aligned with other widgets (starts at 180px from left)
     local box = CreateFrame("Button", nil, container, "BackdropTemplate")
@@ -2507,6 +2510,7 @@ function GUI:CreateFormSlider(parent, label, min, max, step, dbKey, dbTable, onC
     SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Setting")
     text:SetPoint("LEFT", 0, 0); text:SetPoint("RIGHT", container, "LEFT", 210, 0)  -- Constrain label width to avoid overlap
+    text:SetJustifyH("LEFT")
     container.label = text
 
     -- Track container (for the filled + unfilled portions)
@@ -2753,6 +2757,7 @@ function GUI:CreateFormDropdown(parent, label, options, dbKey, dbTable, onChange
     SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Setting")
     text:SetPoint("LEFT", 0, 0); text:SetPoint("RIGHT", container, "LEFT", 210, 0)  -- Constrain label width to avoid overlap
+    text:SetJustifyH("LEFT")
 
     -- Dropdown button (right side)
     local dropdown = CreateFrame("Button", nil, container, "BackdropTemplate")
@@ -3054,6 +3059,7 @@ function GUI:CreateFormDropdownWithTexturePreview(parent, label, dbKey, dbTable,
     text:SetText(label or "Texture")
     text:SetPoint("LEFT", 0, 0)
     text:SetPoint("RIGHT", container, "LEFT", 210, 0)
+    text:SetJustifyH("LEFT")
 
     -- Dropdown button (same style as CreateFormDropdown)
     local dropdown = CreateFrame("Button", nil, container, "BackdropTemplate")
@@ -3286,6 +3292,7 @@ function GUI:CreateFormColorPicker(parent, label, dbKey, dbTable, onChange, opti
     SetFont(text, L.font.normal, "", C.text)
     text:SetText(label or "Color")
     text:SetPoint("LEFT", 0, 0); text:SetPoint("RIGHT", container, "LEFT", 210, 0)  -- Constrain label width to avoid overlap
+    text:SetJustifyH("LEFT")
 
     -- Color swatch aligned with other widgets (starts at 180px from left)
     local swatch = CreateFrame("Button", nil, container, "BackdropTemplate")
