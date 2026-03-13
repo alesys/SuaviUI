@@ -1,5 +1,52 @@
 # SuaviUI Changelog
 
+## [v0.3.15](https://github.com/alesys/SuaviUI/releases/tag/v0.3.15) (2026-03-13)
+
+### Taint Fix Edition
+
+Eliminates CDM taint cascade caused by `HookScript` on CDM viewers, and fixes a `pcall` multi-return bug that left most tracked bars unskinned.
+
+- **CDM taint fix**: Replaced all `HookScript("OnUpdate/OnShow/OnSizeChanged")` on CDM viewers with `hooksecurefunc(viewer, "Layout", ...)` — taint-safe
+- **CDM taint fix**: Separate addon-owned polling frame for legacy skinning (50ms interval)
+- **CDM taint fix**: Restored `SetSize` with `InCombatLockdown()` + Edit Mode guards
+- **pcall multi-return bug**: `GetBuffBarFrames()` only captured first child from `pcall(GetChildren, viewer)` — all bars after the first were unskinned. Fixed in `sui_buffbar.lua`, `cooldownmanager.lua`, and `CooldownManagerCentered`
+- **Combat lockdown guards**: `EnableMouse`, `SetFrameLevel`, `SetFrameStrata`, `extraActionButton:Hide()` — all wrapped with `InCombatLockdown()` check
+- **Deferred combat actions**: `extraActionButton` hide uses pending table, processed on `PLAYER_REGEN_ENABLED`
+- **Release automation**: `dev/release.sh` script for one-command releases
+
+---
+
+## [v0.3.14](https://github.com/alesys/SuaviUI/releases/tag/v0.3.14) (2026-03-09)
+
+### Character Flyout Edition
+
+- Character flyout ilvl overlay: item level on Alt-hover equipment flyout buttons
+- Rewrote flyout ilvl lookup (hook `UpdateItems`, `GetContainerItemInfo` hyperlink) — no more cache misses
+- Buffbar combat taint fix: guard `EnableMouse` calls with `InCombatLockdown()`
+- GUI form widget labels: `SetJustifyH("LEFT")` across all widget types
+- Character stats: `showTooltips` default off
+
+---
+
+## [v0.3.13](https://github.com/alesys/SuaviUI/releases/tag/v0.3.13) (2026-03-06)
+
+### Edit Mode Settings Edition
+
+- Settings migrated from Options GUI to Edit Mode panels (CDM, Action Bars, Minimap, Unit Frames)
+- GUI builder pattern refactor (WrapBuilder, lazy page builders)
+- New Pill/Circle UI widgets, character panel accent pips and section backgrounds
+
+---
+
+## [v0.3.12](https://github.com/alesys/SuaviUI/releases/tag/v0.3.12) (2026-03-06)
+
+### Legacy Skinning Edition
+
+- Tracked bars: legacy path (`USE_CUSTOM_BARS=false`), skin Blizzard viewers in place
+- Tracked icons: legacy path (`USE_CUSTOM_ICONS=false`), remove ForcePopulate taint, show stack counts
+
+---
+
 ## [v0.3.11](https://github.com/alesys/SuaviUI/tree/v0.3.11) (2026-03-05)
 
 ### CDM Taint Elimination — Complete Frame-Field Purge (Sessions 4979–4995)

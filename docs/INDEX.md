@@ -17,8 +17,8 @@ Located in [`GUIDES/`](GUIDES/):
 - **CROSS_PROJECT_KNOWLEDGE_PLAYBOOK.md** - Portable debugging, taint-safety, Edit Mode, and release practices for reuse in other addons
 
 ### Debugging & Incident Records
-- **[CDM_TAINT_INVESTIGATION.md](CDM_TAINT_INVESTIGATION.md)** - Complete record of CDM "secret value" taint bugs (sessions 4891–4927): how WoW value-based taint works, every taint vector found and fixed, rules for safe CDM integration, and the Blizzard data pipeline explained. Read this before touching any code that interacts with `BuffBarCooldownViewer`, `BuffIconCooldownViewer`, or `CooldownViewerSettings`.
 - **[BUGSACKER_ANALYSIS_GUIDE.md](BUGSACKER_ANALYSIS_GUIDE.md)** - How to read BugGrabber/BugSack output and triage session errors.
+- **[ARCHIVE/CDM_TAINT_INVESTIGATION.md](ARCHIVE/CDM_TAINT_INVESTIGATION.md)** - Historical record of CDM taint bugs (sessions 4891–4927). Superseded by fixes in sessions 4979–5076 and by the taint rules in CLAUDE.md memory.
 
 ### Technical References
 Located in [`REFERENCES/`](REFERENCES/):
@@ -51,18 +51,16 @@ SuaviUI/
 │   ├── INDEX.md             (This file - documentation roadmap)
 │   ├── DEVELOPMENT_PRINCIPLES.md
 │   ├── RELEASE_PROCESS.md
-│   ├── KNOWLEDGE_WOW_EVENTS.md
-│   ├── LAYOUT_SYSTEM.md
-│   ├── LIBRARY_AUDIT.md
-│   ├── RESOURCE_BARS_AUDIT.md
-│   ├── SETTINGS_SAVE_SYSTEM.md
-│   ├── GUIDES/              (Implementation guides and strategies)
-│   ├── REFERENCES/          (Technical reference documents)
-│   └── ARCHIVE/             (Historical development documentation)
+│   ├── BUGSACKER_ANALYSIS_GUIDE.md
+│   ├── QUI_COMPARISON_ANALYSIS.md
+│   ├── GUIDES/              (Implementation guides)
+│   ├── REFERENCES/          (Technical references: events, layout, libraries, settings)
+│   └── ARCHIVE/             (Historical documentation)
 ├── dev/                     (Development files)
+│   ├── release.sh           (Automated release script)
 │   ├── DEBUG_*.lua          (Debug scripts)
 │   ├── TEST_*.lua           (Test scripts)
-│   ├── package.ps1          (PowerShell build script)
+│   ├── package.ps1          (PowerShell build script — legacy)
 │   ├── ACE3_UPDATE_REPORT.txt
 │   ├── sui_options_backup.lua
 │   └── error.log
@@ -79,7 +77,7 @@ SuaviUI/
 - **"How do I install SuaviUI?"** → [README.md](README.md)
 - **"What changed in the latest version?"** → [CHANGELOG.md](CHANGELOG.md)
 - **"How do I make a release?"** → [RELEASE_PROCESS.md](RELEASE_PROCESS.md)
-- **"Why are CDM 'secret value' errors appearing?"** → [CDM_TAINT_INVESTIGATION.md](CDM_TAINT_INVESTIGATION.md)
+- **"Why are CDM 'secret value' errors appearing?"** → [ARCHIVE/CDM_TAINT_INVESTIGATION.md](ARCHIVE/CDM_TAINT_INVESTIGATION.md) (historical) + CLAUDE.md memory (current rules)
 - **"What's the code style?"** → [DEVELOPMENT_PRINCIPLES.md](DEVELOPMENT_PRINCIPLES.md)
 - **"How are libraries managed?"** → [LIBRARY_AUDIT.md](LIBRARY_AUDIT.md)
 - **"How does settings save work?"** → [SETTINGS_SAVE_SYSTEM.md](SETTINGS_SAVE_SYSTEM.md)
