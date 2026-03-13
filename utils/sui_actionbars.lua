@@ -663,6 +663,12 @@ local function ApplyExtraButtonSettings(buttonType)
                 -- → ShowUIPanel → SetAttribute) to avoid ADDON_ACTION_BLOCKED on named frame.
                 C_Timer.After(0, function()
                     if holder and not holder:IsShown() then return end  -- already hidden, skip
+                    if InCombatLockdown() then
+                        -- Can't hide protected named frame during combat; defer to combat end
+                        ActionBars.pendingExtraButtonHide = ActionBars.pendingExtraButtonHide or {}
+                        ActionBars.pendingExtraButtonHide[holder] = buttonType
+                        return
+                    end
                     local ss = GetExtraButtonDB(buttonType)
                     if not (ss and (ss._editModeActive or ss.alwaysShow)) then
                         holder:Hide()
@@ -2197,6 +2203,18 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         if ActionBars.pendingExtraButtonRefresh then
             ActionBars.pendingExtraButtonRefresh = false
             RefreshExtraButtons()
+        end
+        if ActionBars.pendingExtraButtonHide then
+            for h, bType in pairs(ActionBars.pendingExtraButtonHide) do
+                if h:IsShown() then
+                    local ss = GetExtraButtonDB(bType)
+                    if not (ss and (ss._editModeActive or ss.alwaysShow)) then
+                        h:Hide()
+                        h:EnableMouse(false)
+                    end
+                end
+            end
+            ActionBars.pendingExtraButtonHide = nil
         end
     end
 end)

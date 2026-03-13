@@ -215,6 +215,26 @@ if (Test-Path "SuaviUI-vX.X.X.zip") {
 
 ## Version History
 
+### v0.3.15 - Taint Fix Edition (March 13, 2026)
+- CDM taint fix: replaced all HookScript on CDM viewers with hooksecurefunc (taint-safe)
+- CDM taint fix: removed HookScript("OnUpdate/OnShow/OnSizeChanged") from buff bar/icon viewers
+- CDM taint fix: separate addon-owned polling frame for legacy skinning (50ms interval)
+- CDM taint fix: restored SetSize with InCombatLockdown + Edit Mode guards
+- Fixed pcall multi-return bug: GetBuffBarFrames only returned first child (all bars after first unskinned)
+- Same pcall fix applied to cooldownmanager.lua ViewerAdapters and CooldownManagerCentered
+- Combat lockdown guards: EnableMouse, SetFrameLevel, SetFrameStrata, extraActionButton Hide
+- Deferred pending table for extraActionButton combat hide (processed on PLAYER_REGEN_ENABLED)
+- Added automated release script (dev/release.sh)
+- Size: ~2 MB
+
+### v0.3.14 - Character Flyout Edition (March 9, 2026)
+- Character flyout ilvl overlay: item level on Alt-hover equipment flyout buttons
+- Rewrote flyout ilvl lookup (hook UpdateItems, GetContainerItemInfo hyperlink) — no more cache misses
+- Buffbar combat taint fix: guard EnableMouse calls with InCombatLockdown()
+- GUI form widget labels: SetJustifyH("LEFT") across all widget types
+- Character stats: showTooltips default (off)
+- Size: ~2.06 MB
+
 ### v0.3.13 - Edit Mode Settings Edition (March 6, 2026)
 - Settings migrated from Options GUI to Edit Mode panels (CDM, Action Bars, Minimap, Unit Frames)
 - GUI builder pattern refactor (WrapBuilder, lazy page builders)

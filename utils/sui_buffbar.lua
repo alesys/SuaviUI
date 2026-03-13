@@ -1283,38 +1283,25 @@ local function GetBuffBarFrames()
         return {}
     end
 
-    local frames = {}
-
-    -- First, try CooldownViewer API if present
+    -- Collect bar item frames via GetChildren (C API — safe, returns all children).
+    -- NOTE: Do NOT use pcall(GetChildren, viewer) — pcall returns (ok, ret1, ret2, ...)
+    -- but only ret1 is captured, losing all children after the first.
+    -- Instead, wrap in a closure so GetChildren() returns all values inside the closure.
+    local all = {}
     pcall(function()
-        if BuffBarCooldownViewer.GetItemFrames then
-            local ok, items = pcall(BuffBarCooldownViewer.GetItemFrames, BuffBarCooldownViewer)
-            if ok and items then
-                frames = items
+        for _, child in ipairs({ BuffBarCooldownViewer:GetChildren() }) do
+            if child and child:IsObjectType("Frame") then
+                -- Skip Selection frame (Edit Mode overlay)
+                if child ~= BuffBarCooldownViewer.Selection then
+                    table.insert(all, child)
+                end
             end
         end
     end)
 
-    -- Fallback to raw children scan
-    if #frames == 0 then
-        local okc, children = pcall(BuffBarCooldownViewer.GetChildren, BuffBarCooldownViewer)
-        if okc and children then
-            for _, child in ipairs({ children }) do
-                if child and child:IsObjectType("Frame") then
-                    -- Skip Selection frame
-                    pcall(function()
-                        if child ~= BuffBarCooldownViewer.Selection then
-                            table.insert(frames, child)
-                        end
-                    end)
-                end
-            end
-        end
-    end
-
     -- Filter to active/visible frames
     local active = {}
-    for _, frame in ipairs(frames) do
+    for _, frame in ipairs(all) do
         if frame:IsShown() and frame:IsVisible() then
             table.insert(active, frame)
         end
@@ -1693,15 +1680,14 @@ local function ApplyBarStyle(frame, settings)
     -- Get the StatusBar child (usually frame.Bar)
     local statusBar = frame.Bar
     if not statusBar and frame.GetChildren then
-        local okC, children = pcall(frame.GetChildren, frame)
-        if okC and children then
-            for _, child in ipairs({children}) do
+        pcall(function()
+            for _, child in ipairs({ frame:GetChildren() }) do
                 if child and child.IsObjectType and child:IsObjectType("StatusBar") then
                     statusBar = child
                     break
                 end
             end
-        end
+        end)
     end
     
     if not statusBar then
@@ -2166,13 +2152,15 @@ LayoutBuffIcons = function()
         return
     end
 
-    -- Apply HUD layer priority
-    local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
-    local hudLayering = SUICore and SUICore.db and SUICore.db.profile and SUICore.db.profile.hudLayering
-    local layerPriority = hudLayering and hudLayering.buffIcon or 5
-    if SUICore and SUICore.GetHUDFrameLevel then
-        local frameLevel = SUICore:GetHUDFrameLevel(layerPriority)
-        BuffIconCooldownViewer:SetFrameLevel(frameLevel)
+    -- Apply HUD layer priority (skip during combat — SetFrameLevel is protected on CDM viewers)
+    if not InCombatLockdown() then
+        local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
+        local hudLayering = SUICore and SUICore.db and SUICore.db.profile and SUICore.db.profile.hudLayering
+        local layerPriority = hudLayering and hudLayering.buffIcon or 5
+        if SUICore and SUICore.GetHUDFrameLevel then
+            local frameLevel = SUICore:GetHUDFrameLevel(layerPriority)
+            BuffIconCooldownViewer:SetFrameLevel(frameLevel)
+        end
     end
 
     local icons = GetBuffIconFrames()
@@ -2298,9 +2286,9 @@ LayoutBuffIcons = function()
         end
     end
 
-    -- During Edit Mode, let Blizzard manage viewer size + Selection overlay so panel
-    -- settings (Icon Size, Icon Padding, etc.) update immediately.
-    -- Outside Edit Mode, pin viewer size to prevent layout drift.
+    -- Pin viewer size to prevent layout drift from Blizzard's ResizeLayoutMixin.
+    -- SetSize is a C API call (safe). The previous taint was caused by HookScript on
+    -- viewers (now removed), not by SetSize itself.
     local isEditMode = EditModeManagerFrame and EditModeManagerFrame.editModeActive
     if not isEditMode and not InCombatLockdown() then
         SuppressLayout()
@@ -2480,17 +2468,19 @@ LayoutBuffBars = function()
     ---------------------------------------------------------------------------
     pcall(function()
 
-    -- Apply HUD layer priority (strata + level)
-    local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
-    local hudLayering = SUICore and SUICore.db and SUICore.db.profile and SUICore.db.profile.hudLayering
-    local layerPriority = hudLayering and hudLayering.buffBar or 5
-    local frameLevel = 200  -- Default fallback
-    if SUICore and SUICore.GetHUDFrameLevel then
-        frameLevel = SUICore:GetHUDFrameLevel(layerPriority)
+    -- Apply HUD layer priority (strata + level) — skip during combat (protected on CDM viewers)
+    if not InCombatLockdown() then
+        local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
+        local hudLayering = SUICore and SUICore.db and SUICore.db.profile and SUICore.db.profile.hudLayering
+        local layerPriority = hudLayering and hudLayering.buffBar or 5
+        local frameLevel = 200  -- Default fallback
+        if SUICore and SUICore.GetHUDFrameLevel then
+            frameLevel = SUICore:GetHUDFrameLevel(layerPriority)
+        end
+        -- Set strata to MEDIUM to match power bars, then apply frame level
+        BuffBarCooldownViewer:SetFrameStrata("MEDIUM")
+        BuffBarCooldownViewer:SetFrameLevel(frameLevel)
     end
-    -- Set strata to MEDIUM to match power bars, then apply frame level
-    BuffBarCooldownViewer:SetFrameStrata("MEDIUM")
-    BuffBarCooldownViewer:SetFrameLevel(frameLevel)
 
     local bars = GetBuffBarFrames()
     local count = #bars
@@ -2653,12 +2643,9 @@ LayoutBuffBars = function()
         end
     end
 
-    -- During Edit Mode, let Blizzard manage viewer size + Selection overlay so the
-    -- panel settings (Bar Width, Icon Size, Padding, etc.) update immediately.
-    -- Outside Edit Mode, pin viewer to single-bar size to prevent layout drift.
+    -- Pin viewer size to prevent layout drift from Blizzard's ResizeLayoutMixin.
     local isEditMode = EditModeManagerFrame and EditModeManagerFrame.editModeActive
-
-    if not isEditMode then
+    if not isEditMode and not InCombatLockdown() then
         SuppressLayout()
         BuffBarCooldownViewer:SetSize(roundPixel(effectiveBarWidth), roundPixel(effectiveBarHeight))
         UnsuppressLayout()
@@ -2939,71 +2926,51 @@ local function Initialize()
 
     -- ForcePopulateBuffIcons removed (taint source — see comment at line 2734)
 
-    -- Legacy icon OnUpdate polling (only when not using custom icons)
-    if not USE_CUSTOM_ICONS then
-        pcall(function()
-            if BuffIconCooldownViewer and not iconViewerHooked then
-                iconViewerHooked = true
-                iconViewerElapsed = 0
-                BuffIconCooldownViewer:HookScript("OnUpdate", function(self, elapsed)
-                    iconViewerElapsed = iconViewerElapsed + elapsed
-                    if iconViewerElapsed > 0.05 then
-                        iconViewerElapsed = 0
-                        if self:IsShown() then
-                            CheckIconChanges()
-                        end
+    -- TAINT-FIX (session 5076): Use a SEPARATE addon-owned frame for OnUpdate polling
+    -- instead of HookScript("OnUpdate") on CDM viewers. HookScript adds insecure handlers
+    -- to the secure viewer's script chain, causing WoW to attribute taint to SuaviUI
+    -- whenever Blizzard's internal code runs on the viewer.
+    if (not USE_CUSTOM_ICONS or not USE_CUSTOM_BARS) and not iconViewerHooked then
+        iconViewerHooked = true
+        barViewerHooked = true
+        iconViewerElapsed = 0
+        barViewerElapsed = 0
+        local pollingFrame = CreateFrame("Frame")
+        pollingFrame:SetScript("OnUpdate", function(self, elapsed)
+            if not USE_CUSTOM_ICONS and BuffIconCooldownViewer then
+                iconViewerElapsed = iconViewerElapsed + elapsed
+                if iconViewerElapsed > 0.05 then
+                    iconViewerElapsed = 0
+                    if BuffIconCooldownViewer:IsShown() then
+                        CheckIconChanges()
                     end
-                end)
+                end
             end
-        end)
-    end
-
-    -- Legacy bar OnUpdate hook (only when not using custom bars)
-    if not USE_CUSTOM_BARS then
-        pcall(function()
-            if BuffBarCooldownViewer and not barViewerHooked then
-                barViewerHooked = true
-                barViewerElapsed = 0
-                BuffBarCooldownViewer:HookScript("OnUpdate", function(self, elapsed)
-                    barViewerElapsed = barViewerElapsed + elapsed
-                    if barViewerElapsed > 0.05 then
-                        barViewerElapsed = 0
-                        if self:IsShown() then
-                            CheckBarChanges()
-                        end
+            if not USE_CUSTOM_BARS and BuffBarCooldownViewer then
+                barViewerElapsed = barViewerElapsed + elapsed
+                if barViewerElapsed > 0.05 then
+                    barViewerElapsed = 0
+                    if BuffBarCooldownViewer:IsShown() then
+                        CheckBarChanges()
                     end
-                end)
+                end
             end
         end)
     end
 
     -- Legacy icon viewer hooks (only when not using custom icons)
+    -- TAINT-FIX (session 5076): Removed HookScript("OnSizeChanged") and HookScript("OnShow")
+    -- on CDM viewers. HookScript adds insecure handlers to the secure frame's script chain,
+    -- tainting the viewer. hooksecurefunc("Layout") covers both cases (Layout runs after
+    -- OnSizeChanged and OnShow internally).
     if not USE_CUSTOM_ICONS then
         pcall(function()
-            -- CRITICAL: OnSizeChanged hook - immediate response when Blizzard resizes viewer
-            if BuffIconCooldownViewer then
-                BuffIconCooldownViewer:HookScript("OnSizeChanged", function(self)
-                    if IsLayoutSuppressed() then return end
-                    if isIconLayoutRunning then return end
-                    LayoutBuffIcons()
-                end)
-            end
-
-            -- OnShow hook - refresh when viewer becomes visible
-            if BuffIconCooldownViewer then
-                BuffIconCooldownViewer:HookScript("OnShow", function(self)
-                    if IsLayoutSuppressed() then return end
-                    if isIconLayoutRunning then return end
-                    LayoutBuffIcons()
-                end)
-            end
-
-            -- Hook Layout - deferred to avoid taint inside Blizzard's secure call chain
+            -- Hook Layout via hooksecurefunc (safe — doesn't taint the viewer)
             if BuffIconCooldownViewer and BuffIconCooldownViewer.Layout then
                 hooksecurefunc(BuffIconCooldownViewer, "Layout", function()
                     if IsLayoutSuppressed() then return end
                     if isIconLayoutRunning then return end
-                    -- TAINT-FIX: defer so we don't run inside Blizzard's secure Layout call stack
+                    -- Defer so we don't run inside Blizzard's secure Layout call stack
                     C_Timer.After(0, function()
                         if IsLayoutSuppressed() then return end
                         if isIconLayoutRunning then return end

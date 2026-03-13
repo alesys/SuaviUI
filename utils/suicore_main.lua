@@ -4827,16 +4827,14 @@ function SUICore:HookViewers()
             -- tainting the Blizzard viewer frame's field table.
             hookedViewers[viewer] = true
 
-            viewer:HookScript("OnShow", function(f)
-                self:ApplyViewerSkin(f)
-            end)
-
-            viewer:HookScript("OnSizeChanged", function(f)
-                -- LOW-LEVEL SAFETY: Prevent re-entrant layout calls.
-                -- TAINT-FIX: guard stored in weak table, not on viewer frame.
+            -- TAINT-FIX (session 5076): Do NOT use HookScript on CDM viewers.
+            -- HookScript adds insecure handlers to the secure frame's script chain,
+            -- causing WoW to attribute taint to SuaviUI whenever Blizzard's internal
+            -- code runs on the viewer. Use hooksecurefunc(viewer, "Layout") instead.
+            hooksecurefunc(viewer, "Layout", function(f)
                 if viewerLayoutRunning[f] then return end
                 viewerLayoutRunning[f] = true
-                self:ApplyViewerLayout(f)
+                self:ApplyViewerSkin(f)
                 viewerLayoutRunning[f] = nil
             end)
 

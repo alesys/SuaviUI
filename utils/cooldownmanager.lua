@@ -410,15 +410,17 @@ function ViewerAdapters.GetBuffIconFrames()
         return {}
     end
     local visible = {}
-    local ok, children = pcall(BuffIconCooldownViewer.GetChildren, BuffIconCooldownViewer)
-    if not ok or not children then return visible end
-    for _, child in ipairs({ children }) do
-        if child and (child.icon or child.Icon) then
-            if child:IsShown() then
-                visible[#visible + 1] = child
+    -- NOTE: GetChildren() returns multiple values. Must wrap in closure so all
+    -- children are captured. pcall(GetChildren, viewer) only captures the first.
+    pcall(function()
+        for _, child in ipairs({ BuffIconCooldownViewer:GetChildren() }) do
+            if child and (child.icon or child.Icon) then
+                if child:IsShown() then
+                    visible[#visible + 1] = child
+                end
             end
         end
-    end
+    end)
     table.sort(visible, function(a, b)
         return (a.layoutIndex or 0) < (b.layoutIndex or 0)
     end)
@@ -436,24 +438,15 @@ function ViewerAdapters.GetBuffBarFrames()
         return {}
     end
     local frames = {}
-    local hasGetItemFrames = false
-    pcall(function() hasGetItemFrames = BuffBarCooldownViewer.GetItemFrames ~= nil end)
-    if hasGetItemFrames then
-        local ok, items = pcall(BuffBarCooldownViewer.GetItemFrames, BuffBarCooldownViewer)
-        if ok and items then
-            frames = items
-        end
-    end
-    if #frames == 0 then
-        local okc, children = pcall(BuffBarCooldownViewer.GetChildren, BuffBarCooldownViewer)
-        if okc and children then
-            for _, child in ipairs({ children }) do
-                if child and child:IsObjectType("Frame") then
-                    frames[#frames + 1] = child
-                end
+    -- NOTE: GetChildren() returns multiple values. Must wrap in closure so all
+    -- children are captured. pcall(GetChildren, viewer) only captures the first.
+    pcall(function()
+        for _, child in ipairs({ BuffBarCooldownViewer:GetChildren() }) do
+            if child and child:IsObjectType("Frame") then
+                frames[#frames + 1] = child
             end
         end
-    end
+    end)
     local active = {}
     for _, frame in ipairs(frames) do
         if frame:IsShown() and frame:IsVisible() then
