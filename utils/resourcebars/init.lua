@@ -10,6 +10,13 @@ local addonName, SUICore = ...
 local RB = SUICore.ResourceBars
 local LEM = RB.LEM
 
+-- Debug helper — logs to the SuaviUI debug window
+local function dbg(msg)
+    if _G.SuaviUI_Debug then _G.SuaviUI_Debug(msg, "RB") end
+end
+-- Expose globally so Bar.lua etc. can use it
+RB.dbg = dbg
+
 ------------------------------------------------------------
 -- BAR INSTANCES STORAGE
 ------------------------------------------------------------
@@ -60,12 +67,12 @@ local function MigrateOldDatabase()
     if not _G.SuaviUI_ResourceBarsDB then
         return  -- Nothing to migrate
     end
-    
+
     local db = RB.GetResourceBarsDB()
     if not db then
         return  -- Profile not available yet
     end
-    
+
     -- Copy old data to profile
     for dbName, layouts in pairs(_G.SuaviUI_ResourceBarsDB) do
         if type(layouts) == "table" then
@@ -77,28 +84,189 @@ local function MigrateOldDatabase()
             end
         end
     end
-    
+
     -- Migrate global settings if they exist
     if _G.SuaviUI_ResourceBarsDB["_Settings"] then
         db["_Settings"] = CopyTable(_G.SuaviUI_ResourceBarsDB["_Settings"])
     end
-    
+
     -- Clear old variable (cleanup)
     _G.SuaviUI_ResourceBarsDB = nil
-    
+
     print("|cFF30D1FFSuaviUI:|r Resource bars migrated to profile system.")
 end
 
+------------------------------------------------------------
+-- SENSEI FORMAT MIGRATION
+-- Migrates old SenseiClassResourceBar DB names and field
+-- names to the current SuaviUI format (one-time per layout).
+------------------------------------------------------------
+
+-- Old DB name → New DB name
+local SENSEI_DB_MAP = {
+    secondaryPowerBar   = "SecondaryResourceBarDB",
+    primaryPowerBar     = "PrimaryResourceBarDB",
+    tertiaryPowerBar    = "TertiaryResourceBarDB",
+    healthBar           = "healthBarDB",
+}
+
+-- Convert array color {r,g,b,a} to object {r=,g=,b=,a=}
+local function ArrayToColorObj(arr)
+    if type(arr) ~= "table" then return nil end
+    if arr.r ~= nil then return arr end  -- already object format
+    return { r = arr[1] or 0, g = arr[2] or 0, b = arr[3] or 0, a = arr[4] or 1 }
+end
+
+-- Map old fields to new fields, returns a new-format table
+local function MapSenseiFields(old, defaults)
+    local new = CopyTable(defaults)
+
+    -- Position & size (same field names)
+    if old.x ~= nil then new.x = old.x end
+    if old.y ~= nil then new.y = old.y end
+    if old.width ~= nil then new.width = old.width end
+    if old.height ~= nil then new.height = old.height end
+    if old.point then new.point = old.point end
+    if old.relativePoint then new.relativePoint = old.relativePoint end
+
+    -- Visibility: boolean enabled → string barVisible
+    if old.enabled == false then
+        new.barVisible = "Hidden"
+    elseif old.enabled == true then
+        new.barVisible = "Always Visible"
+    end
+
+    -- Relative frame
+    if old.relativeTo then new.relativeFrame = old.relativeTo end
+
+    -- Texture
+    if old.texture then new.foregroundStyle = old.texture end
+
+    -- Background color
+    local bgc = ArrayToColorObj(old.bgColor)
+    if bgc then new.backgroundColor = bgc end
+
+    -- Text
+    if old.showText ~= nil then new.showText = old.showText end
+    if old.textSize then new.fontSize = old.textSize end
+    if old.showPercent == true then
+        new.textFormat = "Percent"
+    elseif old.showPercent == false and old.showText then
+        new.textFormat = "Current"
+    end
+
+    -- Text color
+    local tc = ArrayToColorObj(old.textCustomColor)
+    if tc then new.textColor = tc end
+
+    -- Ticks
+    if old.showTicks ~= nil then new.showTicks = old.showTicks end
+    if old.tickThickness then new.tickThickness = old.tickThickness end
+    local tkc = ArrayToColorObj(old.tickColor)
+    if tkc then new.tickColor = tkc end
+
+    -- Fragmented power bar text
+    if old.showFragmentedPowerBarText ~= nil then
+        new.showFragmentedPowerBarText = old.showFragmentedPowerBarText
+    end
+
+    -- Orientation mapping
+    if old.orientation then
+        if old.orientation == "VERTICAL" or old.orientation == "Vertical" then
+            new.orientation = "Vertical"
+        else
+            new.orientation = "Normal"
+        end
+    end
+
+    return new
+end
+
+local function MigrateSenseiFormat()
+    local db = RB.GetResourceBarsDB()
+    if not db then return end
+
+    local migrated = false
+    for oldName, newName in pairs(SENSEI_DB_MAP) do
+        local oldData = db[oldName]
+        if oldData and type(oldData) == "table" then
+            db[newName] = db[newName] or {}
+
+            -- Build defaults for this bar type
+            local defaults = CopyTable(RB.commonDefaults)
+            for _, config in pairs(RB.RegisteredBar or {}) do
+                if config.dbName == newName then
+                    for k, v in pairs(config.defaultValues or {}) do
+                        defaults[k] = v
+                    end
+                    break
+                end
+            end
+
+            for layoutName, oldLayout in pairs(oldData) do
+                if type(oldLayout) == "table" then
+                    db[newName][layoutName] = MapSenseiFields(oldLayout, defaults)
+                    migrated = true
+                end
+            end
+
+            -- Remove old key after migration (self-cleaning)
+            db[oldName] = nil
+        end
+    end
+
+    -- Clean up old migration marker if present
+    db._senseiMigrated = nil
+
+    if migrated then
+        print("|cFF30D1FFSuaviUI:|r Resource bar settings migrated from legacy format.")
+    end
+end
+
+------------------------------------------------------------
+-- LAYOUT RESOLUTION
+------------------------------------------------------------
+
+-- Resolve layout name directly from C_EditMode (bypasses LEM cache)
+local function GetRawActiveLayoutName()
+    if not (C_EditMode and C_EditMode.GetLayouts) then return nil end
+    local layouts = C_EditMode.GetLayouts()
+    if not layouts or not layouts.activeLayout then return nil end
+    local idx = layouts.activeLayout
+    if idx == 1 then return _G.LAYOUT_STYLE_MODERN or "Modern" end
+    if idx == 2 then return _G.LAYOUT_STYLE_CLASSIC or "Classic" end
+    if layouts.layouts then
+        local custom = layouts.layouts[idx - 2]
+        return custom and custom.layoutName
+    end
+    return nil
+end
+
+-- Resolve active layout name: try LEM first, then C_EditMode fallback
+local function ResolveActiveLayoutName()
+    local name = LEM.GetActiveLayoutName()
+    if name then return name end
+    return GetRawActiveLayoutName() or "Default"
+end
+
+------------------------------------------------------------
+-- MAIN INIT
+------------------------------------------------------------
+
 local function InitializeResourceBars()
-    -- Run migration first (one-time)
+    -- Run migrations
     MigrateOldDatabase()
-    
+    MigrateSenseiFormat()
+
     -- Get profile database
     local db = RB.GetResourceBarsDB()
     if not db then
-        print("|cFFFF0000SuaviUI:|r Failed to initialize resource bars - profile not available!")
+        dbg("FATAL: resource bars DB not available")
         return
     end
+
+    local layoutName = ResolveActiveLayoutName()
+    dbg("Init layout: " .. tostring(layoutName))
 
     -- Initialize each bar type from RegisteredBar configs
     for barName, config in pairs(RB.RegisteredBar) do
@@ -114,7 +282,6 @@ local function InitializeResourceBars()
         RB.barInstances[config.frameName] = bar
 
         -- Initial layout and visibility
-        local layoutName = LEM.GetActiveLayoutName() or "Default"
         if not db[config.dbName][layoutName] then
             local defaults = CopyTable(RB.commonDefaults)
             for k, v in pairs(config.defaultValues or {}) do
@@ -128,6 +295,63 @@ local function InitializeResourceBars()
         bar:ApplyLayout(layoutName, true)
         bar:UpdateDisplay(layoutName, true)
     end
+
+    dbg("Init complete with layout '" .. layoutName .. "'")
+
+    -- WoW resolves the per-character active layout AFTER ADDON_LOADED.
+    -- At init time, C_EditMode reports the account-default layout (e.g. "Modern")
+    -- instead of the character's actual layout. Poll until the real layout resolves.
+    local initLayoutName = layoutName
+    local function ReapplyAllBars(newLayout)
+        dbg("Layout resolved: '" .. initLayoutName .. "' -> '" .. newLayout .. "'")
+        local db2 = RB.GetResourceBarsDB()
+        for _, bar in pairs(RB.barInstances) do
+            local config = bar:GetConfig()
+            if db2 and db2[config.dbName] then
+                if not db2[config.dbName][newLayout] then
+                    local defs = CopyTable(RB.commonDefaults)
+                    for k, v in pairs(config.defaultValues or {}) do
+                        defs[k] = v
+                    end
+                    db2[config.dbName][newLayout] = CopyTable(defs)
+                end
+            end
+            bar:InitCooldownManagerWidthHook(newLayout)
+            bar:ApplyVisibilitySettings(newLayout)
+            bar:ApplyLayout(newLayout, true)
+            bar:UpdateDisplay(newLayout, true)
+        end
+        initLayoutName = newLayout
+    end
+
+    -- Poll C_EditMode every few frames until the layout changes or timeout
+    local pollFrame = CreateFrame("Frame")
+    local pollCount = 0
+    local resolved = false
+    pollFrame:SetScript("OnUpdate", function(self)
+        pollCount = pollCount + 1
+        if resolved or pollCount > 600 then
+            self:SetScript("OnUpdate", nil)
+            return
+        end
+        if pollCount % 5 ~= 0 then return end
+        local rawName = GetRawActiveLayoutName()
+        if rawName and rawName ~= initLayoutName then
+            resolved = true
+            self:SetScript("OnUpdate", nil)
+            ReapplyAllBars(rawName)
+        end
+    end)
+
+    -- Also catch EDIT_MODE_LAYOUTS_UPDATED in case it fires after the poll ends
+    local layoutWatcher = CreateFrame("Frame")
+    layoutWatcher:RegisterEvent("EDIT_MODE_LAYOUTS_UPDATED")
+    layoutWatcher:SetScript("OnEvent", function()
+        local rawName = GetRawActiveLayoutName()
+        if rawName and rawName ~= initLayoutName then
+            ReapplyAllBars(rawName)
+        end
+    end)
 end
 
 ------------------------------------------------------------
@@ -138,7 +362,10 @@ local initFrame = CreateFrame("Frame")
 initFrame:RegisterEvent("ADDON_LOADED")
 initFrame:SetScript("OnEvent", function(self, event, loadedAddonName)
     if loadedAddonName == addonName then
-        InitializeResourceBars()
+        -- Defer resource bar creation so Edit Mode's secureexecuterange
+        -- finishes before our globally-named frames exist. This prevents
+        -- CDM viewers from being tainted via SetPoint anchors to addon frames.
+        C_Timer.After(0, InitializeResourceBars)
         self:UnregisterEvent("ADDON_LOADED")
     end
 end)
@@ -186,7 +413,7 @@ SlashCmdList["SUIBAR"] = function(msg)
             RB.prettyPrint("Cannot reset - profile not available!")
             return
         end
-        
+
         for name, bar in pairs(RB.barInstances) do
             local config = bar:GetConfig()
             local layoutName = LEM.GetActiveLayoutName() or "Default"
