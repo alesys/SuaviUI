@@ -199,7 +199,7 @@ function BarMixin:GetConfig()
 end
 
 function BarMixin:GetData(layoutName)
-    layoutName = layoutName or LEM.GetActiveLayoutName() or "Default"
+    layoutName = layoutName or RB.activeLayoutName or LEM.GetActiveLayoutName() or "Default"
     local dbRoot = RB.GetResourceBarsDB()
     if not dbRoot then
         return nil

@@ -266,6 +266,7 @@ local function InitializeResourceBars()
     end
 
     local layoutName = ResolveActiveLayoutName()
+    RB.activeLayoutName = layoutName
     dbg("Init layout: " .. tostring(layoutName))
 
     -- Initialize each bar type from RegisteredBar configs
@@ -304,6 +305,7 @@ local function InitializeResourceBars()
     local initLayoutName = layoutName
     local function ReapplyAllBars(newLayout)
         dbg("Layout resolved: '" .. initLayoutName .. "' -> '" .. newLayout .. "'")
+        RB.activeLayoutName = newLayout
         local db2 = RB.GetResourceBarsDB()
         for _, bar in pairs(RB.barInstances) do
             local config = bar:GetConfig()
@@ -348,8 +350,11 @@ local function InitializeResourceBars()
     layoutWatcher:RegisterEvent("EDIT_MODE_LAYOUTS_UPDATED")
     layoutWatcher:SetScript("OnEvent", function()
         local rawName = GetRawActiveLayoutName()
-        if rawName and rawName ~= initLayoutName then
-            ReapplyAllBars(rawName)
+        if rawName then
+            RB.activeLayoutName = rawName
+            if rawName ~= initLayoutName then
+                ReapplyAllBars(rawName)
+            end
         end
     end)
 end
