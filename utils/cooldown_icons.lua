@@ -546,7 +546,7 @@ function StyledIcons:Disable()
 end
 
 function StyledIcons:Initialize()
-    if FORCE_DISABLE_CDM_STYLING then
+    if FORCE_DISABLE_CDM_STYLING or ns.DISABLE_ALL_CDM_HOOKS or not ns.CDM_HOOKS.iconStyling then
         return
     end
     if not IsAnyStyledFeatureEnabled() then

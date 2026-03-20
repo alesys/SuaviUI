@@ -904,6 +904,7 @@ function EventHandler.FlushDeferredIfSafe()
 end
 
 EventHandler.frame:SetScript("OnEvent", function(_, event, arg1)
+    if ns.DISABLE_ALL_CDM_HOOKS or not ns.CDM_HOOKS.cooldownmanager then return end
     if event == "ADDON_LOADED" and arg1 == "Blizzard_CooldownManager" then
         RefreshViewerRefs()
         if CooldownManager.HookViewerRefreshLayout then
@@ -966,6 +967,7 @@ function CooldownManager.HookViewerRefreshLayout()
 end
 
 function CooldownManager.Initialize()
+    if ns.DISABLE_ALL_CDM_HOOKS or not ns.CDM_HOOKS.cooldownmanager then return end
     RefreshViewerRefs()
     CooldownManager.HookViewerRefreshLayout()
     if not RequestCoordinatedRefresh({ icons = true, bars = true, essential = true, utility = true }, "cmc", { delay = 0 }) then

@@ -111,6 +111,7 @@ local viewers = {
 }
 
 local function ProcessViewer(viewerName)
+    if SUI.DISABLE_ALL_CDM_HOOKS or not SUI.CDM_HOOKS.effects then return end
     local viewer = _G[viewerName]
     if not viewer then return end
     
@@ -191,6 +192,7 @@ local function HideExistingBlizzardGlows()
 end
 
 local function HookAllGlows()
+    if SUI.DISABLE_ALL_CDM_HOOKS or not SUI.CDM_HOOKS.effects then return end
     if EMERGENCY_STABILITY_MODE then
         -- One-shot cleanup only; skip global runtime hook while stabilizing FPS.
         HideExistingBlizzardGlows()

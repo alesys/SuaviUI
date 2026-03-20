@@ -936,6 +936,9 @@ function LEMSettingsLoaderMixin:Init(bar, defaults)
     end)
 
     LEM:RegisterCallback("layout", function(layoutName)
+        -- Update the authoritative layout name — this fires on spec change too,
+        -- since per-character Edit Mode layouts can differ by spec.
+        RB.activeLayoutName = layoutName
         local data = EnsureBarData(config, layoutName, defaults)
         bar:OnLayoutChange(layoutName)
         bar:InitCooldownManagerWidthHook(layoutName)

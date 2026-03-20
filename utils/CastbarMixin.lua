@@ -702,6 +702,7 @@ end
 -- LEM INTEGRATION
 ---------------------------------------------------------------------------
 function CastbarMixin:InitCooldownManagerWidthHook(layoutName)
+    if ns.DISABLE_ALL_CDM_HOOKS or not ns.CDM_HOOKS.castbarSync then return end
     local settings = self:GetSettings()
     if not settings then return end
 

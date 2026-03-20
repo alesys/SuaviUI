@@ -39,6 +39,19 @@ function PowerBarMixin:OnEvent(event, ...)
         or event == "UPDATE_SHAPESHIFT_FORM"
         or (event == "PLAYER_SPECIALIZATION_CHANGED" and unit == "player") then
 
+        if RB.dbg then
+            local res = self:GetResource()
+            local data = self:GetData()
+            local w = data and data.width or "nil"
+            local x = data and data.x or "nil"
+            local y = data and data.y or "nil"
+            local vis = data and data.barVisible or "nil"
+            local wm = data and data.widthMode or "nil"
+            local layout = RB.activeLayoutName or "nil"
+            RB.dbg(string.format("PowerBar %s event=%s layout=%s res=%s w=%s x=%s y=%s vis=%s widthMode=%s",
+                tostring(self.barName), event, layout, tostring(res), tostring(w), tostring(x), tostring(y), tostring(vis), tostring(wm)))
+        end
+
         self:ApplyVisibilitySettings()
         self:ApplyLayout(nil, true)
 

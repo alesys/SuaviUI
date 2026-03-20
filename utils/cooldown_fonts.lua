@@ -287,6 +287,7 @@ end
 
 -- Refresh all fonts across all viewers
 function CooldownFonts.RefreshAllFonts()
+    if SUI.DISABLE_ALL_CDM_HOOKS or not SUI.CDM_HOOKS.fontStyling then return end
     local viewers = {
         {"EssentialCooldownViewer", "Essential"},
         {"UtilityCooldownViewer", "Utility"},

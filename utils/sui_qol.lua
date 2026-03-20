@@ -311,24 +311,26 @@ local deletePopups = {
     ["DELETE_QUEST_ITEM"] = true,
 }
 
+-- TAINT-FIX (session 5231): Auto-delete-confirm DISABLED.
+-- Calling editBox:SetText() from addon context taints the StaticPopup frame.
+-- StaticPopup frames are reused — the taint persists and blocks protected calls
+-- like UpgradeItem() when Blizzard reuses the same frame for item upgrades.
+-- C_Timer.After(0) deferral was insufficient: the execution context is still
+-- addon-tainted. No known way to call SetText without tainting the frame.
+-- TODO: Investigate securecall or alternative approaches that don't taint.
+--[[ DISABLED
 hooksecurefunc("StaticPopup_Show", function(which)
     if not deletePopups[which] then return end
 
     local settings = GetSettings()
     if not settings or not settings.autoDeleteConfirm then return end
 
-    -- Defer to next frame to isolate addon taint from StaticPopup_Show's
-    -- secure execution context. Without this, taint on the StaticPopup frame
-    -- can persist across frame reuse and block protected calls like UpgradeItem().
     C_Timer.After(0, function()
         for i = 1, STATICPOPUP_NUMDIALOGS or 4 do
             local frame = _G["StaticPopup" .. i]
             if frame and frame.which == which and frame:IsShown() then
                 local editBox = frame.editBox or _G["StaticPopup" .. i .. "EditBox"]
                 if editBox then
-                    -- SetText() triggers OnTextChanged through the C engine,
-                    -- no need to manually call the handler (which would run
-                    -- Blizzard's handler from addon context, tainting frame fields).
                     editBox:SetText(DELETE_ITEM_CONFIRM_STRING or "DELETE")
                 end
                 break
@@ -336,6 +338,7 @@ hooksecurefunc("StaticPopup_Show", function(which)
         end
     end)
 end)
+--]]
 
 ---------------------------------------------------------------------------
 -- QUEST / DIALOG WINDOWS: DRAGGABLE + POSITION MEMORY

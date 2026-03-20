@@ -17,6 +17,26 @@ SUI.SUICore = SUICore
 -- Expose SUICore to namespace for other files
 ns.Addon = SUICore
 
+-- DIAGNOSTIC: Phase 2 binary-search taint diagnosis.
+-- All groups start DISABLED (false). Enable one at a time, /reload, play combat,
+-- check BugGrabber. The group that introduces taint errors is the culprit.
+-- Set DISABLE_ALL_CDM_HOOKS = true to override all groups (Phase 1 kill switch).
+ns.DISABLE_ALL_CDM_HOOKS = false
+ns.CDM_HOOKS = {
+    buffbar = true,        -- A: sui_buffbar.lua Layout hooks + styling + init
+    cooldownmanager = true,  -- B: cooldownmanager.lua icon/bar positioning
+    suicoreViewers = false, -- C: TAINT SOURCE! SkinIcon calls SetSize/CreateTexture on CDM items
+    swipe = true,          -- D: cooldownswipe.lua swipe customization
+    keybinds = true,       -- E: keybinds.lua keybind text + rotation helper
+    iconStyling = true,    -- F: cooldown_icons.lua square icon styling (StyledIcons)
+    fontStyling = true,    -- G: cooldown_fonts.lua custom font overlays
+    advancedSwipe = true,  -- H: cooldown_advanced.lua swipe colors + dimming
+    effects = true,        -- I: cooldowneffects.lua effect hiding + HookScript("OnShow")
+    glows = true,          -- J: customglows.lua ActionButtonSpellAlertManager hooks
+    castbarSync = true,    -- K: CastbarMixin.lua width sync on viewers
+    resbarSync = true,     -- L: Bar.lua (resourcebars) width sync on viewers
+}
+
 -- TAINT-FIX (session 4796): All direct field writes to Blizzard CDM viewer/item frames
 -- replaced with module-level weak tables. Writing ANY field from addon context to a
 -- Blizzard frame taints that field; viewer.__cdmElapsed written every tick via
@@ -4422,6 +4442,7 @@ function SUICore:SkinIcon(icon, settings)
 end
 
 function SUICore:SkinAllIconsInViewer(viewer)
+    if ns.DISABLE_ALL_CDM_HOOKS or not ns.CDM_HOOKS.suicoreViewers then return end
     if not viewer or not viewer.GetName then return end
 
     local name     = viewer:GetName()
@@ -4820,6 +4841,7 @@ function SUICore:ProcessPendingIcons()
 end
 
 function SUICore:HookViewers()
+    if ns.DISABLE_ALL_CDM_HOOKS or not ns.CDM_HOOKS.suicoreViewers then return end
     for _, name in ipairs(self.viewers) do
         local viewer = _G[name]
         if viewer and not hookedViewers[viewer] then

@@ -101,6 +101,7 @@ function BarMixin:Init(config, parent, frameLevel)
 end
 
 function BarMixin:InitCooldownManagerWidthHook(layoutName)
+    if SUICore.DISABLE_ALL_CDM_HOOKS or not SUICore.CDM_HOOKS.resbarSync then return nil end
     local data = self:GetData(layoutName)
     if not data then return nil end
 
@@ -584,6 +585,13 @@ function BarMixin:ApplyLayout(layoutName, force)
     local point, relativeTo, relativePoint, x, y = self:GetPoint(layoutName)
     self.Frame:ClearAllPoints()
     self.Frame:SetPoint(point, relativeTo, relativePoint, x, y)
+
+    if RB.dbg then
+        local relName = relativeTo and (relativeTo.GetName and relativeTo:GetName() or tostring(relativeTo)) or "nil"
+        RB.dbg(string.format("  ApplyLayout %s: size=%.1fx%.1f pos=%s@%s+%s x=%.1f y=%.1f layout=%s",
+            tostring(self.barName), width, height, point or "?", relName, relativePoint or "?",
+            x or 0, y or 0, tostring(layoutName or RB.activeLayoutName)))
+    end
 
     -- Disable drag & drop if the relative frame is not UIParent
     LEM:SetFrameDragEnabled(self.Frame, relativeTo == UIParent)

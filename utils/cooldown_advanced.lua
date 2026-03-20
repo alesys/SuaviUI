@@ -279,7 +279,7 @@ end
 
 -- Refresh all advanced features across all viewers
 function CooldownAdvanced.RefreshAllFeatures()
-    if FORCE_DISABLE_CDM_ADVANCED then
+    if FORCE_DISABLE_CDM_ADVANCED or SUI.DISABLE_ALL_CDM_HOOKS or not SUI.CDM_HOOKS.advancedSwipe then
         return
     end
     local viewers = {
@@ -298,7 +298,7 @@ end
 
 -- Hook cooldown updates to refresh dimming and colors
 local function HookCooldownUpdates()
-    if FORCE_DISABLE_CDM_ADVANCED then
+    if FORCE_DISABLE_CDM_ADVANCED or SUI.DISABLE_ALL_CDM_HOOKS or not SUI.CDM_HOOKS.advancedSwipe then
         return
     end
     local frame = CreateFrame("Frame")

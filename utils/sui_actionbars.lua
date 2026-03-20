@@ -573,17 +573,16 @@ local function ApplyExtraButtonSettings(buttonType)
             if isVisible then
                 holder:Show()
                 holder:EnableMouse(true)
+                -- TAINT-FIX: Don't call Show()/Hide()/EnableMouse() on protected
+                -- ExtraActionBarFrame. Alpha 0/1 controls visibility.
                 if blizzFrame then
-                    blizzFrame:Show()
-                    blizzFrame:EnableMouse(true)
+                    blizzFrame:SetAlpha(1)
                 end
             else
                 holder:Hide()
                 holder:EnableMouse(false)
-                -- Completely disable the Blizzard frame to prevent any mouse interaction
                 if blizzFrame then
-                    blizzFrame:Hide()
-                    blizzFrame:EnableMouse(false)
+                    blizzFrame:SetAlpha(0)
                 end
             end
         end
@@ -640,8 +639,10 @@ local function ApplyExtraButtonSettings(buttonType)
                         if not (ss and (ss._editModeActive or ss.alwaysShow)) then
                             holder:Show()
                             holder:EnableMouse(true)
-                            blizzFrame:Show()
-                            blizzFrame:EnableMouse(true)
+                            -- TAINT-FIX: Don't call Show()/EnableMouse() on protected
+                            -- ExtraActionBarFrame. Alpha 0/1 controls visibility;
+                            -- Blizzard manages mouse interaction natively.
+                            blizzFrame:SetAlpha(1)
                         end
                     end)
                 else
@@ -649,8 +650,7 @@ local function ApplyExtraButtonSettings(buttonType)
                     C_Timer.After(0, function()
                         holder:Hide()
                         holder:EnableMouse(false)
-                        blizzFrame:Hide()
-                        blizzFrame:EnableMouse(false)
+                        blizzFrame:SetAlpha(0)
                     end)
                 end
             end

@@ -988,6 +988,7 @@ end
 
 -- Update keybinds on all icons in a viewer
 local function UpdateViewerKeybinds(viewerName)
+    if SUI.DISABLE_ALL_CDM_HOOKS or not SUI.CDM_HOOKS.keybinds then return end
     local viewer = _G[viewerName]
     if not viewer then return end
     
@@ -1107,6 +1108,7 @@ local hookedViewers = {}
 
 -- Hook into viewer layout updates
 local function HookViewerLayout(viewerName)
+    if SUI.DISABLE_ALL_CDM_HOOKS or not SUI.CDM_HOOKS.keybinds then return end
     local viewer = _G[viewerName]
     if not viewer then return end
 
@@ -1786,6 +1788,7 @@ end
 
 -- Update rotation helper on all icons in a viewer
 local function UpdateViewerRotationHelper(viewerName, nextSpellID)
+    if SUI.DISABLE_ALL_CDM_HOOKS or not SUI.CDM_HOOKS.keybinds then return end
     local viewer = _G[viewerName]
     if not viewer then return end
     

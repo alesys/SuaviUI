@@ -285,6 +285,7 @@ end
 -- Hook into Blizzard's glow system
 -- ======================================================
 local function SetupGlowHooks()
+    if SUI.DISABLE_ALL_CDM_HOOKS or not SUI.CDM_HOOKS.glows then return end
     -- TAINT-FIX: Hook ActionButtonSpellAlertManager (singleton) for CDM proc detection.
     -- Previously hooked per-CDM-icon methods (OnSpellActivationOverlayGlowShowEvent,
     -- OnSpellActivationOverlayGlowHideEvent, RefreshOverlayGlow) which rawset wrapper

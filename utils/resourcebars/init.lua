@@ -345,7 +345,8 @@ local function InitializeResourceBars()
         end
     end)
 
-    -- Also catch EDIT_MODE_LAYOUTS_UPDATED in case it fires after the poll ends
+    -- Also catch EDIT_MODE_LAYOUTS_UPDATED in case it fires after the poll ends.
+    -- This also fires on spec change when per-character layouts differ by spec.
     local layoutWatcher = CreateFrame("Frame")
     layoutWatcher:RegisterEvent("EDIT_MODE_LAYOUTS_UPDATED")
     layoutWatcher:SetScript("OnEvent", function()

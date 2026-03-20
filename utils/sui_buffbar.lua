@@ -2062,7 +2062,14 @@ LayoutBuffIcons = function()
         local iconSize = settings.iconSize or 42
         local padding = settings.padding or 0
         local aspectRatio = settings.aspectRatioCrop or 1.0
-        local growthDirection = settings.growthDirection or "CENTERED_HORIZONTAL"
+        -- Viewer orientation takes priority (set by Edit Mode); settings.growthDirection
+        -- is only used for horizontal layout customization.
+        local growthDirection
+        if SUI_BuffBar.iconViewerIsVertical then
+            growthDirection = "DOWN"
+        else
+            growthDirection = settings.growthDirection or "CENTERED_HORIZONTAL"
+        end
 
         local iconWidth, iconHeight = iconSize, iconSize
         if aspectRatio > 1.0 then
@@ -2179,7 +2186,14 @@ LayoutBuffIcons = function()
     local blizzPadding = BuffIconCooldownViewer.childXPadding or BuffIconCooldownViewer.childYPadding
     local padding = blizzPadding or (settings.padding or 0)
     local aspectRatio = settings.aspectRatioCrop or 1.0
-    local growthDirection = settings.growthDirection or "CENTERED_HORIZONTAL"
+    -- Viewer orientation takes priority (set by Edit Mode); settings.growthDirection
+    -- is only used for horizontal layout customization.
+    local growthDirection
+    if SUI_BuffBar.iconViewerIsVertical then
+        growthDirection = "DOWN"
+    else
+        growthDirection = settings.growthDirection or "CENTERED_HORIZONTAL"
+    end
 
     -- Calculate dimensions using crop-based aspect ratio
     local iconWidth, iconHeight = iconSize, iconSize
@@ -2747,7 +2761,7 @@ end
 local initialized = false
 
 local function Initialize()
-    if FORCE_DISABLE_CDM_BUFFBAR then return end
+    if FORCE_DISABLE_CDM_BUFFBAR or ns.DISABLE_ALL_CDM_HOOKS or not ns.CDM_HOOKS.buffbar then return end
     if initialized then return end
     initialized = true
     UpdateOwnershipExports()
@@ -2963,11 +2977,18 @@ local function Initialize()
     -- on CDM viewers. HookScript adds insecure handlers to the secure frame's script chain,
     -- tainting the viewer. hooksecurefunc("Layout") covers both cases (Layout runs after
     -- OnSizeChanged and OnShow internally).
-    if not USE_CUSTOM_ICONS then
+    if not USE_CUSTOM_ICONS and not ns.DISABLE_ALL_CDM_HOOKS or not ns.CDM_HOOKS.buffbar then
         pcall(function()
             -- Hook Layout via hooksecurefunc (safe — doesn't taint the viewer)
             if BuffIconCooldownViewer and BuffIconCooldownViewer.Layout then
                 hooksecurefunc(BuffIconCooldownViewer, "Layout", function()
+                    -- Capture orientation: viewer.isHorizontal is set by RefreshLayout()
+                    -- BEFORE Layout() fires (GetItemContainerFrame() returns self), so
+                    -- this field is guaranteed correct when our hooksecurefunc triggers.
+                    local isHoriz = BuffIconCooldownViewer.isHorizontal
+                    if isHoriz ~= nil then
+                        SUI_BuffBar.iconViewerIsVertical = (isHoriz == false)
+                    end
                     if IsLayoutSuppressed() then return end
                     if isIconLayoutRunning then return end
                     -- Defer so we don't run inside Blizzard's secure Layout call stack
@@ -2982,7 +3003,7 @@ local function Initialize()
     end
 
     -- Legacy bar Layout hooks (only when not using custom bars)
-    if not USE_CUSTOM_BARS then
+    if not USE_CUSTOM_BARS and not ns.DISABLE_ALL_CDM_HOOKS or not ns.CDM_HOOKS.buffbar then
         pcall(function()
             if BuffBarCooldownViewer and BuffBarCooldownViewer.Layout then
                 hooksecurefunc(BuffBarCooldownViewer, "Layout", function()
@@ -3056,7 +3077,7 @@ eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:SetScript("OnEvent", function(self, event, ...)
-    if FORCE_DISABLE_CDM_BUFFBAR then return end
+    if FORCE_DISABLE_CDM_BUFFBAR or ns.DISABLE_ALL_CDM_HOOKS or not ns.CDM_HOOKS.buffbar then return end
     if event == "PLAYER_LOGIN" then
         C_Timer.After(1, Initialize)
     elseif event == "PLAYER_ENTERING_WORLD" then
@@ -3078,6 +3099,7 @@ end)
 
 -- Also try to initialize immediately if viewers exist
 C_Timer.After(0, function()
+    if ns.DISABLE_ALL_CDM_HOOKS or not ns.CDM_HOOKS.buffbar then return end
     if BuffIconCooldownViewer or BuffBarCooldownViewer then
         Initialize()
     end

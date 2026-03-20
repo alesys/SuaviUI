@@ -104,6 +104,7 @@ end
 
 -- Apply settings to all CDM viewers
 local function ApplyAllSettings()
+    if SUI.DISABLE_ALL_CDM_HOOKS or not SUI.CDM_HOOKS.swipe then return end
     local viewers = {
         _G.EssentialCooldownViewer,
         _G.UtilityCooldownViewer,
@@ -135,6 +136,7 @@ end
 local swipeTicker = nil
 
 local function StartSwipeTicker()
+    if SUI.DISABLE_ALL_CDM_HOOKS or not SUI.CDM_HOOKS.swipe then return end
     if swipeTicker then return end
     swipeTicker = C_Timer.NewTicker(0.2, function()
         local viewers = {
