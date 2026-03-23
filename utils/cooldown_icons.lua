@@ -556,7 +556,7 @@ function StyledIcons:Initialize()
 end
 
 function StyledIcons:OnSettingChanged()
-    if FORCE_DISABLE_CDM_STYLING then
+    if FORCE_DISABLE_CDM_STYLING or ns.DISABLE_ALL_CDM_HOOKS or not ns.CDM_HOOKS.iconStyling then
         if isModuleStyledEnabled then
             self:Disable()
         end

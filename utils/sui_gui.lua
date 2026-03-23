@@ -662,6 +662,168 @@ function GUI:ShowConfirmation(options)
 end
 
 ---------------------------------------------------------------------------
+-- TEXT INPUT/DISPLAY DIALOG (addon-owned replacement for StaticPopup + EditBox)
+-- TAINT-FIX: StaticPopup_Show from addon context taints the popup frame,
+-- blocking protected calls (UpgradeItem, etc.) when Blizzard reuses the frame.
+---------------------------------------------------------------------------
+local textDialog = nil
+
+function GUI:ShowTextDialog(options)
+    -- options = {
+    --   title = "Export Settings",
+    --   text = "pre-filled text",       -- pre-fill EditBox (for export)
+    --   selectAll = true,               -- highlight all text on show
+    --   acceptText = "OK",
+    --   cancelText = "Close",
+    --   onAccept = function(text) end,  -- receives EditBox text
+    --   onCancel = function() end,      -- optional
+    -- }
+
+    if not textDialog then
+        textDialog = CreateFrame("Frame", "SUI_TextDialog", UIParent, "BackdropTemplate")
+        textDialog:SetSize(380, 180)
+        textDialog:SetPoint("CENTER")
+        textDialog:SetFrameStrata("FULLSCREEN_DIALOG")
+        textDialog:SetFrameLevel(500)
+        textDialog:EnableMouse(true)
+        textDialog:SetMovable(true)
+        textDialog:RegisterForDrag("LeftButton")
+        textDialog:SetScript("OnDragStart", function(self) self:StartMoving() end)
+        textDialog:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
+        textDialog:SetClampedToScreen(true)
+        textDialog:Hide()
+
+        textDialog:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        textDialog:SetBackdropColor(C.bg[1], C.bg[2], C.bg[3], 0.98)
+        textDialog:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
+
+        -- Title
+        textDialog.title = textDialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        SetFont(textDialog.title, 14, "", C.accentLight)
+        textDialog.title:SetPoint("TOP", 0, -14)
+
+        -- EditBox inside a scroll frame
+        local editBox = CreateFrame("EditBox", "SUI_TextDialogEditBox", textDialog)
+        editBox:SetSize(340, 22)
+        editBox:SetPoint("TOP", 0, -42)
+        editBox:SetFontObject(ChatFontNormal)
+        editBox:SetAutoFocus(false)
+        editBox:SetTextInsets(6, 6, 4, 4)
+
+        local editBg = editBox:CreateTexture(nil, "BACKGROUND")
+        editBg:SetAllPoints()
+        editBg:SetColorTexture(C.bgLight[1], C.bgLight[2], C.bgLight[3], 1)
+
+        local editBorder = CreateFrame("Frame", nil, editBox, "BackdropTemplate")
+        editBorder:SetPoint("TOPLEFT", -1, 1)
+        editBorder:SetPoint("BOTTOMRIGHT", 1, -1)
+        editBorder:SetBackdrop({
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        editBorder:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
+
+        textDialog.editBox = editBox
+
+        -- Accept button
+        textDialog.acceptBtn = CreateFrame("Button", nil, textDialog, "BackdropTemplate")
+        textDialog.acceptBtn:SetSize(100, 28)
+        textDialog.acceptBtn:SetPoint("BOTTOMLEFT", 50, 18)
+        textDialog.acceptBtn:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        textDialog.acceptBtn:SetBackdropColor(C.bgLight[1], C.bgLight[2], C.bgLight[3], 1)
+        textDialog.acceptBtn:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
+
+        textDialog.acceptBtn.text = textDialog.acceptBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        textDialog.acceptBtn.text:SetFont(GetFontPath(), 12, "")
+        textDialog.acceptBtn.text:SetPoint("CENTER")
+
+        textDialog.acceptBtn:SetScript("OnEnter", function(self)
+            pcall(self.SetBackdropBorderColor, self, C.accent[1], C.accent[2], C.accent[3], 1)
+        end)
+        textDialog.acceptBtn:SetScript("OnLeave", function(self)
+            pcall(self.SetBackdropBorderColor, self, C.border[1], C.border[2], C.border[3], 1)
+        end)
+
+        -- Cancel button
+        textDialog.cancelBtn = CreateFrame("Button", nil, textDialog, "BackdropTemplate")
+        textDialog.cancelBtn:SetSize(100, 28)
+        textDialog.cancelBtn:SetPoint("BOTTOMRIGHT", -50, 18)
+        textDialog.cancelBtn:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        textDialog.cancelBtn:SetBackdropColor(C.bgLight[1], C.bgLight[2], C.bgLight[3], 1)
+        textDialog.cancelBtn:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
+
+        textDialog.cancelBtn.text = textDialog.cancelBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        textDialog.cancelBtn.text:SetFont(GetFontPath(), 12, "")
+        textDialog.cancelBtn.text:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
+        textDialog.cancelBtn.text:SetPoint("CENTER")
+
+        textDialog.cancelBtn:SetScript("OnEnter", function(self)
+            pcall(self.SetBackdropBorderColor, self, C.accent[1], C.accent[2], C.accent[3], 1)
+        end)
+        textDialog.cancelBtn:SetScript("OnLeave", function(self)
+            pcall(self.SetBackdropBorderColor, self, C.border[1], C.border[2], C.border[3], 1)
+        end)
+
+        -- ESC to close
+        textDialog:SetScript("OnKeyDown", function(self, key)
+            if key == "ESCAPE" then
+                self:SetPropagateKeyboardInput(false)
+                if self._onCancel then self._onCancel() end
+                self:Hide()
+            else
+                self:SetPropagateKeyboardInput(true)
+            end
+        end)
+    end
+
+    -- Configure for this call
+    textDialog.title:SetText(options.title or "")
+    textDialog.editBox:SetText(options.text or "")
+    textDialog._onCancel = options.onCancel
+
+    textDialog.acceptBtn.text:SetText(options.acceptText or "OK")
+    textDialog.acceptBtn.text:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
+    textDialog.cancelBtn.text:SetText(options.cancelText or "Cancel")
+
+    textDialog.acceptBtn:SetScript("OnClick", function()
+        local text = textDialog.editBox:GetText() or ""
+        textDialog:Hide()
+        if options.onAccept then options.onAccept(text) end
+    end)
+
+    textDialog.cancelBtn:SetScript("OnClick", function()
+        textDialog:Hide()
+        if options.onCancel then options.onCancel() end
+    end)
+
+    textDialog.editBox:SetScript("OnEnterPressed", function(self)
+        local text = self:GetText() or ""
+        textDialog:Hide()
+        if options.onAccept then options.onAccept(text) end
+    end)
+
+    textDialog:Show()
+    textDialog:EnableKeyboard(true)
+    textDialog.editBox:SetFocus()
+
+    if options.selectAll then
+        textDialog.editBox:HighlightText()
+    end
+end
+
+---------------------------------------------------------------------------
 -- WIDGET: SECTION HEADER (Mint colored text with underline)
 -- Auto-detects if first element in panel (no top margin) vs subsequent (12px margin)
 ---------------------------------------------------------------------------

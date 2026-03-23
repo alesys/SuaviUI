@@ -2300,15 +2300,11 @@ LayoutBuffIcons = function()
         end
     end
 
-    -- Pin viewer size to prevent layout drift from Blizzard's ResizeLayoutMixin.
-    -- SetSize is a C API call (safe). The previous taint was caused by HookScript on
-    -- viewers (now removed), not by SetSize itself.
-    local isEditMode = EditModeManagerFrame and EditModeManagerFrame.editModeActive
-    if not isEditMode and not InCombatLockdown() then
-        SuppressLayout()
-        BuffIconCooldownViewer:SetSize(roundPixel(totalWidth), roundPixel(totalHeight))
-        UnsuppressLayout()
-    end
+    -- TAINT-FIX: Removed BuffIconCooldownViewer:SetSize(). Calling SetSize on a CDM
+    -- viewer from addon context triggers OnSizeChanged → RefreshLayout → RefreshData
+    -- in addon context, tainting ALL CDM item fields via the shared data provider.
+    -- Icons are positioned via SetPoint on individual items; viewer size is cosmetic
+    -- and managed by Blizzard via Edit Mode.
 
     end) -- end pcall wrapping legacy icon path
 
@@ -2657,13 +2653,8 @@ LayoutBuffBars = function()
         end
     end
 
-    -- Pin viewer size to prevent layout drift from Blizzard's ResizeLayoutMixin.
-    local isEditMode = EditModeManagerFrame and EditModeManagerFrame.editModeActive
-    if not isEditMode and not InCombatLockdown() then
-        SuppressLayout()
-        BuffBarCooldownViewer:SetSize(roundPixel(effectiveBarWidth), roundPixel(effectiveBarHeight))
-        UnsuppressLayout()
-    end
+    -- TAINT-FIX: Removed BuffBarCooldownViewer:SetSize(). Same as BuffIcon above —
+    -- SetSize on CDM viewers triggers the shared data provider taint cascade.
 
     end) -- end pcall wrapping legacy bar path
 
@@ -3270,74 +3261,72 @@ do
     end, iconControlKeys)
 
     ---------------------------------------------------------------------------
-    -- Essential: square icon controls + CDM global settings
+    -- Essential: square icon controls + Essential-specific settings
     ---------------------------------------------------------------------------
     local essentialControlKeys = {
         "essentialDivider", "essentialSquare", "essentialBorderSize",
         "essentialBorderOverlap", "essentialZoom",
-        "cdmGlobalDivider", "cdmCentered",
-        "cdmEssentialGrow", "cdmUtilityGrow",
-        "cdmDimUtility", "cdmDimOpacity",
-        "cdmLimitUtilitySize", "cdmNormalizeUtility",
-        "cdmHighlightEssential", "cdmHighlightUtility",
+        "essentialCenteredDivider", "essentialCentered",
+        "essentialGrow", "essentialHighlight",
     }
 
     EP.RegisterSystem(IsEssentialViewer, function()
         CreateCDMSquareIconControls("essential", "Essential", RefreshIcons)
 
-        -- CDM Global settings (shown on Essential panel as the "main" CDM panel)
-        controls.cdmGlobalDivider = EP.CreateDivider("CDMGlobal", "CDM Global")
+        controls.essentialCenteredDivider = EP.CreateDivider("EssentialCentered", "Centered Layout")
 
-        controls.cdmCentered = EP.CreateCheckbox("CDMCentered", "Use Centered Styling",
-            function() local p = GetProfile(); return p and p.cooldownManager_useCenteredStyling or false end,
-            function(v) local p = GetProfile(); if p then p.cooldownManager_useCenteredStyling = v end; RefreshIcons() end
+        controls.essentialCentered = EP.CreateCheckbox("EssentialCentered", "Use Centered Styling",
+            function() local p = GetProfile(); return p and p.cooldownManager_useCenteredStyling_Essential or false end,
+            function(v) local p = GetProfile(); if p then p.cooldownManager_useCenteredStyling_Essential = v end; RefreshIcons() end
         )
-        controls.cdmEssentialGrow = EP.CreateDropdown("CDMEssentialGrow", "Essential Grow",
+        controls.essentialGrow = EP.CreateDropdown("EssentialGrow", "Growth Direction",
             function() return { {value = "TOP", text = "Top"}, {value = "BOTTOM", text = "Bottom"} } end,
             function() local p = GetProfile(); return p and p.cooldownManager_centerEssential_growFromDirection or "TOP" end,
             function(v) local p = GetProfile(); if p then p.cooldownManager_centerEssential_growFromDirection = v end; RefreshIcons() end
         )
-        controls.cdmUtilityGrow = EP.CreateDropdown("CDMUtilityGrow", "Utility Grow",
-            function() return { {value = "TOP", text = "Top"}, {value = "BOTTOM", text = "Bottom"} } end,
-            function() local p = GetProfile(); return p and p.cooldownManager_centerUtility_growFromDirection or "TOP" end,
-            function(v) local p = GetProfile(); if p then p.cooldownManager_centerUtility_growFromDirection = v end; RefreshIcons() end
-        )
-        controls.cdmDimUtility = EP.CreateCheckbox("CDMDimUtility", "Dim Utility Off CD",
-            function() local p = GetProfile(); return p and p.cooldownManager_utility_dimWhenNotOnCD or false end,
-            function(v) local p = GetProfile(); if p then p.cooldownManager_utility_dimWhenNotOnCD = v end; RefreshIcons() end
-        )
-        controls.cdmDimOpacity = EP.CreateSlider("CDMDimOpacity", "Dim Opacity", 0, 90, 5,
-            function() local p = GetProfile(); return math.floor(((p and p.cooldownManager_utility_dimOpacity) or 0.3) * 100 + 0.5) end,
-            function(v) local p = GetProfile(); if p then p.cooldownManager_utility_dimOpacity = v / 100 end; RefreshIcons() end
-        )
-        controls.cdmLimitUtilitySize = EP.CreateCheckbox("CDMLimitUtility", "Limit Utility to Essential Width",
-            function() local p = GetProfile(); return p and p.cooldownManager_limitUtilitySizeToEssential or false end,
-            function(v) local p = GetProfile(); if p then p.cooldownManager_limitUtilitySizeToEssential = v end; RefreshAdvanced() end
-        )
-        controls.cdmNormalizeUtility = EP.CreateCheckbox("CDMNormalizeUtility", "Normalize Utility Size",
-            function() local p = GetProfile(); return p and p.cooldownManager_normalizeUtilitySize or false end,
-            function(v) local p = GetProfile(); if p then p.cooldownManager_normalizeUtilitySize = v end; RefreshAdvanced() end
-        )
-        controls.cdmHighlightEssential = EP.CreateCheckbox("CDMHighlightEssential", "Rotation Highlight",
+        controls.essentialHighlight = EP.CreateCheckbox("EssentialHighlight", "Rotation Highlight",
             function() local p = GetProfile(); return p and p.cooldownManager_showHighlight_Essential or false end,
             function(v) local p = GetProfile(); if p then p.cooldownManager_showHighlight_Essential = v end; RefreshAdvanced() end
-        )
-        controls.cdmHighlightUtility = EP.CreateCheckbox("CDMHighlightUtility", "Utility Rot. Highlight",
-            function() local p = GetProfile(); return p and p.cooldownManager_showHighlight_Utility or false end,
-            function(v) local p = GetProfile(); if p then p.cooldownManager_showHighlight_Utility = v end; RefreshAdvanced() end
         )
     end, essentialControlKeys)
 
     ---------------------------------------------------------------------------
-    -- Utility: square icon controls
+    -- Utility: square icon controls + Utility-specific settings
     ---------------------------------------------------------------------------
     local utilityControlKeys = {
         "utilityDivider", "utilitySquare", "utilityBorderSize",
         "utilityBorderOverlap", "utilityZoom",
+        "utilityCenteredDivider", "utilityCentered",
+        "utilityGrow", "utilityDim", "utilityDimOpacity",
+        "utilityHighlight",
     }
 
     EP.RegisterSystem(IsUtilityViewer, function()
         CreateCDMSquareIconControls("utility", "Utility", RefreshIcons)
+
+        controls.utilityCenteredDivider = EP.CreateDivider("UtilityCentered", "Centered Layout")
+
+        controls.utilityCentered = EP.CreateCheckbox("UtilityCentered", "Use Centered Styling",
+            function() local p = GetProfile(); return p and p.cooldownManager_useCenteredStyling_Utility or false end,
+            function(v) local p = GetProfile(); if p then p.cooldownManager_useCenteredStyling_Utility = v end; RefreshIcons() end
+        )
+        controls.utilityGrow = EP.CreateDropdown("UtilityGrow", "Growth Direction",
+            function() return { {value = "TOP", text = "Top"}, {value = "BOTTOM", text = "Bottom"} } end,
+            function() local p = GetProfile(); return p and p.cooldownManager_centerUtility_growFromDirection or "TOP" end,
+            function(v) local p = GetProfile(); if p then p.cooldownManager_centerUtility_growFromDirection = v end; RefreshIcons() end
+        )
+        controls.utilityDim = EP.CreateCheckbox("UtilityDim", "Dim When Off CD",
+            function() local p = GetProfile(); return p and p.cooldownManager_utility_dimWhenNotOnCD or false end,
+            function(v) local p = GetProfile(); if p then p.cooldownManager_utility_dimWhenNotOnCD = v end; RefreshIcons() end
+        )
+        controls.utilityDimOpacity = EP.CreateSlider("UtilityDimOpacity", "Dim Opacity", 0, 90, 5,
+            function() local p = GetProfile(); return math.floor(((p and p.cooldownManager_utility_dimOpacity) or 0.3) * 100 + 0.5) end,
+            function(v) local p = GetProfile(); if p then p.cooldownManager_utility_dimOpacity = v / 100 end; RefreshIcons() end
+        )
+        controls.utilityHighlight = EP.CreateCheckbox("UtilityHighlight", "Rotation Highlight",
+            function() local p = GetProfile(); return p and p.cooldownManager_showHighlight_Utility or false end,
+            function(v) local p = GetProfile(); if p then p.cooldownManager_showHighlight_Utility = v end; RefreshAdvanced() end
+        )
     end, utilityControlKeys)
 end
 

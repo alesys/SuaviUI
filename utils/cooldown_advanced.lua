@@ -94,33 +94,11 @@ end
 
 -- Apply size constraints between Essential and Utility viewers
 function CooldownAdvanced.ApplySizeControls()
-    local essentialViewer = _G.EssentialCooldownViewer
-    local utilityViewer = _G.UtilityCooldownViewer
-    
-    if not essentialViewer or not utilityViewer then
-        return
-    end
-    
-    local limitSize = GetSetting("cooldownManager_limitUtilitySizeToEssential", false)
-    local normalizeSize = GetSetting("cooldownManager_normalizeUtilitySize", false)
-    
-    if limitSize then
-        -- Constrain Utility viewer width to match Essential viewer width
-        local essentialWidth = essentialViewer:GetWidth()
-        if essentialWidth > 0 then
-            utilityViewer:SetWidth(essentialWidth)
-        end
-    end
-    
-    if normalizeSize then
-        -- Make both viewers the same size
-        local essentialWidth = essentialViewer:GetWidth()
-        local essentialHeight = essentialViewer:GetHeight()
-        
-        if essentialWidth > 0 and essentialHeight > 0 then
-            utilityViewer:SetSize(essentialWidth, essentialHeight)
-        end
-    end
+    -- TAINT-FIX: SetSize/SetWidth on CDM viewers triggers OnSizeChanged →
+    -- RefreshLayout → RefreshData in addon context, tainting ALL CDM data
+    -- via the shared CooldownViewerSettings data provider.
+    -- Viewer sizing must be managed through Edit Mode, not addon code.
+    return
 end
 
 -- =====================================================
@@ -292,8 +270,6 @@ function CooldownAdvanced.RefreshAllFeatures()
         CooldownAdvanced.RefreshViewerFeatures(viewerInfo[1], viewerInfo[2])
     end
     
-    -- Apply size controls
-    CooldownAdvanced.ApplySizeControls()
 end
 
 -- Hook cooldown updates to refresh dimming and colors

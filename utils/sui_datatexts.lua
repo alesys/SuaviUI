@@ -978,20 +978,20 @@ Datatexts:Register("gold", {
                     -- Capture values for closure
                     local deleteCharKey = charKey
                     local btn = root:CreateButton(colorCode .. charKey .. "|r - " .. FormatGold(charMoney), function()
-                        -- Confirm deletion
-                        StaticPopupDialogs["suavi_GOLD_DELETE_CHAR"] = {
-                            text = "Delete gold data for " .. deleteCharKey .. "?",
-                            button1 = "Delete",
-                            button2 = "Cancel",
-                            OnAccept = function()
+                        -- TAINT-FIX: Use addon-owned dialog instead of StaticPopup.
+                        -- StaticPopup_Show from addon context taints the popup frame;
+                        -- Blizzard reuses the same frame for UpgradeItem() confirmation.
+                        SuaviUI.GUI:ShowConfirmation({
+                            title = "Delete Character Data",
+                            message = "Delete gold data for " .. deleteCharKey .. "?",
+                            acceptText = "Delete",
+                            cancelText = "Cancel",
+                            isDestructive = true,
+                            onAccept = function()
                                 db.global.goldData[deleteCharKey] = nil
                                 print("|cff30D1FF[SuaviUI]|r Removed gold data for " .. deleteCharKey)
                             end,
-                            timeout = 0,
-                            whileDead = true,
-                            hideOnEscape = true,
-                        }
-                        StaticPopup_Show("suavi_GOLD_DELETE_CHAR")
+                        })
                     end)
 
                     -- Can't delete current character
@@ -1002,11 +1002,14 @@ Datatexts:Register("gold", {
 
                 root:CreateDivider()
                 root:CreateButton("|cffFF6666Reset All (Keep Current)|r", function()
-                    StaticPopupDialogs["suavi_GOLD_RESET_ALL"] = {
-                        text = "Delete gold data for ALL characters except current?",
-                        button1 = "Reset All",
-                        button2 = "Cancel",
-                        OnAccept = function()
+                    -- TAINT-FIX: addon-owned dialog (see gold delete above)
+                    SuaviUI.GUI:ShowConfirmation({
+                        title = "Reset Gold Data",
+                        message = "Delete gold data for ALL characters except current?",
+                        acceptText = "Reset All",
+                        cancelText = "Cancel",
+                        isDestructive = true,
+                        onAccept = function()
                             local keepKey = currentCharKey
                             local keepData = db.global.goldData[keepKey]
                             db.global.goldData = {}
@@ -1015,11 +1018,7 @@ Datatexts:Register("gold", {
                             end
                             print("|cff30D1FF[SuaviUI]|r Reset gold data (kept current character)")
                         end,
-                        timeout = 0,
-                        whileDead = true,
-                        hideOnEscape = true,
-                    }
-                    StaticPopup_Show("suavi_GOLD_RESET_ALL")
+                    })
                 end)
             end)
         end

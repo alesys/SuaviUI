@@ -996,66 +996,36 @@ function LEMSettingsLoaderMixin:LoadSettings()
                     RB.prettyPrint(L["EXPORT_FAILED"])
                     return
                 end
-                StaticPopupDialogs["SUI_RB_EXPORT_SETTINGS"] = StaticPopupDialogs["SUI_RB_EXPORT_SETTINGS"]
-                    or {
-                        text = L["EXPORT"],
-                        button1 = L["CLOSE"],
-                        hasEditBox = true,
-                        editBoxWidth = 320,
-                        timeout = 0,
-                        whileDead = true,
-                        hideOnEscape = true,
-                        preferredIndex = 3,
-                    }
-                StaticPopupDialogs["SUI_RB_EXPORT_SETTINGS"].OnShow = function(self)
-                    self:SetFrameStrata("TOOLTIP")
-                    local editBox = self.editBox or self:GetEditBox()
-                    editBox:SetText(exportString)
-                    editBox:HighlightText()
-                    editBox:SetFocus()
-                end
-                StaticPopup_Show("SUI_RB_EXPORT_SETTINGS")
+                -- TAINT-FIX: Use addon-owned dialog instead of StaticPopup.
+                -- StaticPopup_Show from addon context taints the popup frame;
+                -- Blizzard reuses the same frame for UpgradeItem() confirmation.
+                SuaviUI.GUI:ShowTextDialog({
+                    title = L["EXPORT"],
+                    text = exportString,
+                    selectAll = true,
+                    cancelText = L["CLOSE"],
+                    acceptText = L["CLOSE"],
+                })
             end,
         },
         {
             text = L["IMPORT_BAR"],
             click = function()
                 local dbName = self.bar:GetConfig().dbName
-                StaticPopupDialogs["SUI_RB_IMPORT_SETTINGS"] = StaticPopupDialogs["SUI_RB_IMPORT_SETTINGS"]
-                    or {
-                        text = L["IMPORT"],
-                        button1 = L["OKAY"],
-                        button2 = L["CANCEL"],
-                        hasEditBox = true,
-                        editBoxWidth = 320,
-                        timeout = 0,
-                        whileDead = true,
-                        hideOnEscape = true,
-                        preferredIndex = 3,
-                    }
-                StaticPopupDialogs["SUI_RB_IMPORT_SETTINGS"].OnShow = function(self)
-                    self:SetFrameStrata("TOOLTIP")
-                    local editBox = self.editBox or self:GetEditBox()
-                    editBox:SetText("")
-                    editBox:SetFocus()
-                end
-                StaticPopupDialogs["SUI_RB_IMPORT_SETTINGS"].EditBoxOnEnterPressed = function(editBox)
-                    local parent = editBox:GetParent()
-                    if parent and parent.button1 then parent.button1:Click() end
-                end
-                StaticPopupDialogs["SUI_RB_IMPORT_SETTINGS"].OnAccept = function(self)
-                    local editBox = self.editBox or self:GetEditBox()
-                    local input = editBox:GetText() or ""
-
-                    local ok, error = RB.importBarAsString(input, dbName)
-                    if not ok then
-                        RB.prettyPrint(L["IMPORT_FAILED_WITH_ERROR"] .. error)
-                    end
-
-                    RB.fullUpdateBars()
-                    LEM.internal:RefreshSettingValues()
-                end
-                StaticPopup_Show("SUI_RB_IMPORT_SETTINGS")
+                -- TAINT-FIX: addon-owned dialog (see export above)
+                SuaviUI.GUI:ShowTextDialog({
+                    title = L["IMPORT"],
+                    acceptText = L["OKAY"],
+                    cancelText = L["CANCEL"],
+                    onAccept = function(input)
+                        local ok, importErr = RB.importBarAsString(input, dbName)
+                        if not ok then
+                            RB.prettyPrint(L["IMPORT_FAILED_WITH_ERROR"] .. importErr)
+                        end
+                        RB.fullUpdateBars()
+                        LEM.internal:RefreshSettingValues()
+                    end,
+                })
             end
         }
     }

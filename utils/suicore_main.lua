@@ -25,12 +25,12 @@ ns.DISABLE_ALL_CDM_HOOKS = false
 ns.CDM_HOOKS = {
     buffbar = true,        -- A: sui_buffbar.lua Layout hooks + styling + init
     cooldownmanager = true,  -- B: cooldownmanager.lua icon/bar positioning
-    suicoreViewers = false, -- C: TAINT SOURCE! SkinIcon calls SetSize/CreateTexture on CDM items
+    suicoreViewers = true,  -- C: SkinIcon (StripBlizzardOverlay deferred to avoid taint)
     swipe = true,          -- D: cooldownswipe.lua swipe customization
     keybinds = true,       -- E: keybinds.lua keybind text + rotation helper
-    iconStyling = true,    -- F: cooldown_icons.lua square icon styling (StyledIcons)
+    iconStyling = true,    -- F: cooldown_icons.lua square icon styling (safe — matches CMC pattern)
     fontStyling = true,    -- G: cooldown_fonts.lua custom font overlays
-    advancedSwipe = true,  -- H: cooldown_advanced.lua swipe colors + dimming
+    advancedSwipe = true,   -- H: cooldown_advanced.lua swipe colors + dimming (ApplySizeControls gutted)
     effects = true,        -- I: cooldowneffects.lua effect hiding + HookScript("OnShow")
     glows = true,          -- J: customglows.lua ActionButtonSpellAlertManager hooks
     castbarSync = true,    -- K: CastbarMixin.lua width sync on viewers
@@ -2923,7 +2923,8 @@ local defaults = {
         },
 
         -- CooldownManagerCentered (layout/centering defaults)
-        cooldownManager_useCenteredStyling = false,
+        cooldownManager_useCenteredStyling_Essential = false,
+        cooldownManager_useCenteredStyling_Utility = false,
         cooldownManager_alignBuffIcons_growFromDirection = "START",
         cooldownManager_alignBuffBars_growFromDirection = "BOTTOM",
         cooldownManager_centerEssential_growFromDirection = "TOP",
@@ -4151,14 +4152,23 @@ local function StripBlizzardOverlay(icon)
     for _, region in ipairs({ icon:GetRegions() }) do
         if region:IsObjectType("Texture") and region.GetAtlas and region:GetAtlas() == "UI-HUD-CoolDownManager-IconOverlay" then
             region:SetTexture("")
-            region:Hide()
-            -- TAINT-FIX: hooksecurefunc preserves the original C Show as secure.
-            -- Don't call Hide() — causes Show→Hide→Show infinite loop.
+            region:SetAlpha(0)
+            -- TAINT-FIX: Defer work to next frame to break out of Blizzard's secure
+            -- RefreshData execution chain. The inline approach (SetTexture/SetAlpha
+            -- inside hooksecurefunc) ran synchronously during RefreshData, tainting
+            -- the execution context. Matches QUI's DeferredHideOnShow pattern.
             if not overlayShowHooked[region] then
                 overlayShowHooked[region] = true
                 hooksecurefunc(region, "Show", function(self)
-                    self:SetTexture("")
-                    self:SetAlpha(0)
+                    C_Timer.After(0, function()
+                        if self.IsForbidden and self:IsForbidden() then return end
+                        if InCombatLockdown() then
+                            pcall(self.SetAlpha, self, 0)
+                            return
+                        end
+                        pcall(self.SetTexture, self, "")
+                        pcall(self.SetAlpha, self, 0)
+                    end)
                 end)
             end
         end

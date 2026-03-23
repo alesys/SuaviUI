@@ -115,10 +115,17 @@ function Runtime:IsReady(viewerNameOrFrame)
 end
 
 CMC_DEBUG = false
--- CDM layout is controlled by the user-facing "Use Centered Styling" toggle
--- When disabled, all centering/alignment routines early-return.
-local function FORCE_DISABLE_CDM_LAYOUT()
-    return not GetSetting("cooldownManager_useCenteredStyling", false)
+-- Per-viewer centered styling check. Essential and Utility have independent toggles.
+-- BuffIcon/BuffBar use the old combined check (either viewer enabled → layout enabled).
+local function IsCenteredStylingEnabled(viewerType)
+    if viewerType == "Essential" then
+        return GetSetting("cooldownManager_useCenteredStyling_Essential", false)
+    elseif viewerType == "Utility" then
+        return GetSetting("cooldownManager_useCenteredStyling_Utility", false)
+    end
+    -- BuffIcon/BuffBar: enabled if EITHER Essential or Utility centered is on
+    return GetSetting("cooldownManager_useCenteredStyling_Essential", false)
+        or GetSetting("cooldownManager_useCenteredStyling_Utility", false)
 end
 -- TAINT-SAFE MODE (WoW 12.x): avoid mutating Blizzard CooldownViewer item frames
 -- from addon code. This prevents "secret value tainted by 'SuaviUI'" chains in
@@ -466,7 +473,7 @@ function ViewerAdapters.UpdateBuffIcons()
     if ns.BuffBar and ns.BuffBar.USE_CUSTOM_ICONS then
         return
     end
-    if FORCE_DISABLE_CDM_LAYOUT() then
+    if not IsCenteredStylingEnabled() then
         return
     end
     if DISABLE_BLIZZARD_VIEWER_MUTATIONS then
@@ -566,7 +573,7 @@ function ViewerAdapters.UpdateBuffBarsIfNeeded()
     if ns.BuffBar and ns.BuffBar.USE_CUSTOM_BARS then
         return
     end
-    if FORCE_DISABLE_CDM_LAYOUT() then
+    if not IsCenteredStylingEnabled() then
         return
     end
     if DISABLE_BLIZZARD_VIEWER_MUTATIONS then
@@ -712,7 +719,12 @@ function ViewerAdapters.CenterAllRows(viewer, fromDirection)
     -- Why: Core centering routine that groups children into rows/columns and applies offsets.
     -- When: `UpdateEssentialIfNeeded` or `UpdateUtilityIfNeeded` determines changes require recompute.
     -- WoW 12.0.5: viewer may be forbidden. All access wrapped in pcall.
-    if FORCE_DISABLE_CDM_LAYOUT() then
+    if not viewer then return end
+    local viewerName = pcall(viewer.GetName, viewer) and viewer:GetName() or ""
+    local viewerType = viewerName:find("Essential") and "Essential"
+                    or viewerName:find("Utility") and "Utility"
+                    or nil
+    if not IsCenteredStylingEnabled(viewerType) then
         return
     end
     if DISABLE_BLIZZARD_VIEWER_MUTATIONS then
@@ -802,7 +814,7 @@ function ViewerAdapters.CenterAllRows(viewer, fromDirection)
 end
 
 function CooldownManager.UpdateEssentialIfNeeded()
-    if FORCE_DISABLE_CDM_LAYOUT() then
+    if not IsCenteredStylingEnabled("Essential") then
         return
     end
     local growKey = "cooldownManager_centerEssential_growFromDirection"
@@ -813,7 +825,7 @@ function CooldownManager.UpdateEssentialIfNeeded()
 end
 
 function CooldownManager.UpdateUtilityIfNeeded()
-    if FORCE_DISABLE_CDM_LAYOUT() then
+    if not IsCenteredStylingEnabled("Utility") then
         return
     end
     local growKey = "cooldownManager_centerUtility_growFromDirection"
@@ -836,9 +848,9 @@ function CooldownManager.ForceRefresh(parts)
         QueueDeferredRefresh(parts)
         return
     end
-    if FORCE_DISABLE_CDM_LAYOUT() then
-        -- Centering is OFF: do nothing in CMC layer.
-        -- Avoid direct Blizzard RefreshLayout invocation from addon code.
+    -- Per-viewer check: only process parts whose centered styling is enabled
+    local anyEnabled = IsCenteredStylingEnabled("Essential") or IsCenteredStylingEnabled("Utility")
+    if not anyEnabled then
         return
     end
     if parts.icons then

@@ -5350,7 +5350,18 @@ local function CreateCooldownViewersPage(parent)
     if db.cooldownManager_squareIconsBorder_BuffIcons == nil then db.cooldownManager_squareIconsBorder_BuffIcons = 4 end
     if db.cooldownManager_squareIconsBorder_BuffIcons_Overlap == nil then db.cooldownManager_squareIconsBorder_BuffIcons_Overlap = false end
     if db.cooldownManager_squareIconsZoom_BuffIcons == nil then db.cooldownManager_squareIconsZoom_BuffIcons = 0 end
-    if db.cooldownManager_useCenteredStyling == nil then db.cooldownManager_useCenteredStyling = false end
+    -- Migrate old global centered styling key → per-viewer keys
+    if db.cooldownManager_useCenteredStyling then
+        if db.cooldownManager_useCenteredStyling_Essential == nil then
+            db.cooldownManager_useCenteredStyling_Essential = true
+        end
+        if db.cooldownManager_useCenteredStyling_Utility == nil then
+            db.cooldownManager_useCenteredStyling_Utility = true
+        end
+        db.cooldownManager_useCenteredStyling = nil
+    end
+    if db.cooldownManager_useCenteredStyling_Essential == nil then db.cooldownManager_useCenteredStyling_Essential = false end
+    if db.cooldownManager_useCenteredStyling_Utility == nil then db.cooldownManager_useCenteredStyling_Utility = false end
     if db.cooldownManager_utility_dimWhenNotOnCD == nil then db.cooldownManager_utility_dimWhenNotOnCD = false end
     if db.cooldownManager_utility_dimOpacity == nil then db.cooldownManager_utility_dimOpacity = 0.3 end
     if db.cooldownManager_alignBuffIcons_growFromDirection == nil then db.cooldownManager_alignBuffIcons_growFromDirection = "Disable" end
