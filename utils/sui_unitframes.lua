@@ -3066,9 +3066,14 @@ function SUI_UF:HidePreview(unitKey)
             RegisterStateDriver(frame, "visibility", "[@pet,exists] show; hide")
         elseif unit == "targettarget" then
             RegisterStateDriver(frame, "visibility", "[@targettarget,exists] show; hide")
+        elseif unit:match("^boss%d$") then
+            local bossNum = unit:match("^boss(%d)$")
+            if bossNum then
+                RegisterStateDriver(frame, "visibility", "[@boss" .. bossNum .. ",exists] show; hide")
+            end
         end
     end
-    
+
     -- Restore real state
     if UnitExists(frame.unit) or unitKey == "player" then
         UpdateFrame(frame)
@@ -4845,11 +4850,21 @@ function SUI_UF:HookBlizzardEditMode()
         self.editModeActive = true
         
         -- Unregister state drivers so unit frames stay visible during edit mode
+        local bossHandled = false
         for unitKey, frame in pairs(self.frames) do
             UnregisterStateDriver(frame, "visibility")
             frame:Show()
-            -- Show preview data so frames are visible
-            self:ShowPreview(unitKey)
+            -- Boss frames must be handled as a group ("boss" key) because
+            -- ShowPreview("boss") sets up all 5 with correct settings.
+            -- ShowPreview("boss1") would use GetUnitSettings("boss1") → nil.
+            if unitKey:match("^boss%d+$") then
+                if not bossHandled then
+                    self:ShowPreview("boss")
+                    bossHandled = true
+                end
+            else
+                self:ShowPreview(unitKey)
+            end
         end
         
         -- Hide Blizzard's selection frames to prevent visual conflicts
@@ -4863,8 +4878,16 @@ function SUI_UF:HookBlizzardEditMode()
         self.editModeActive = false
         
         -- Hide preview mode for all frames (restores real health values)
+        -- Boss frames must be handled as a group ("boss" key) because
+        -- HidePreview("boss") re-registers state drivers for all 5.
+        local bossHandled = false
         for unitKey, frame in pairs(self.frames) do
-            if self.previewMode[unitKey] then
+            if unitKey:match("^boss%d+$") then
+                if not bossHandled and self.previewMode[unitKey] then
+                    self:HidePreview("boss")
+                    bossHandled = true
+                end
+            elseif self.previewMode[unitKey] then
                 self:HidePreview(unitKey)
             end
         end
