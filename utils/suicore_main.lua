@@ -4074,14 +4074,42 @@ function SUICore:CreateMinimapButton()
             icon = "Interface\\AddOns\\SuaviUI\\assets\\textures\\suaviLogo.tga",
             label = "Suavi UI",
             OnClick = function(clickedframe, button)
-                if suicore and suicore.OpenConfig then
-                    suicore:OpenConfig()
+                if button == "RightButton" then
+                    MenuUtil.CreateContextMenu(clickedframe, function(owner, rootDescription)
+                        rootDescription:SetTag("SUAVIUI_MINIMAP")
+                        rootDescription:CreateTitle("|cFF30D1FFSuaviUI|r")
+                        rootDescription:CreateButton("SuaviUI Settings", function()
+                            if suicore and suicore.OpenConfig then suicore:OpenConfig() end
+                        end)
+                        rootDescription:CreateButton("CDM Settings", function()
+                            if CooldownViewerSettings then
+                                CooldownViewerSettings:SetShown(not CooldownViewerSettings:IsShown())
+                            end
+                        end)
+                        rootDescription:CreateButton("Edit Mode", function()
+                            if EditModeManagerFrame then
+                                if EditModeManagerFrame:IsShown() then
+                                    EditModeManagerFrame:Hide()
+                                else
+                                    EditModeManagerFrame:Show()
+                                end
+                            end
+                        end)
+                        rootDescription:CreateDivider()
+                        rootDescription:CreateButton("|cffff6666Reload UI|r", function()
+                            ReloadUI()
+                        end)
+                    end)
+                else
+                    if suicore and suicore.OpenConfig then
+                        suicore:OpenConfig()
+                    end
                 end
             end,
             OnTooltipShow = function(tooltip)
                 tooltip:SetText("|cFF30D1FFSuavi UI|r")
-                tooltip:AddLine("Left-click to open configuration", 1, 1, 1)
-                tooltip:AddLine("Right-click to open configuration", 1, 1, 1)
+                tooltip:AddLine("|cffFFFFFFLeft Click:|r Open Settings", 0.2, 1, 0.2)
+                tooltip:AddLine("|cffFFFFFFRight Click:|r Quick Menu", 0.2, 1, 0.2)
             end,
         })
     end
