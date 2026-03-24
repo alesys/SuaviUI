@@ -12,6 +12,7 @@
     <Script file="cooldown_advanced.lua"/>
     <Script file="customglows.lua"/>
     <Script file="cooldowneffects.lua"/>
+    <Script file="cdm_alerts.lua"/>
     <Script file="cooldownswipe.lua"/>
     <Script file="uihider.lua"/>
     <Script file="buffborders.lua"/>

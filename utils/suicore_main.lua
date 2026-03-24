@@ -35,6 +35,7 @@ ns.CDM_HOOKS = {
     glows = true,          -- J: customglows.lua ActionButtonSpellAlertManager hooks
     castbarSync = true,    -- K: CastbarMixin.lua width sync on viewers
     resbarSync = true,     -- L: Bar.lua (resourcebars) width sync on viewers
+    alerts = true,         -- M: cdm_alerts.lua custom alert sounds/TTS
 }
 
 -- TAINT-FIX (session 4796): All direct field writes to Blizzard CDM viewer/item frames
@@ -3050,6 +3051,12 @@ local defaults = {
             utilityYOffset = 0,
         },
         
+        -- CDM Enhanced Alerts (custom sounds, SharedMedia, TTS overrides)
+        cdmAlerts = {
+            enabled = true,
+            overrides = {},
+        },
+
         -- Buff/Debuff Visuals
         buffBorders = {
             enableBuffs = true,
