@@ -5,7 +5,7 @@
 ---------------------------------------------------------------------------
 local _, ns = ...
 local SUI = SuaviUI
-if ns.DISABLE_ALL_CDM_HOOKS or not ns.CDM_HOOKS.alerts then return end
+if ns.DISABLE_ALL_CDM_HOOKS or (ns.CDM_HOOKS and not ns.CDM_HOOKS.alerts) then return end
 
 local LSM = LibStub("LibSharedMedia-3.0", true)
 
