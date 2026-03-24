@@ -473,8 +473,44 @@ function SuaviUI:DebugPrint(...)
 end
 
 -- ADDON COMPARTMENT FUNCTIONS --
-function SuaviUI_CompartmentClick()
-    -- Open the new GUI
+function SuaviUI_CompartmentClick(addonName, buttonName)
+    if buttonName == "RightButton" then
+        -- Right-click context menu
+        MenuUtil.CreateContextMenu(nil, function(owner, rootDescription)
+            rootDescription:SetTag("SUAVIUI_COMPARTMENT")
+
+            rootDescription:CreateTitle("|cFF30D1FFSuaviUI|r")
+
+            rootDescription:CreateButton("SuaviUI Settings", function()
+                if SuaviUI.GUI then SuaviUI.GUI:Toggle() end
+            end)
+
+            rootDescription:CreateButton("CDM Settings", function()
+                if CooldownViewerSettings then
+                    CooldownViewerSettings:SetShown(not CooldownViewerSettings:IsShown())
+                end
+            end)
+
+            rootDescription:CreateButton("Edit Mode", function()
+                if EditModeManagerFrame then
+                    if EditModeManagerFrame:IsShown() then
+                        EditModeManagerFrame:Hide()
+                    else
+                        EditModeManagerFrame:Show()
+                    end
+                end
+            end)
+
+            rootDescription:CreateDivider()
+
+            rootDescription:CreateButton("|cffff6666Reload UI|r", function()
+                ReloadUI()
+            end)
+        end)
+        return
+    end
+
+    -- Left click: open options
     if SuaviUI.GUI then
         SuaviUI.GUI:Toggle()
     end
@@ -485,7 +521,8 @@ function SuaviUI_CompartmentOnEnter(self, button)
     GameTooltip:ClearLines()
     GameTooltip:SetOwner(type(self) ~= "string" and self or button, "ANCHOR_LEFT")
     GameTooltip:AddLine(L["AddonName"] .. " v" .. SuaviUI.versionString)
-    GameTooltip:AddLine(L["LeftClickOpen"])
+    GameTooltip:AddLine("|cffFFFFFFLeft Click:|r Open Settings", 0.2, 1, 0.2)
+    GameTooltip:AddLine("|cffFFFFFFRight Click:|r Quick Menu", 0.2, 1, 0.2)
     GameTooltip:Show()
 end
 
