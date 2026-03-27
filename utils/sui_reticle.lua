@@ -460,15 +460,12 @@ eventFrame:SetScript("OnEvent", function(self, event, unit, _, spellID)
 
         -- Check cooldown of cast spell, fall back to GCD spell
         if spellID then
-            local start, duration, modRate = ReadSpellCooldown(spellID)
-            if IsCooldownActive(start, duration) then
+            local ok, start, duration, modRate = pcall(ReadSpellCooldown, spellID)
+            if ok and IsCooldownActive(start, duration) then
                 if gcdCooldown then
                     gcdCooldown:Show()
-                    if modRate then
-                        gcdCooldown:SetCooldown(start, duration, modRate)
-                    else
-                        gcdCooldown:SetCooldown(start, duration)
-                    end
+                    pcall(gcdCooldown.SetCooldown, gcdCooldown,
+                        start, duration, modRate or 1)
                     UpdateRingAppearance()
                 end
             else

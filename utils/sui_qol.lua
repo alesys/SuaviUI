@@ -123,7 +123,10 @@ local function OnPartyInvite(inviterName)
 
     if shouldAccept then
         AcceptGroup()
-        StaticPopup_Hide("PARTY_INVITE")
+        -- TAINT-FIX: Do NOT call StaticPopup_Hide from addon context.
+        -- It taints the popup frame, which persists across frame reuse
+        -- and blocks protected calls like UpgradeItem().
+        -- AcceptGroup() triggers the game to dismiss the popup automatically.
     end
 end
 

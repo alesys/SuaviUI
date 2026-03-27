@@ -1,13 +1,29 @@
 ---------------------------------------------------------------------------
 -- CDM Enhanced Alerts
--- Custom SoundKit IDs, SharedMedia sounds, and custom TTS messages
--- for Blizzard's Cooldown Manager alert system.
+-- Extends Blizzard's Cooldown Manager alert system with:
+--   1. Custom SoundKit IDs — injected into Blizzard's data, played natively
+--   2. SharedMedia sounds — post-hook via PlaySoundFile
+--   3. Custom TTS messages — post-hook via StopSpeakingText + SpeakText
+--
+-- APPROACH:
+--   SoundKit IDs are injected into CooldownViewerSoundData at load time.
+--   Blizzard's own pipeline plays them (zero taint, zero double sounds).
+--   SharedMedia + TTS use hooksecurefunc post-hook on PlayAlert.
+--
+-- NEVER replace global CooldownViewerAlert_PlayAlert — doing so taints
+-- the calling context (TriggerAlertEvent → RefreshData cascade).
 ---------------------------------------------------------------------------
 local _, ns = ...
 local SUI = SuaviUI
 if ns.DISABLE_ALL_CDM_HOOKS or (ns.CDM_HOOKS and not ns.CDM_HOOKS.alerts) then return end
 
 local LSM = LibStub("LibSharedMedia-3.0", true)
+
+---------------------------------------------------------------------------
+-- CONSTANTS
+---------------------------------------------------------------------------
+local CUSTOM_ENUM_BASE = 1000  -- our enum values start here (Blizzard uses 0-67)
+local ALERT_DEBOUNCE = 2.0     -- seconds between same alert per item
 
 ---------------------------------------------------------------------------
 -- DB ACCESS
@@ -39,6 +55,70 @@ local function RemoveOverride(cooldownID, alertEvent)
         db.overrides[cooldownID][alertEvent] = nil
         if not next(db.overrides[cooldownID]) then
             db.overrides[cooldownID] = nil
+        end
+    end
+end
+
+---------------------------------------------------------------------------
+-- DETAINT
+-- Secret/tainted strings pass type()=="string" but fail string operations.
+-- Detect via pcall(string.len), then clean via FontString round-trip.
+---------------------------------------------------------------------------
+local detaintFS = nil
+local function Detaint(value, fallback)
+    local ok = pcall(string.len, value)
+    if ok then return value end
+    if not detaintFS then
+        detaintFS = UIParent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+        detaintFS:Hide()
+    end
+    local ok2, result = pcall(function()
+        detaintFS:SetText(value)
+        return detaintFS:GetText()
+    end)
+    return (ok2 and result) or fallback or ""
+end
+
+---------------------------------------------------------------------------
+-- NATIVE INJECTION: SoundKit IDs → CooldownViewerSoundData
+-- Injected at load time so Blizzard's lazy init picks them up.
+-- BuildSoundMenus() traverses CooldownViewerSoundData and shows them
+-- in the dropdown. Entries with soundEnum+text are treated as leaf buttons.
+---------------------------------------------------------------------------
+local customSoundKitMap = {}  -- enumVal → soundKitID (for post-hook fallback)
+local injected = false
+
+local function InjectCustomSounds()
+    if injected then return end
+    injected = true
+
+    if not CooldownViewerSoundData or not CooldownViewerSound then return end
+
+    local db = GetDB()
+    if not db then return end
+    local sounds = db.customSounds
+    if not sounds then return end
+
+    for i, entry in ipairs(sounds) do
+        if entry.soundKitID and entry.soundKitID > 0 then
+            local enumVal = CUSTOM_ENUM_BASE + i
+            local label = entry.label or ("Sound " .. entry.soundKitID)
+
+            -- Add to Blizzard's enum table
+            CooldownViewerSound["SuaviUI_" .. i] = enumVal
+
+            -- Add as top-level entry in Blizzard's data table.
+            -- BuildSoundMenus sees soundEnum+text → creates a selectable button.
+            -- Prefixed with colored marker for visual distinction.
+            CooldownViewerSoundData[enumVal] = {
+                soundEnum = enumVal,
+                soundKitID = entry.soundKitID,
+                text = "|cFF30D1FF\226\150\186|r " .. label,
+            }
+
+            -- Keep our own mapping for post-hook fallback
+            -- (in case lazy init already ran before our injection)
+            customSoundKitMap[enumVal] = entry.soundKitID
         end
     end
 end
@@ -80,53 +160,80 @@ local function PlayCustomAlert(override, spellName)
 end
 
 ---------------------------------------------------------------------------
--- PLAYALERT OVERRIDE (Option A: pre-hook replacement)
+-- POST-HOOK: hooksecurefunc on CooldownViewerAlert_PlayAlert
+-- Runs AFTER the original Blizzard function (secure context preserved).
+-- Handles:
+--   1. Fallback for SoundKit entries added after lazy init (Blizzard's
+--      PlaySound(nil) is silent, our hook plays the actual sound)
+--   2. SharedMedia overrides (PlaySoundFile on top of original)
+--   3. Custom TTS overrides (StopSpeakingText + custom message)
 ---------------------------------------------------------------------------
-local originalPlayAlert = nil
+local recentAlerts = setmetatable({}, { __mode = "k" })
 
-local function SuaviUI_PlayAlert(cooldownItem, spellName, alert)
+local function OnAlertPlayed(cooldownItem, spellName, alert)
     local alertType = CooldownViewerAlert_GetType(alert)
-    -- Only override Sound alerts (leave Visual alerts untouched)
-    if alertType ~= Enum.CooldownViewerAlertType.Sound then
-        return originalPlayAlert(cooldownItem, spellName, alert)
-    end
+    if alertType ~= Enum.CooldownViewerAlertType.Sound then return end
 
     local ok, cooldownID = pcall(function() return cooldownItem:GetCooldownID() end)
-    if not ok or not cooldownID then
-        return originalPlayAlert(cooldownItem, spellName, alert)
-    end
+    if not ok or not cooldownID then return end
 
     local alertEvent = CooldownViewerAlert_GetEvent(alert)
+
+    -- Debounce: weak table, no CDM frame writes
+    local now = GetTime()
+    local itemAlerts = recentAlerts[cooldownItem]
+    if itemAlerts and itemAlerts[alertEvent]
+       and (now - itemAlerts[alertEvent]) < ALERT_DEBOUNCE then
+        return
+    end
+    if not itemAlerts then
+        itemAlerts = {}
+        recentAlerts[cooldownItem] = itemAlerts
+    end
+    itemAlerts[alertEvent] = now
+
+    -- Check for SuaviUI override (SharedMedia / TTS)
     local override = GetOverride(cooldownID, alertEvent)
     if override then
-        PlayCustomAlert(override, spellName)
-    else
-        originalPlayAlert(cooldownItem, spellName, alert)
+        local cleanName = Detaint(spellName, "Spell")
+        if override.type == "tts" then
+            pcall(C_VoiceChat.StopSpeakingText)
+        end
+        PlayCustomAlert(override, cleanName)
+        return
+    end
+
+    -- Fallback: if the alert payload is one of our custom enum values
+    -- but Blizzard's mapping didn't have it (lazy init already ran),
+    -- play it from our own map.
+    local alertPayload = CooldownViewerAlert_GetPayload(alert)
+    if alertPayload and alertPayload >= CUSTOM_ENUM_BASE then
+        local soundKitID = customSoundKitMap[alertPayload]
+        if soundKitID then
+            PlaySound(soundKitID)
+        end
     end
 end
 
 ---------------------------------------------------------------------------
 -- DIALOG UI INJECTION
 -- Adds SuaviUI controls to Blizzard's CooldownViewerSettingsEditAlert
--- dialog (the "New Alert" / "Edit Alert" panel).
+-- dialog for SharedMedia + Custom TTS overrides.
+-- SoundKit sounds go through Blizzard's native dropdown (no override needed).
 ---------------------------------------------------------------------------
-local suaviPanel = nil  -- cached SuaviUI sub-frame
+local suaviPanel = nil
 
--- Source type constants
-local SOURCE_SOUNDKIT = "soundkit"
 local SOURCE_LSM = "lsm"
 local SOURCE_TTS = "tts"
 local SOURCE_LABELS = {
-    [SOURCE_SOUNDKIT] = "SoundKit ID",
     [SOURCE_LSM] = "SharedMedia Sound",
     [SOURCE_TTS] = "Custom TTS Message",
 }
-local SOURCE_ORDER = { SOURCE_SOUNDKIT, SOURCE_LSM, SOURCE_TTS }
+local SOURCE_ORDER = { SOURCE_LSM, SOURCE_TTS }
 
 local function CreateSuaviPanel(dialog)
     if suaviPanel then return suaviPanel end
 
-    -- Increase dialog height to accommodate our controls
     dialog:SetHeight(520)
 
     local panel = CreateFrame("Frame", nil, dialog)
@@ -134,14 +241,14 @@ local function CreateSuaviPanel(dialog)
     panel:SetPoint("RIGHT", dialog, "RIGHT", -20, 0)
     panel:SetHeight(130)
 
-    -- Divider line
+    -- Divider
     local divider = panel:CreateTexture(nil, "ARTWORK")
     divider:SetHeight(1)
     divider:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, 0)
     divider:SetPoint("TOPRIGHT", panel, "TOPRIGHT", 0, 0)
     divider:SetColorTexture(0.4, 0.4, 0.4, 0.6)
 
-    -- Section header
+    -- Header
     local header = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     header:SetPoint("TOPLEFT", divider, "BOTTOMLEFT", 0, -8)
     header:SetText("|cFF30D1FFSuaviUI|r Custom Alert")
@@ -152,10 +259,10 @@ local function CreateSuaviPanel(dialog)
     checkbox:SetSize(26, 26)
     local cbText = checkbox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     cbText:SetPoint("LEFT", checkbox, "RIGHT", 4, 0)
-    cbText:SetText("Override with custom sound")
+    cbText:SetText("Override with custom alert")
     panel.enableCheckbox = checkbox
 
-    -- Controls container (shown/hidden by checkbox)
+    -- Controls container
     local controls = CreateFrame("Frame", nil, panel)
     controls:SetPoint("TOPLEFT", checkbox, "BOTTOMLEFT", 4, -4)
     controls:SetPoint("RIGHT", panel, "RIGHT", 0, 0)
@@ -173,28 +280,14 @@ local function CreateSuaviPanel(dialog)
     sourceDropdown:SetPoint("TOPLEFT", sourceLabel, "BOTTOMLEFT", 0, -2)
     sourceDropdown:SetSize(200, 25)
     panel.sourceDropdown = sourceDropdown
-    panel.currentSource = SOURCE_SOUNDKIT
+    panel.currentSource = SOURCE_LSM
 
-    -- Preview button (right of source dropdown)
+    -- Preview button
     local previewBtn = CreateFrame("Button", nil, controls, "UIPanelButtonNoTooltipTemplate, UIButtonTemplate")
     previewBtn:SetSize(60, 25)
     previewBtn:SetPoint("LEFT", sourceDropdown, "RIGHT", 6, 0)
     previewBtn:SetText("Play")
     panel.previewBtn = previewBtn
-
-    -- SoundKit ID editbox
-    local soundKitBox = CreateFrame("EditBox", nil, controls, "InputBoxTemplate")
-    soundKitBox:SetSize(200, 22)
-    soundKitBox:SetPoint("TOPLEFT", sourceDropdown, "BOTTOMLEFT", 0, -6)
-    soundKitBox:SetAutoFocus(false)
-    soundKitBox:SetNumeric(true)
-    soundKitBox:SetMaxLetters(10)
-    local skLabel = controls:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    skLabel:SetPoint("LEFT", soundKitBox, "RIGHT", 6, 0)
-    skLabel:SetText("Enter SoundKit ID")
-    skLabel:SetTextColor(0.5, 0.5, 0.5, 1)
-    panel.soundKitBox = soundKitBox
-    panel.soundKitLabel = skLabel
 
     -- SharedMedia dropdown
     local lsmDropdown = CreateFrame("DropdownButton", nil, controls, "WowStyle1DropdownTemplate")
@@ -216,21 +309,13 @@ local function CreateSuaviPanel(dialog)
     panel.ttsBox = ttsBox
     panel.ttsHint = ttsHint
 
-    ---------------------------------------------------------------------------
-    -- Control visibility based on source type
-    ---------------------------------------------------------------------------
+    -- Control visibility
     local function ShowSourceControls(source)
         panel.currentSource = source
-        panel.soundKitBox:Hide()
-        panel.soundKitLabel:Hide()
         panel.lsmDropdown:Hide()
         panel.ttsBox:Hide()
         panel.ttsHint:Hide()
-
-        if source == SOURCE_SOUNDKIT then
-            panel.soundKitBox:Show()
-            panel.soundKitLabel:Show()
-        elseif source == SOURCE_LSM then
+        if source == SOURCE_LSM then
             panel.lsmDropdown:Show()
         elseif source == SOURCE_TTS then
             panel.ttsBox:Show()
@@ -238,13 +323,10 @@ local function CreateSuaviPanel(dialog)
         end
     end
 
-    ---------------------------------------------------------------------------
     -- Source dropdown setup
-    ---------------------------------------------------------------------------
     sourceDropdown:SetSelectionText(function()
-        return SOURCE_LABELS[panel.currentSource] or "SoundKit ID"
+        return SOURCE_LABELS[panel.currentSource] or "SharedMedia Sound"
     end)
-
     sourceDropdown:SetupMenu(function(dropdown, rootDescription)
         rootDescription:SetTag("SUI_ALERT_SOURCE")
         for _, source in ipairs(SOURCE_ORDER) do
@@ -256,13 +338,10 @@ local function CreateSuaviPanel(dialog)
         end
     end)
 
-    ---------------------------------------------------------------------------
     -- LSM dropdown setup
-    ---------------------------------------------------------------------------
     lsmDropdown:SetSelectionText(function()
         return panel.currentLSMName or "Select Sound..."
     end)
-
     lsmDropdown:SetupMenu(function(dropdown, rootDescription)
         rootDescription:SetTag("SUI_ALERT_LSM")
         if LSM then
@@ -277,15 +356,10 @@ local function CreateSuaviPanel(dialog)
         end
     end)
 
-    ---------------------------------------------------------------------------
-    -- Preview button handler
-    ---------------------------------------------------------------------------
+    -- Preview handler
     previewBtn:SetScript("OnClick", function()
         local source = panel.currentSource
-        if source == SOURCE_SOUNDKIT then
-            local id = panel.soundKitBox:GetNumber()
-            if id and id > 0 then PlaySound(id) end
-        elseif source == SOURCE_LSM then
+        if source == SOURCE_LSM then
             if panel.currentLSMName then
                 PlayCustomAlert({ type = SOURCE_LSM, lsmName = panel.currentLSMName })
             end
@@ -298,9 +372,7 @@ local function CreateSuaviPanel(dialog)
         end
     end)
 
-    ---------------------------------------------------------------------------
     -- Checkbox toggle
-    ---------------------------------------------------------------------------
     checkbox:SetScript("OnClick", function(self)
         if self:GetChecked() then
             controls:Show()
@@ -309,24 +381,21 @@ local function CreateSuaviPanel(dialog)
         end
     end)
 
-    -- Initial state: hidden
     controls:Hide()
-    ShowSourceControls(SOURCE_SOUNDKIT)
+    ShowSourceControls(SOURCE_LSM)
 
     suaviPanel = panel
     return panel
 end
 
 ---------------------------------------------------------------------------
--- Populate controls from existing override data
+-- Populate / save from panel
 ---------------------------------------------------------------------------
 local function PopulatePanelFromOverride(panel, override)
     if not override then
         panel.enableCheckbox:SetChecked(false)
         panel.controls:Hide()
-        -- Reset to defaults
-        panel.currentSource = SOURCE_SOUNDKIT
-        panel.soundKitBox:SetText("")
+        panel.currentSource = SOURCE_LSM
         panel.currentLSMName = nil
         panel.ttsBox:SetText("")
         return
@@ -335,10 +404,7 @@ local function PopulatePanelFromOverride(panel, override)
     panel.enableCheckbox:SetChecked(true)
     panel.controls:Show()
 
-    if override.type == SOURCE_SOUNDKIT then
-        panel.currentSource = SOURCE_SOUNDKIT
-        panel.soundKitBox:SetText(tostring(override.soundKitID or ""))
-    elseif override.type == SOURCE_LSM then
+    if override.type == SOURCE_LSM then
         panel.currentSource = SOURCE_LSM
         panel.currentLSMName = override.lsmName
     elseif override.type == SOURCE_TTS then
@@ -346,17 +412,10 @@ local function PopulatePanelFromOverride(panel, override)
         panel.ttsBox:SetText(override.ttsMessage or "")
     end
 
-    -- Show correct controls
-    panel.soundKitBox:Hide()
-    panel.soundKitLabel:Hide()
     panel.lsmDropdown:Hide()
     panel.ttsBox:Hide()
     panel.ttsHint:Hide()
-
-    if panel.currentSource == SOURCE_SOUNDKIT then
-        panel.soundKitBox:Show()
-        panel.soundKitLabel:Show()
-    elseif panel.currentSource == SOURCE_LSM then
+    if panel.currentSource == SOURCE_LSM then
         panel.lsmDropdown:Show()
     elseif panel.currentSource == SOURCE_TTS then
         panel.ttsBox:Show()
@@ -364,9 +423,6 @@ local function PopulatePanelFromOverride(panel, override)
     end
 end
 
----------------------------------------------------------------------------
--- Save override from current panel state
----------------------------------------------------------------------------
 local function SaveOverrideFromPanel(panel, cooldownID, alertEvent)
     if not panel.enableCheckbox:GetChecked() then
         RemoveOverride(cooldownID, alertEvent)
@@ -376,11 +432,7 @@ local function SaveOverrideFromPanel(panel, cooldownID, alertEvent)
     local source = panel.currentSource
     local data = { type = source }
 
-    if source == SOURCE_SOUNDKIT then
-        local id = panel.soundKitBox:GetNumber()
-        if not id or id <= 0 then return end
-        data.soundKitID = id
-    elseif source == SOURCE_LSM then
+    if source == SOURCE_LSM then
         if not panel.currentLSMName then return end
         data.lsmName = panel.currentLSMName
     elseif source == SOURCE_TTS then
@@ -399,7 +451,6 @@ local function SetupDialogHooks()
     local dialog = CooldownViewerSettingsEditAlert
     if not dialog then return end
 
-    -- Hook DisplayForAlert to populate SuaviUI controls when dialog opens
     hooksecurefunc(CooldownViewerSettingsEditAlertMixin, "DisplayForAlert", function(self)
         local panel = CreateSuaviPanel(self)
         local cooldownID = self:GetCooldownID()
@@ -409,11 +460,9 @@ local function SetupDialogHooks()
         panel:Show()
     end)
 
-    -- Hook SetupDropdowns to re-read event type when user changes dropdowns
     hooksecurefunc(CooldownViewerSettingsEditAlertMixin, "SetupDropdowns", function(self)
         if not suaviPanel then return end
         local alertType = CooldownViewerAlert_GetType(self.workingCopyOfAlert)
-        -- Only show SuaviUI panel for Sound alerts
         if alertType == Enum.CooldownViewerAlertType.Sound then
             suaviPanel:Show()
             local cooldownID = self:GetCooldownID()
@@ -425,7 +474,6 @@ local function SetupDialogHooks()
         end
     end)
 
-    -- Hook AddCurrentAlert to save SuaviUI override when user clicks Apply
     hooksecurefunc(CooldownViewerSettingsEditAlertMixin, "AddCurrentAlert", function(self)
         if not suaviPanel then return end
         local cooldownID = self:GetCooldownID()
@@ -433,23 +481,22 @@ local function SetupDialogHooks()
         SaveOverrideFromPanel(suaviPanel, cooldownID, alertEvent)
     end)
 
-    -- Clear panel state when dialog hides
     hooksecurefunc(CooldownViewerSettingsEditAlertMixin, "OnHide", function()
-        if suaviPanel then
-            suaviPanel:Hide()
-        end
+        if suaviPanel then suaviPanel:Hide() end
     end)
 end
 
 ---------------------------------------------------------------------------
 -- INITIALIZATION
 ---------------------------------------------------------------------------
-local function InitAlertOverride()
-    if not CooldownViewerAlert_PlayAlert then return false end
-    if originalPlayAlert then return true end  -- already initialized
+local hookInstalled = false
 
-    originalPlayAlert = CooldownViewerAlert_PlayAlert
-    CooldownViewerAlert_PlayAlert = SuaviUI_PlayAlert
+local function InstallHook()
+    if hookInstalled then return true end
+    if not CooldownViewerAlert_PlayAlert then return false end
+
+    hooksecurefunc("CooldownViewerAlert_PlayAlert", OnAlertPlayed)
+    hookInstalled = true
     return true
 end
 
@@ -458,18 +505,22 @@ initFrame:RegisterEvent("ADDON_LOADED")
 initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:SetScript("OnEvent", function(_, event, addon)
     if event == "ADDON_LOADED" and addon == "Blizzard_CooldownViewer" then
-        InitAlertOverride()
+        -- Inject BEFORE lazy init (CheckCreateSoundAlertData) runs
+        InjectCustomSounds()
+        InstallHook()
         SetupDialogHooks()
     elseif event == "PLAYER_LOGIN" then
-        -- Fallback: if Blizzard_CooldownViewer loaded before us
-        if InitAlertOverride() then
+        InjectCustomSounds()
+        if InstallHook() then
             SetupDialogHooks()
         end
     end
 end)
 
--- Also try immediate init if already loaded
-if CooldownViewerAlert_PlayAlert then
-    InitAlertOverride()
-    -- Dialog hooks deferred to PLAYER_LOGIN since dialog frame may not exist yet
-end
+-- Deferred fallback if Blizzard_CooldownViewer loaded before us
+C_Timer.After(0, function()
+    InjectCustomSounds()
+    if InstallHook() then
+        SetupDialogHooks()
+    end
+end)

@@ -57,9 +57,14 @@ local function GetPlayerKeystoneData()
         -- We're in an active M+ dungeon
         keystoneData.challengeMapID = challengeID
         keystoneData.mapID = challengeID
-        -- Get level from C_ChallengeMode
-        local level = C_ChallengeMode.GetActiveKeystoneLevel()
-        keystoneData.level = level or 0
+        -- Get level from C_ChallengeMode (API renamed in recent patches)
+        local level = 0
+        if C_ChallengeMode.GetActiveKeystoneInfo then
+            level = C_ChallengeMode.GetActiveKeystoneInfo() or 0
+        elseif C_ChallengeMode.GetActiveKeystoneLevel then
+            level = C_ChallengeMode.GetActiveKeystoneLevel() or 0
+        end
+        keystoneData.level = level
         keystoneData.mythicPlusMapID = challengeID
     end
 

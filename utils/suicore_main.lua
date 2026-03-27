@@ -3054,7 +3054,8 @@ local defaults = {
         -- CDM Enhanced Alerts (custom sounds, SharedMedia, TTS overrides)
         cdmAlerts = {
             enabled = true,
-            overrides = {},
+            customSounds = {},  -- { { soundKitID = 12345, label = "My Sound" }, ... }
+            overrides = {},     -- [cooldownID] = { [alertEvent] = { type, lsmName/ttsMessage } }
         },
 
         -- Buff/Debuff Visuals
