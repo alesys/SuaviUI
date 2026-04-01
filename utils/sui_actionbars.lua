@@ -2180,6 +2180,7 @@ eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
 eventFrame:RegisterEvent("UPDATE_BINDINGS")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+eventFrame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_LOGIN" then
@@ -2190,7 +2191,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == "ACTIONBAR_SLOT_CHANGED" then
         if DISABLE_STANDARD_ACTIONBAR_CUSTOMIZATION then return end
-        -- Re-apply text styling when actions change
+        -- Re-apply text styling and hide-empty when actions change
         C_Timer.After(0.1, function()
             for barKey, _ in pairs(BUTTON_PATTERNS) do
                 local effectiveSettings = GetEffectiveSettings(barKey)
@@ -2198,6 +2199,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                     local buttons = GetBarButtons(barKey)
                     for _, button in ipairs(buttons) do
                         UpdateButtonText(button, effectiveSettings)
+                        UpdateEmptySlotVisibility(button, effectiveSettings)
                     end
                 end
             end
@@ -2250,6 +2252,16 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             end
             ActionBars.pendingExtraButtonHide = nil
         end
+
+    elseif event == "PLAYER_SPECIALIZATION_CHANGED" then
+        -- Spec change reassigns spells to action bar slots.
+        -- Delay to let Blizzard finish updating slot contents.
+        C_Timer.After(0.5, function()
+            if DISABLE_STANDARD_ACTIONBAR_CUSTOMIZATION then return end
+            for barKey, _ in pairs(BUTTON_PATTERNS) do
+                SkinBar(barKey)
+            end
+        end)
     end
 end)
 
