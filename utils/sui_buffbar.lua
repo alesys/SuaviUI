@@ -3226,10 +3226,6 @@ do
             function() local p = GetProfile(); return p and p["cooldownManager_squareIconsBorder_" .. suffix] or 4 end,
             function(v) local p = GetProfile(); if p then p["cooldownManager_squareIconsBorder_" .. suffix] = v end; refreshFn() end
         )
-        controls[prefix .. "BorderOverlap"] = EP.CreateCheckbox(prefix .. "BorderOverlap", "Border Overlap",
-            function() local p = GetProfile(); return p and p["cooldownManager_squareIconsBorder_" .. suffix .. "_Overlap"] or false end,
-            function(v) local p = GetProfile(); if p then p["cooldownManager_squareIconsBorder_" .. suffix .. "_Overlap"] = v end; refreshFn() end
-        )
         controls[prefix .. "Zoom"] = EP.CreateSlider(prefix .. "Zoom", "Icon Zoom", 0, 50, 5,
             function() local p = GetProfile(); return math.floor(((p and p["cooldownManager_squareIconsZoom_" .. suffix]) or 0) * 100 + 0.5) end,
             function(v) local p = GetProfile(); if p then p["cooldownManager_squareIconsZoom_" .. suffix] = v / 100 end; refreshFn() end
@@ -3303,7 +3299,7 @@ do
     ---------------------------------------------------------------------------
     local iconControlKeys = {
         "buffIconDivider", "buffIconSquare", "buffIconBorderSize",
-        "buffIconBorderOverlap", "buffIconZoom", "buffIconHideMounted",
+        "buffIconZoom", "buffIconHideMounted",
     }
 
     EP.RegisterSystem(IsBuffIconViewer, function()
@@ -3326,7 +3322,7 @@ do
     ---------------------------------------------------------------------------
     local essentialControlKeys = {
         "essentialDivider", "essentialSquare", "essentialBorderSize",
-        "essentialBorderOverlap", "essentialZoom",
+        "essentialZoom",
         "essentialCenteredDivider", "essentialCentered",
         "essentialGrow", "essentialHighlight",
     }
@@ -3356,7 +3352,7 @@ do
     ---------------------------------------------------------------------------
     local utilityControlKeys = {
         "utilityDivider", "utilitySquare", "utilityBorderSize",
-        "utilityBorderOverlap", "utilityZoom",
+        "utilityZoom",
         "utilityCenteredDivider", "utilityCentered",
         "utilityGrow", "utilityDim", "utilityDimOpacity",
         "utilityHighlight",
