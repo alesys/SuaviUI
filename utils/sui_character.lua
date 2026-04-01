@@ -258,11 +258,12 @@ local function GetEnchantText(unit, slotId)
     local itemLink = GetInventoryItemLink(unit, slotId)
     if not itemLink then return nil, nil end  -- No item
 
-    -- TWW Season 2: enchantable slots (primary/secondary stat enchants).
-    -- Back and Wrist only have tertiary-stat enchants (Avoidance/Leech/Speed)
-    -- so they are treated as optional and excluded from the required list.
+    -- Midnight: enchantable slots.
+    -- Back and Wrist excluded (tertiary stats only, optional).
     -- OffHand: only weapons can be enchanted (not shields or held-in-off-hand).
     local enchantableSlots = {
+        [INVSLOT_HEAD] = true,
+        [INVSLOT_SHOULDER] = true,
         [INVSLOT_CHEST] = true,
         [INVSLOT_LEGS] = true,
         [INVSLOT_FEET] = true,
