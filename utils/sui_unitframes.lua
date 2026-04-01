@@ -89,33 +89,6 @@ local PREVIEW_AURAS = {
 }
 
 ---------------------------------------------------------------------------
--- MOUNT / VEHICLE VISIBILITY
--- Uses SetAlpha(0/1) to avoid taint from Show/Hide on secure frames.
--- Checks all unit frames with hideWhileMounted enabled.
----------------------------------------------------------------------------
-local mountWatcherFrame = CreateFrame("Frame")
-mountWatcherFrame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
-mountWatcherFrame:RegisterEvent("UNIT_ENTERED_VEHICLE")
-mountWatcherFrame:RegisterEvent("UNIT_EXITED_VEHICLE")
-mountWatcherFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-mountWatcherFrame:SetScript("OnEvent", function()
-    local isMounted = IsMounted() or UnitInVehicle("player")
-    for unitKey, frame in pairs(SUI_UF.frames) do
-        local settings = GetUnitSettings(unitKey)
-        if settings and settings.hideWhileMounted then
-            if isMounted and not SUI_UF.previewMode[unitKey] then
-                frame:SetAlpha(0)
-            else
-                frame:SetAlpha(1)
-            end
-        elseif frame:GetAlpha() == 0 and not SUI_UF.previewMode[unitKey] then
-            -- Restore alpha if setting was just disabled
-            frame:SetAlpha(1)
-        end
-    end
-end)
-
----------------------------------------------------------------------------
 -- HELPER: Anchor type handling for frame positioning
 ---------------------------------------------------------------------------
 -- Anchor type constants (map text values to anchor targets)
@@ -244,6 +217,31 @@ local function GetUnitSettings(unit)
     local db = GetDB()
     return db and db[unit]
 end
+
+---------------------------------------------------------------------------
+-- MOUNT / VEHICLE VISIBILITY
+-- Uses SetAlpha(0/1) to avoid taint from Show/Hide on secure frames.
+---------------------------------------------------------------------------
+local mountWatcherFrame = CreateFrame("Frame")
+mountWatcherFrame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
+mountWatcherFrame:RegisterEvent("UNIT_ENTERED_VEHICLE")
+mountWatcherFrame:RegisterEvent("UNIT_EXITED_VEHICLE")
+mountWatcherFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+mountWatcherFrame:SetScript("OnEvent", function()
+    local isMounted = IsMounted() or UnitInVehicle("player")
+    for unitKey, frame in pairs(SUI_UF.frames) do
+        local settings = GetUnitSettings(unitKey)
+        if settings and settings.hideWhileMounted then
+            if isMounted and not SUI_UF.previewMode[unitKey] then
+                frame:SetAlpha(0)
+            else
+                frame:SetAlpha(1)
+            end
+        elseif frame:GetAlpha() == 0 and not SUI_UF.previewMode[unitKey] then
+            frame:SetAlpha(1)
+        end
+    end
+end)
 
 ---------------------------------------------------------------------------
 -- HELPER: Pixel-perfect scaling (uses SUICore:Scale if available)
