@@ -193,6 +193,20 @@ local function InjectControls(dialog, controlKeys)
     end
 
     dialog.Settings:Layout()
+
+    -- Expand dialog height if our injected controls cause overflow.
+    -- Blizzard's dialog may have a fixed height that clips our settings.
+    C_Timer.After(0, function()
+        if not dialog:IsShown() then return end
+        local settingsHeight = dialog.Settings:GetHeight()
+        local headerHeight = 60  -- approximate title + padding
+        local neededHeight = settingsHeight + headerHeight + 20
+        local maxHeight = select(2, GetPhysicalScreenSize()) * 0.85
+        local finalHeight = math.min(neededHeight, maxHeight)
+        if finalHeight > dialog:GetHeight() then
+            dialog:SetHeight(finalHeight)
+        end
+    end)
 end
 
 -- Expose for direct use

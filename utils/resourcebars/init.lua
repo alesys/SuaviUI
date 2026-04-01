@@ -368,9 +368,15 @@ local initFrame = CreateFrame("Frame")
 initFrame:RegisterEvent("ADDON_LOADED")
 initFrame:SetScript("OnEvent", function(self, event, loadedAddonName)
     if loadedAddonName == addonName then
-        -- Defer resource bar creation so Edit Mode's secureexecuterange
-        -- finishes before our globally-named frames exist. This prevents
-        -- CDM viewers from being tainted via SetPoint anchors to addon frames.
+        -- Create placeholder frames immediately so Edit Mode can resolve
+        -- anchors (e.g., UtilityCooldownViewer anchored to our resource bar).
+        -- Full initialization is deferred to avoid CDM taint during
+        -- Edit Mode's secureexecuterange.
+        for _, config in pairs(RB.RegisteredBar or {}) do
+            if config.frameName and not _G[config.frameName] then
+                CreateFrame("Frame", config.frameName, UIParent)
+            end
+        end
         C_Timer.After(0, InitializeResourceBars)
         self:UnregisterEvent("ADDON_LOADED")
     end

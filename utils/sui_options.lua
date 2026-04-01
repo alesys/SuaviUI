@@ -10379,8 +10379,8 @@ local function BuildImportExportTab(tabContent)
         if SUICore and SUICore.ImportProfileFromString then
             local ok, err = SUICore:ImportProfileFromString(str)
             if ok then
-                print("|cff34D399SuaviUI:|r Profile imported successfully!")
-                print("|cff34D399SuaviUI:|r Please type |cFFFFD700/reload|r to apply changes.")
+                print("|cff34D399SuaviUI:|r Profile imported successfully! Reloading...")
+                C_Timer.After(0.5, ReloadUI)
             else
                 print("|cffff0000SuaviUI: Import failed: " .. (err or "Unknown error") .. "|r")
             end
@@ -11722,6 +11722,95 @@ function GUI:InitializeOptions()
     -- Visibility
     RegisterBuilders("Visibility", CreateAutohideBuilders())
     GUI:AddPage(frame, "Visibility", "HUD Layers", CreateHUDLayeringPage)
+
+    -- Resource Bars
+    GUI:AddCategory(frame, "Resource Bars")
+    GUI:AddPage(frame, "Resource Bars", "Resource Bars", function(tabContent)
+        local y = -10
+        local PAD = 10
+        local FORM_ROW = 30
+        local RB = ns.RB
+
+        GUI:SetSearchContext({tabIndex = 12, tabName = "Resource Bars"})
+
+        if not RB or not RB.barInstances or not RB.GetResourceBarsDB then
+            local err = GUI:CreateLabel(tabContent, "Resource Bars module not loaded. Please /reload.", 12, {1, 0.3, 0.3, 1})
+            err:SetPoint("TOPLEFT", PAD, y)
+            tabContent:SetHeight(50)
+            return
+        end
+
+        local rbDB = RB.GetResourceBarsDB()
+        local layoutName = RB.activeLayoutName or "Default"
+
+        local info = GUI:CreateLabel(tabContent, "Toggle resource bars on/off and reset their position. Detailed settings are in Edit Mode sidepanels.", 11, C.textMuted)
+        info:SetPoint("TOPLEFT", PAD, y)
+        info:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        info:SetJustifyH("LEFT")
+        info:SetWordWrap(true)
+        info:SetHeight(28)
+        y = y - 35
+
+        local layoutLabel = GUI:CreateLabel(tabContent, "Current Layout: |cFFFFD700" .. layoutName .. "|r", 11, C.text)
+        layoutLabel:SetPoint("TOPLEFT", PAD, y)
+        y = y - 25
+
+        -- Build a row for each registered bar
+        local barOrder = {
+            {name = "Health Bar",             frameName = "SuaviUI_HealthBar",             dbName = "healthBarDB"},
+            {name = "Primary Resource Bar",   frameName = "SuaviUI_PrimaryResourceBar",    dbName = "PrimaryResourceBarDB"},
+            {name = "Secondary Resource Bar", frameName = "SuaviUI_SecondaryResourceBar",  dbName = "SecondaryResourceBarDB"},
+            {name = "Tertiary Resource Bar",  frameName = "SuaviUI_TertiaryResourceBar",   dbName = "TertiaryResourceBarDB"},
+        }
+
+        for _, barInfo in ipairs(barOrder) do
+            local header = GUI:CreateSectionHeader(tabContent, barInfo.name)
+            header:SetPoint("TOPLEFT", PAD, y)
+            y = y - header.gap
+
+            -- Get or create bar data for current layout
+            local barDB = rbDB and rbDB[barInfo.dbName]
+            local data = barDB and barDB[layoutName]
+
+            -- Visibility dropdown
+            if data then
+                local visLabel = GUI:CreateLabel(tabContent, "Visibility:", 12, C.text)
+                visLabel:SetPoint("TOPLEFT", PAD + 10, y)
+
+                local currentVis = data.barVisible or "Always Visible"
+                local visOptions = {"Always Visible", "In Combat", "Has Target Selected", "Has Target Selected OR In Combat", "Hidden"}
+                local visDropdown = GUI:CreateDropdown(tabContent, nil, visOptions, "barVisible", data, function()
+                    local bar = RB.barInstances[barInfo.frameName]
+                    if bar then
+                        bar:ApplyVisibilitySettings(layoutName)
+                    end
+                end)
+                visDropdown:SetPoint("TOPLEFT", PAD + 100, y + 4)
+                y = y - FORM_ROW
+            end
+
+            -- Reset Position button
+            local resetBtn = GUI:CreateButton(tabContent, "Reset to Center", 140, 24, function()
+                if not barDB then return end
+                if not barDB[layoutName] then barDB[layoutName] = {} end
+                barDB[layoutName].point = "CENTER"
+                barDB[layoutName].relativePoint = "CENTER"
+                barDB[layoutName].relativeFrame = nil
+                barDB[layoutName].x = 0
+                barDB[layoutName].y = 0
+
+                local bar = RB.barInstances[barInfo.frameName]
+                if bar then
+                    bar:ApplyLayout(layoutName, true)
+                end
+                print("|cFFFF6AC1SuaviUI|r: " .. barInfo.name .. " reset to center")
+            end)
+            resetBtn:SetPoint("TOPLEFT", PAD + 10, y)
+            y = y - 35
+        end
+
+        tabContent:SetHeight(math.abs(y) + 20)
+    end)
 
     -- Profiles (2 sub-pages)
     RegisterBuilders("Profiles", CreateProfileBuilders())

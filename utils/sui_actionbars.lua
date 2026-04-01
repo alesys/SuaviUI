@@ -1947,6 +1947,40 @@ combatFadeFrame:SetScript("OnEvent", function(self, event)
 end)
 
 ---------------------------------------------------------------------------
+-- MOUNT / VEHICLE VISIBILITY
+-- Hide action bars while mounted/flying/in vehicle.
+-- Uses SetAlpha(0/1) on holder frames (safe, no taint).
+---------------------------------------------------------------------------
+local mountFadeFrame = CreateFrame("Frame")
+mountFadeFrame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
+mountFadeFrame:RegisterEvent("UNIT_ENTERED_VEHICLE")
+mountFadeFrame:RegisterEvent("UNIT_EXITED_VEHICLE")
+mountFadeFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+mountFadeFrame:SetScript("OnEvent", function()
+    local fadeSettings = GetFadeSettings()
+    if not fadeSettings or not fadeSettings.hideWhileMounted then return end
+    local isMounted = IsMounted() or UnitInVehicle("player")
+    for barKey, _ in pairs(COMBAT_FADE_BARS) do
+        local holder = _G["SuaviUI_ActionBar_" .. barKey]
+        if holder then
+            if isMounted then
+                holder:SetAlpha(0)
+                holder:EnableMouse(false)
+            else
+                -- Restore normal state (respect fade settings)
+                holder:EnableMouse(true)
+                local state = GetBarFadeState(barKey)
+                if state and state.currentAlpha then
+                    holder:SetAlpha(state.currentAlpha)
+                else
+                    holder:SetAlpha(1)
+                end
+            end
+        end
+    end
+end)
+
+---------------------------------------------------------------------------
 -- BAR PROCESSING
 ---------------------------------------------------------------------------
 
@@ -2371,7 +2405,7 @@ do
         -- Mouseover Hide
         "abFadeDivider",
         "abFadeEnable", "abFadeIn", "abFadeOut", "abFadeAlpha", "abFadeDelay",
-        "abFadeCombat", "abFadeLink",
+        "abFadeCombat", "abFadeLink", "abFadeMounted",
         "abAlwaysShow",
     }
 
@@ -2514,6 +2548,15 @@ do
         controls.abFadeLink = EP.CreateCheckbox("ABFadeLink", "Link Bars 1-8",
             function() local f = GetFade(); return f and f.linkBars1to8 or false end,
             function(v) local f = GetFade(); if f then f.linkBars1to8 = v end; RefreshAB() end
+        )
+        controls.abFadeMounted = EP.CreateCheckbox("ABFadeMounted", "Hide While Mounted/Vehicle",
+            function() local f = GetFade(); return f and f.hideWhileMounted or false end,
+            function(v)
+                local f = GetFade()
+                if f then f.hideWhileMounted = v end
+                -- Trigger mount watcher immediately
+                mountFadeFrame:GetScript("OnEvent")(mountFadeFrame, "PLAYER_MOUNT_DISPLAY_CHANGED")
+            end
         )
 
         -- Per-bar "Always Show" checkbox (refreshed dynamically per selected bar)

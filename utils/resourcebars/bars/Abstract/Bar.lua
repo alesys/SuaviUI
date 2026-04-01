@@ -26,7 +26,11 @@ local BarMixin = {}
 ------------------------------------------------------------
 
 function BarMixin:Init(config, parent, frameLevel)
-    local Frame = CreateFrame("Frame", config.frameName or "", parent or UIParent)
+    -- Reuse existing placeholder frame (created early for Edit Mode anchors)
+    -- or create a new one
+    local name = config.frameName or ""
+    local Frame = (name ~= "" and _G[name]) or CreateFrame("Frame", name, parent or UIParent)
+    Frame:SetParent(parent or UIParent)
 
     Frame:SetFrameLevel(frameLevel)
     self.config = config
@@ -738,9 +742,21 @@ function BarMixin:ApplyMaskAndBorderSettings(layoutName, data)
 
     local defaults = self.defaults or {}
 
-    local styleName = data.maskAndBorderStyle or defaults.maskAndBorderStyle
-    local style = RB.maskAndBorderStyles[styleName]
-    if not style then return end
+    -- Migration: convert legacy maskAndBorderStyle to borderThickness
+    if data.maskAndBorderStyle and not data.borderThickness then
+        local legacyMap = { ["1 Pixel"] = 1, ["Thin"] = 2, ["Slight"] = 3, ["Bold"] = 5, ["None"] = 0 }
+        data.borderThickness = legacyMap[data.maskAndBorderStyle] or 2
+    end
+
+    local thickness = data.borderThickness or defaults.borderThickness or 2
+
+    -- Build a style from the thickness value
+    local style
+    if thickness == 0 then
+        style = {}
+    else
+        style = { type = "fixed", thickness = thickness }
+    end
 
     local width, height = self.StatusBar:GetSize()
     local angle = GetRotationAngle(data.orientation)

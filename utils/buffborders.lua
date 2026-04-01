@@ -175,39 +175,38 @@ local function ApplyFrameHiding()
     local settings = GetSettings()
     if not settings then return end
 
-    -- BuffFrame hiding (simple Hide + Show hook, no EnableMouse)
+    -- BuffFrame hiding (SetAlpha instead of Show/Hide — BuffFrame is protected)
     if BuffFrame then
         if settings.hideBuffFrame then
-            BuffFrame:Hide()
+            BuffFrame:SetAlpha(0)
         else
-            BuffFrame:Show()
+            BuffFrame:SetAlpha(1)
         end
-        -- Hook Show() once to prevent Blizzard from re-showing
+        -- Hook Show() once to re-apply alpha=0 when Blizzard re-shows
         if not BuffFrame._SUI_ShowHooked then
             BuffFrame._SUI_ShowHooked = true
             pcall(hooksecurefunc, BuffFrame, "Show", function(self)
                 local s = GetSettings()
                 if s and s.hideBuffFrame then
-                    self:Hide()
+                    self:SetAlpha(0)
                 end
             end)
         end
     end
 
-    -- DebuffFrame hiding (simple Hide + Show hook, no EnableMouse)
+    -- DebuffFrame hiding (SetAlpha instead of Show/Hide — may be protected)
     if DebuffFrame then
         if settings.hideDebuffFrame then
-            DebuffFrame:Hide()
+            DebuffFrame:SetAlpha(0)
         else
-            DebuffFrame:Show()
+            DebuffFrame:SetAlpha(1)
         end
-        -- Hook Show() once to prevent Blizzard from re-showing
         if not DebuffFrame._SUI_ShowHooked then
             DebuffFrame._SUI_ShowHooked = true
             pcall(hooksecurefunc, DebuffFrame, "Show", function(self)
                 local s = GetSettings()
                 if s and s.hideDebuffFrame then
-                    self:Hide()
+                    self:SetAlpha(0)
                 end
             end)
         end

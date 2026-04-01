@@ -89,6 +89,33 @@ local PREVIEW_AURAS = {
 }
 
 ---------------------------------------------------------------------------
+-- MOUNT / VEHICLE VISIBILITY
+-- Uses SetAlpha(0/1) to avoid taint from Show/Hide on secure frames.
+-- Checks all unit frames with hideWhileMounted enabled.
+---------------------------------------------------------------------------
+local mountWatcherFrame = CreateFrame("Frame")
+mountWatcherFrame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
+mountWatcherFrame:RegisterEvent("UNIT_ENTERED_VEHICLE")
+mountWatcherFrame:RegisterEvent("UNIT_EXITED_VEHICLE")
+mountWatcherFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+mountWatcherFrame:SetScript("OnEvent", function()
+    local isMounted = IsMounted() or UnitInVehicle("player")
+    for unitKey, frame in pairs(SUI_UF.frames) do
+        local settings = GetUnitSettings(unitKey)
+        if settings and settings.hideWhileMounted then
+            if isMounted and not SUI_UF.previewMode[unitKey] then
+                frame:SetAlpha(0)
+            else
+                frame:SetAlpha(1)
+            end
+        elseif frame:GetAlpha() == 0 and not SUI_UF.previewMode[unitKey] then
+            -- Restore alpha if setting was just disabled
+            frame:SetAlpha(1)
+        end
+    end
+end)
+
+---------------------------------------------------------------------------
 -- HELPER: Anchor type handling for frame positioning
 ---------------------------------------------------------------------------
 -- Anchor type constants (map text values to anchor targets)
@@ -1369,6 +1396,8 @@ end
 ---------------------------------------------------------------------------
 -- UPDATE: Full frame update
 ---------------------------------------------------------------------------
+local UpdateAuras  -- forward declaration (defined later, needed by UpdateFrame)
+
 local function UpdateFrame(frame)
     if not frame then return end
     
@@ -1436,6 +1465,12 @@ local function UpdateFrame(frame)
             end
         end
     end)
+
+    -- Update auras OUTSIDE the pcall — the pcall's tainted context would
+    -- cascade to aura processing, which then contaminates CDM systems.
+    if UpdateAuras then
+        UpdateAuras(frame, true)
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -2426,10 +2461,10 @@ local function GetAuraIcon(container, index, parent, size, auraSettings, isDebuf
     return icon
 end
 
-local function UpdateAuras(frame)
+UpdateAuras = function(frame, forceNoThrottle)
     if not frame or not frame.unit then return end
     local unit = frame.unit
-    
+
     if not UnitExists(unit) then
         -- Hide all auras
         if frame.buffIcons then
@@ -2445,10 +2480,10 @@ local function UpdateAuras(frame)
         return
     end
     
-    -- Throttle updates
+    -- Throttle updates (skip throttle when forced, e.g., Edit Mode setting change)
     local now = GetTime()
     local lastUpdate = lastAuraUpdate[unit] or 0
-    if (now - lastUpdate) < AURA_THROTTLE then
+    if not forceNoThrottle and (now - lastUpdate) < AURA_THROTTLE then
         return
     end
     lastAuraUpdate[unit] = now

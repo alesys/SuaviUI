@@ -75,7 +75,8 @@ RB.commonDefaults = {
     fontSize = 12,
     fontOutline = "OUTLINE",
     textAlign = "CENTER",
-    maskAndBorderStyle = "Thin",
+    maskAndBorderStyle = "Thin",  -- legacy (migration to borderThickness)
+    borderThickness = 2,
     borderColor = { r = 0, g = 0, b = 0, a = 1 },
     backgroundStyle = "SUI Semi-transparent",
     backgroundColor = { r = 1, g = 1, b = 1, a = 1 },

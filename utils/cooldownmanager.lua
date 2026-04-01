@@ -127,10 +127,12 @@ local function IsCenteredStylingEnabled(viewerType)
     return GetSetting("cooldownManager_useCenteredStyling_Essential", false)
         or GetSetting("cooldownManager_useCenteredStyling_Utility", false)
 end
--- TAINT-SAFE MODE (WoW 12.x): avoid mutating Blizzard CooldownViewer item frames
--- from addon code. This prevents "secret value tainted by 'SuaviUI'" chains in
--- Blizzard_CooldownViewer.lua / CooldownViewerItemData.lua.
-local DISABLE_BLIZZARD_VIEWER_MUTATIONS = true
+-- SetPoint on CDM item frames IS safe when guarded:
+-- 1. NOT during Blizzard's layoutApplyInProgress (taint cascade)
+-- 2. Deferred via C_Timer.After(0) (outside secure call stack)
+-- 3. NOT during Edit Mode (Blizzard manages layout)
+-- CooldownManagerCentered addon uses this exact approach successfully.
+local DISABLE_BLIZZARD_VIEWER_MUTATIONS = false
 local PrintDebug = function(...)
     if CMC_DEBUG then
         print("[CMC]", ...)
@@ -718,16 +720,18 @@ local sizeSavedValues = {
 function ViewerAdapters.CenterAllRows(viewer, fromDirection)
     -- Why: Core centering routine that groups children into rows/columns and applies offsets.
     -- When: `UpdateEssentialIfNeeded` or `UpdateUtilityIfNeeded` determines changes require recompute.
-    -- WoW 12.0.5: viewer may be forbidden. All access wrapped in pcall.
+    -- Guards: same as CooldownManagerCentered — skip during layoutApplyInProgress and Edit Mode.
     if not viewer then return end
+    -- Guard: don't run during Blizzard's layout chain (taint cascade)
+    if EditModeManagerFrame and EditModeManagerFrame.layoutApplyInProgress then return end
+    -- Guard: don't run during Edit Mode (Blizzard manages layout)
+    if EditModeManagerFrame and EditModeManagerFrame:IsShown() then return end
+
     local viewerName = pcall(viewer.GetName, viewer) and viewer:GetName() or ""
     local viewerType = viewerName:find("Essential") and "Essential"
                     or viewerName:find("Utility") and "Utility"
                     or nil
     if not IsCenteredStylingEnabled(viewerType) then
-        return
-    end
-    if DISABLE_BLIZZARD_VIEWER_MUTATIONS then
         return
     end
     if not viewer then return end
@@ -979,6 +983,19 @@ function CooldownManager.HookViewerRefreshLayout()
 end
 
 function CooldownManager.Initialize()
+    -- Migrate old global centered styling key → per-viewer keys (must run early,
+    -- not inside the options page builder which only fires when the page is opened)
+    local db = SuaviUI and SuaviUI.SUICore and SuaviUI.SUICore.db and SuaviUI.SUICore.db.profile
+    if db and db.cooldownManager_useCenteredStyling then
+        if db.cooldownManager_useCenteredStyling_Essential == nil then
+            db.cooldownManager_useCenteredStyling_Essential = true
+        end
+        if db.cooldownManager_useCenteredStyling_Utility == nil then
+            db.cooldownManager_useCenteredStyling_Utility = true
+        end
+        db.cooldownManager_useCenteredStyling = nil
+    end
+
     if ns.DISABLE_ALL_CDM_HOOKS or not ns.CDM_HOOKS.cooldownmanager then return end
     RefreshViewerRefs()
     CooldownManager.HookViewerRefreshLayout()

@@ -63,7 +63,10 @@ local function BuildLemSettings(bar, defaults)
             end,
             set = function(layoutName, value)
                 local data = EnsureBarData(config, layoutName, defaults)
-                if data then data.barVisible = value end
+                if data then
+                    data.barVisible = value
+                    bar:ApplyVisibilitySettings(layoutName)
+                end
             end,
         },
         {
@@ -103,7 +106,10 @@ local function BuildLemSettings(bar, defaults)
             end,
             set = function(layoutName, value)
                 local data = EnsureBarData(config, layoutName, defaults)
-                if data then data.hideWhileMountedOrVehicule = value end
+                if data then
+                    data.hideWhileMountedOrVehicule = value
+                    bar:ApplyVisibilitySettings(layoutName)
+                end
             end,
             tooltip = L["HIDE_WHILE_MOUNTED_OR_VEHICULE_TOOLTIP"],
         },
@@ -419,7 +425,10 @@ local function BuildLemSettings(bar, defaults)
             end,
             set = function(layoutName, value)
                 local data = EnsureBarData(config, layoutName, defaults)
-                if data then data.smoothProgress = value end
+                if data then
+                    data.smoothProgress = value
+                    bar:UpdateDisplay(layoutName, true)
+                end
             end,
         },
         -- BAR STYLE CATEGORY
@@ -615,28 +624,35 @@ local function BuildLemSettings(bar, defaults)
         {
             parentId = L["CATEGORY_BAR_STYLE"],
             order = 405,
-            name = L["BORDER"],
-            kind = LEM.SettingType.DropdownColor,
-            default = defaults.maskAndBorderStyle,
-            colorDefault = defaults.borderColor,
-            useOldStyle = true,
-            values = RB.availableMaskAndBorderStyles,
+            name = L["BORDER"] .. " Size",
+            kind = LEM.SettingType.Slider,
+            default = defaults.borderThickness or 2,
+            minValue = 0,
+            maxValue = 5,
+            stepSize = 1,
             get = function(layoutName)
                 local data = GetBarData(config, layoutName)
-                return (data and data.maskAndBorderStyle) or defaults.maskAndBorderStyle
-            end,
-            colorGet = function(layoutName)
-                local data = GetBarData(config, layoutName)
-                return data and data.borderColor or defaults.borderColor
+                return (data and data.borderThickness) or defaults.borderThickness or 2
             end,
             set = function(layoutName, value)
                 local data = EnsureBarData(config, layoutName, defaults)
                 if data then
-                    data.maskAndBorderStyle = value
+                    data.borderThickness = value
                     bar:ApplyMaskAndBorderSettings(layoutName)
                 end
             end,
-            colorSet = function(layoutName, value)
+        },
+        {
+            parentId = L["CATEGORY_BAR_STYLE"],
+            order = 406,
+            name = L["BORDER"] .. " Color",
+            kind = LEM.SettingType.Color,
+            default = defaults.borderColor,
+            get = function(layoutName)
+                local data = GetBarData(config, layoutName)
+                return data and data.borderColor or defaults.borderColor
+            end,
+            set = function(layoutName, value)
                 local data = EnsureBarData(config, layoutName, defaults)
                 if data then
                     data.borderColor = value

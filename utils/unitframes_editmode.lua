@@ -313,6 +313,42 @@ local function BuildUnitFrameSettings(unitKey)
         order = order + 1
     end
     
+    -- Visibility Category
+    table.insert(settings, {
+        order = order,
+        name = "Visibility",
+        kind = LEM.SettingType.Collapsible,
+        id = "CATEGORY_VISIBILITY_" .. unitKey,
+        defaultCollapsed = true,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_VISIBILITY_" .. unitKey,
+        order = order,
+        name = "Hide While Mounted/Vehicle",
+        kind = LEM.SettingType.Checkbox,
+        default = false,
+        get = function()
+            local s = GetUnitSettings(unitKey)
+            return s and s.hideWhileMounted or false
+        end,
+        set = function(layoutName, value)
+            local s = GetUnitSettings(unitKey)
+            if s then
+                s.hideWhileMounted = value
+                -- Trigger mount watcher to recheck immediately
+                local isMounted = IsMounted() or UnitInVehicle("player")
+                local SUI_UF = ns.SUI_UnitFrames
+                local frame = SUI_UF and SUI_UF.frames[unitKey]
+                if frame then
+                    frame:SetAlpha((value and isMounted) and 0 or 1)
+                end
+            end
+        end,
+    })
+    order = order + 1
+
     -- Anchoring Category (Player/Target only)
     if unitKey == "player" or unitKey == "target" then
         table.insert(settings, {

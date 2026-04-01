@@ -2980,10 +2980,14 @@ local function Initialize()
                     if isHoriz ~= nil then
                         SUI_BuffBar.iconViewerIsVertical = (isHoriz == false)
                     end
+                    -- During Edit Mode, let Blizzard handle layout so the selection
+                    -- overlay matches the actual icon positions.
+                    if BuffIconCooldownViewer.isEditing then return end
                     if IsLayoutSuppressed() then return end
                     if isIconLayoutRunning then return end
                     -- Defer so we don't run inside Blizzard's secure Layout call stack
                     C_Timer.After(0, function()
+                        if BuffIconCooldownViewer.isEditing then return end
                         if IsLayoutSuppressed() then return end
                         if isIconLayoutRunning then return end
                         LayoutBuffIcons()
@@ -2998,10 +3002,12 @@ local function Initialize()
         pcall(function()
             if BuffBarCooldownViewer and BuffBarCooldownViewer.Layout then
                 hooksecurefunc(BuffBarCooldownViewer, "Layout", function()
+                    if BuffBarCooldownViewer.isEditing then return end
                     if IsLayoutSuppressed() then return end
                     if isBarLayoutRunning then return end
                     -- TAINT-FIX: defer so we don't run inside Blizzard's secure Layout call stack
                     C_Timer.After(0, function()
+                        if BuffBarCooldownViewer.isEditing then return end
                         if IsLayoutSuppressed() then return end
                         if isBarLayoutRunning then return end
                         LayoutBuffBars()
@@ -3088,6 +3094,33 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     end
 end)
 
+---------------------------------------------------------------------------
+-- MOUNT / VEHICLE VISIBILITY
+-- Hide CDM viewers while mounted/flying/in vehicle via SetAlpha(0/1).
+---------------------------------------------------------------------------
+local cdmMountFrame = CreateFrame("Frame")
+cdmMountFrame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
+cdmMountFrame:RegisterEvent("UNIT_ENTERED_VEHICLE")
+cdmMountFrame:RegisterEvent("UNIT_EXITED_VEHICLE")
+cdmMountFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+cdmMountFrame:SetScript("OnEvent", function()
+    local isMounted = IsMounted() or UnitInVehicle("player")
+    local barSettings = GetTrackedBarSettings()
+    local iconSettings = GetBuffSettings()
+    if barSettings and barSettings.hideWhileMounted then
+        local viewer = SafeGetViewer("BuffBarCooldownViewer")
+        if viewer then
+            pcall(function() viewer:SetAlpha(isMounted and 0 or 1) end)
+        end
+    end
+    if iconSettings and iconSettings.hideWhileMounted then
+        local viewer = SafeGetViewer("BuffIconCooldownViewer")
+        if viewer then
+            pcall(function() viewer:SetAlpha(isMounted and 0 or 1) end)
+        end
+    end
+end)
+
 -- Also try to initialize immediately if viewers exist
 C_Timer.After(0, function()
     if ns.DISABLE_ALL_CDM_HOOKS or not ns.CDM_HOOKS.buffbar then return end
@@ -3123,7 +3156,16 @@ do
     end
 
     local function RefreshIcons()
-        if _G.SuaviUI_RefreshCooldownIcons then _G.SuaviUI_RefreshCooldownIcons() end
+        -- Refresh icon styling (square, borders, zoom)
+        local SI = ns.StyledIcons
+        if SI and SI.RefreshAll then
+            SI:RefreshAll()
+        end
+        -- Refresh centered layout
+        local CM = SuaviUI and SuaviUI.CooldownManager
+        if CM then
+            CM.ForceRefresh({ icons = true, bars = true, essential = true, utility = true })
+        end
     end
 
     local function RefreshAdvanced()
@@ -3200,6 +3242,7 @@ do
     local barControlKeys = {
         "barDivider", "barHeight", "barTexture", "barOrientation", "barGrowth",
         "barClassColor", "barBorderSize", "barBgOpacity", "barTextSize",
+        "barHideMounted",
     }
 
     EP.RegisterSystem(IsBuffBarViewer, function()
@@ -3246,6 +3289,13 @@ do
             function() return (GetTrackedBarSettings()).textSize or 12 end,
             function(v) local t = GetOrCreateTrackedBarDB(); if t then t.textSize = v end; LayoutBuffBars() end
         )
+        controls.barHideMounted = EP.CreateCheckbox("BarHideMounted", "Hide While Mounted/Vehicle",
+            function() return (GetTrackedBarSettings()).hideWhileMounted or false end,
+            function(v)
+                local t = GetOrCreateTrackedBarDB(); if t then t.hideWhileMounted = v end
+                cdmMountFrame:GetScript("OnEvent")(cdmMountFrame, "PLAYER_MOUNT_DISPLAY_CHANGED")
+            end
+        )
     end, barControlKeys)
 
     ---------------------------------------------------------------------------
@@ -3253,11 +3303,22 @@ do
     ---------------------------------------------------------------------------
     local iconControlKeys = {
         "buffIconDivider", "buffIconSquare", "buffIconBorderSize",
-        "buffIconBorderOverlap", "buffIconZoom",
+        "buffIconBorderOverlap", "buffIconZoom", "buffIconHideMounted",
     }
 
     EP.RegisterSystem(IsBuffIconViewer, function()
         CreateCDMSquareIconControls("buffIcon", "BuffIcons", LayoutBuffIcons)
+        controls.buffIconHideMounted = EP.CreateCheckbox("BuffIconHideMounted", "Hide While Mounted/Vehicle",
+            function() return (GetBuffSettings()).hideWhileMounted or false end,
+            function(v)
+                local db = GetDB()
+                if db then
+                    if not db.buff then db.buff = {} end
+                    db.buff.hideWhileMounted = v
+                end
+                cdmMountFrame:GetScript("OnEvent")(cdmMountFrame, "PLAYER_MOUNT_DISPLAY_CHANGED")
+            end
+        )
     end, iconControlKeys)
 
     ---------------------------------------------------------------------------
