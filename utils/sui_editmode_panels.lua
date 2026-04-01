@@ -141,6 +141,59 @@ function SUI_EditPanels.CreateDivider(name, label)
     return frame
 end
 
+function SUI_EditPanels.CreateCollapsible(name, label, childKeys, defaultCollapsed)
+    local frame = CreateFrame("Button", "SUI_EditMode_Collapsible_" .. name, UIParent)
+    frame:SetSize(343, 22)
+    frame:Hide()
+
+    local arrow = frame:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    arrow:SetPoint("LEFT", 0, 0)
+    arrow:SetJustifyH("LEFT")
+
+    local text = frame:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    text:SetPoint("LEFT", arrow, "RIGHT", 2, 0)
+    text:SetText("|cff00ccff" .. label .. "|r")
+    text:SetJustifyH("LEFT")
+
+    local line = frame:CreateTexture(nil, "ARTWORK")
+    line:SetHeight(1)
+    line:SetPoint("LEFT", text, "RIGHT", 6, 0)
+    line:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
+    line:SetColorTexture(0.3, 0.3, 0.3, 0.6)
+
+    frame._collapsed = defaultCollapsed or false
+    frame._childKeys = childKeys or {}
+    frame._arrow = arrow
+
+    local function UpdateArrow()
+        arrow:SetText(frame._collapsed and "|cff00ccff>|r" or "|cff00ccffv|r")
+    end
+    UpdateArrow()
+
+    frame:SetScript("OnClick", function()
+        PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+        frame._collapsed = not frame._collapsed
+        UpdateArrow()
+        for _, key in ipairs(frame._childKeys) do
+            local child = SUI_EditPanels.controls[key]
+            if child then
+                if frame._collapsed then
+                    child:Hide()
+                else
+                    child:Show()
+                end
+            end
+        end
+        -- Re-layout the settings container
+        if frame:GetParent() and frame:GetParent().Layout then
+            frame:GetParent():Layout()
+        end
+    end)
+
+    frame._suiGetter = nil  -- Not a value control
+    return frame
+end
+
 ---------------------------------------------------------------------------
 -- INJECTION INFRASTRUCTURE
 ---------------------------------------------------------------------------
@@ -164,6 +217,17 @@ local function InjectControls(dialog, controlKeys)
 
     local nextIndex = maxIndex + 1
 
+    -- Build set of keys hidden by collapsed sections
+    local collapsedChildren = {}
+    for _, key in ipairs(controlKeys) do
+        local ctrl = SUI_EditPanels.controls[key]
+        if ctrl and ctrl._childKeys and ctrl._collapsed then
+            for _, childKey in ipairs(ctrl._childKeys) do
+                collapsedChildren[childKey] = true
+            end
+        end
+    end
+
     for _, key in ipairs(controlKeys) do
         local ctrl = SUI_EditPanels.controls[key]
         if ctrl then
@@ -172,23 +236,28 @@ local function InjectControls(dialog, controlKeys)
             ctrl.layoutIndex = nextIndex
             nextIndex = nextIndex + 1
 
-            -- Type-specific refresh before showing
-            if ctrl.Slider then
-                ctrl.initInProgress = true
-                local steps = (ctrl._suiMax - ctrl._suiMin) / ctrl._suiStep
-                ctrl.Slider:Init(ctrl._suiGetter(), ctrl._suiMin, ctrl._suiMax, steps, {
-                    [MinimalSliderWithSteppersMixin.Label.Right] = CreateMinimalSliderFormatter(MinimalSliderWithSteppersMixin.Label.Right),
-                })
-                ctrl.initInProgress = false
-            elseif ctrl.Button then
-                local checked = ctrl._suiGetter()
-                ctrl.checked = checked
-                ctrl.Button:SetChecked(checked)
-            elseif ctrl.Dropdown then
-                ctrl._suiSetup()
-            end
+            -- Skip children of collapsed sections
+            if collapsedChildren[key] then
+                ctrl:Hide()
+            else
+                -- Type-specific refresh before showing
+                if ctrl.Slider then
+                    ctrl.initInProgress = true
+                    local steps = (ctrl._suiMax - ctrl._suiMin) / ctrl._suiStep
+                    ctrl.Slider:Init(ctrl._suiGetter(), ctrl._suiMin, ctrl._suiMax, steps, {
+                        [MinimalSliderWithSteppersMixin.Label.Right] = CreateMinimalSliderFormatter(MinimalSliderWithSteppersMixin.Label.Right),
+                    })
+                    ctrl.initInProgress = false
+                elseif ctrl.Button then
+                    local checked = ctrl._suiGetter()
+                    ctrl.checked = checked
+                    ctrl.Button:SetChecked(checked)
+                elseif ctrl.Dropdown then
+                    ctrl._suiSetup()
+                end
 
-            ctrl:Show()
+                ctrl:Show()
+            end
         end
     end
 

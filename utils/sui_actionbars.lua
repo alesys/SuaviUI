@@ -2390,23 +2390,28 @@ do
     ---------------------------------------------------------------------------
     local abControlKeys = {
         "abDivider",
-        -- Button Appearance
+        -- Per-bar setting (always visible)
+        "abAlwaysShow",
+        -- Collapsible: Button Appearance
+        "abAppearanceSection",
         "abIconCrop", "abBackdrop", "abBackdropAlpha",
         "abGloss", "abGlossAlpha", "abBorders", "abHideEmpty",
-        -- Text: Keybinds
+        -- Collapsible: Keybinds
+        "abKeybindSection",
         "abShowKeybinds", "abHideEmptyKeybinds", "abKeybindSize",
         "abKeybindAnchor", "abKeybindOffX", "abKeybindOffY",
-        -- Text: Macro Names
+        -- Collapsible: Macro Names
+        "abMacroSection",
         "abShowMacro", "abMacroSize",
         "abMacroAnchor", "abMacroOffX", "abMacroOffY",
-        -- Text: Stack Counts
+        -- Collapsible: Stack Counts
+        "abCountSection",
         "abShowCounts", "abCountSize",
         "abCountAnchor", "abCountOffX", "abCountOffY",
-        -- Mouseover Hide
-        "abFadeDivider",
+        -- Collapsible: Mouseover Hide
+        "abFadeSection",
         "abFadeEnable", "abFadeIn", "abFadeOut", "abFadeAlpha", "abFadeDelay",
         "abFadeCombat", "abFadeLink", "abFadeMounted",
-        "abAlwaysShow",
     }
 
     ---------------------------------------------------------------------------
@@ -2415,7 +2420,18 @@ do
     local function InitABControls()
         controls.abDivider = EP.CreateDivider("AB", "SuaviUI")
 
-        -- Button Appearance
+        -- Per-bar: Always Show (moved to top, always visible)
+        controls.abAlwaysShow = EP.CreateCheckbox("ABAlwaysShow", "Always Show This Bar",
+            function() return false end,
+            function() end
+        )
+
+        -- Collapsible: Button Appearance
+        controls.abAppearanceSection = EP.CreateCollapsible("ABAppearance", "Button Appearance", {
+            "abIconCrop", "abBackdrop", "abBackdropAlpha",
+            "abGloss", "abGlossAlpha", "abBorders", "abHideEmpty",
+        }, true)
+
         controls.abIconCrop = EP.CreateSlider("ABIconCrop", "Icon Crop", 5, 15, 1,
             function() local g = GetGlobal(); return g and math.floor((g.iconZoom or 0.08) * 100 + 0.5) or 8 end,
             function(v) local g = GetGlobal(); if g then g.iconZoom = v / 100 end; RefreshAB() end
@@ -2445,7 +2461,12 @@ do
             function(v) local g = GetGlobal(); if g then g.hideEmptySlots = v end; RefreshAB() end
         )
 
-        -- Text: Keybinds
+        -- Collapsible: Keybinds
+        controls.abKeybindSection = EP.CreateCollapsible("ABKeybinds", "Keybinds", {
+            "abShowKeybinds", "abHideEmptyKeybinds", "abKeybindSize",
+            "abKeybindAnchor", "abKeybindOffX", "abKeybindOffY",
+        }, true)
+
         controls.abShowKeybinds = EP.CreateCheckbox("ABShowKeybinds", "Show Keybinds",
             function() local g = GetGlobal(); return g and g.showKeybinds ~= false end,
             function(v) local g = GetGlobal(); if g then g.showKeybinds = v end; RefreshAB() end
@@ -2472,7 +2493,12 @@ do
             function(v) local g = GetGlobal(); if g then g.keybindOffsetY = v end; RefreshAB() end
         )
 
-        -- Text: Macro Names
+        -- Collapsible: Macro Names
+        controls.abMacroSection = EP.CreateCollapsible("ABMacros", "Macro Names", {
+            "abShowMacro", "abMacroSize",
+            "abMacroAnchor", "abMacroOffX", "abMacroOffY",
+        }, true)
+
         controls.abShowMacro = EP.CreateCheckbox("ABShowMacro", "Show Macro Names",
             function() local g = GetGlobal(); return g and g.showMacroNames or false end,
             function(v) local g = GetGlobal(); if g then g.showMacroNames = v end; RefreshAB() end
@@ -2495,7 +2521,12 @@ do
             function(v) local g = GetGlobal(); if g then g.macroNameOffsetY = v end; RefreshAB() end
         )
 
-        -- Text: Stack Counts
+        -- Collapsible: Stack Counts
+        controls.abCountSection = EP.CreateCollapsible("ABCounts", "Stack Counts", {
+            "abShowCounts", "abCountSize",
+            "abCountAnchor", "abCountOffX", "abCountOffY",
+        }, true)
+
         controls.abShowCounts = EP.CreateCheckbox("ABShowCounts", "Show Stack Counts",
             function() local g = GetGlobal(); return g and g.showCounts ~= false end,
             function(v) local g = GetGlobal(); if g then g.showCounts = v end; RefreshAB() end
@@ -2518,8 +2549,11 @@ do
             function(v) local g = GetGlobal(); if g then g.countOffsetY = v end; RefreshAB() end
         )
 
-        -- Mouseover Hide
-        controls.abFadeDivider = EP.CreateDivider("ABFade", "Mouseover Hide")
+        -- Collapsible: Mouseover Hide
+        controls.abFadeSection = EP.CreateCollapsible("ABFade", "Mouseover Hide", {
+            "abFadeEnable", "abFadeIn", "abFadeOut", "abFadeAlpha", "abFadeDelay",
+            "abFadeCombat", "abFadeLink", "abFadeMounted",
+        }, true)
 
         controls.abFadeEnable = EP.CreateCheckbox("ABFadeEnable", "Enable Mouseover Hide",
             function() local f = GetFade(); return f and f.enabled or false end,
@@ -2559,11 +2593,6 @@ do
             end
         )
 
-        -- Per-bar "Always Show" checkbox (refreshed dynamically per selected bar)
-        controls.abAlwaysShow = EP.CreateCheckbox("ABAlwaysShow", "Always Show This Bar",
-            function() return false end,  -- Overridden dynamically
-            function() end  -- Overridden dynamically
-        )
     end
 
     ---------------------------------------------------------------------------
