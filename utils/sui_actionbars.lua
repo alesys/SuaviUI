@@ -2437,15 +2437,15 @@ do
             function(v) local g = GetGlobal(); if g then g.iconZoom = v / 100 end; RefreshAB() end
         )
         controls.abBackdrop = EP.CreateCheckbox("ABBackdrop", "Show Backdrop",
-            function() local g = GetGlobal(); return g and g.showBackdrop or false end,
+            function() local g = GetGlobal(); return g and g.showBackdrop ~= false end,
             function(v) local g = GetGlobal(); if g then g.showBackdrop = v end; RefreshAB() end
         )
         controls.abBackdropAlpha = EP.CreateSlider("ABBackdropAlpha", "Backdrop Alpha", 0, 100, 5,
-            function() local g = GetGlobal(); return g and math.floor((g.backdropAlpha or 0.5) * 100 + 0.5) or 50 end,
+            function() local g = GetGlobal(); return g and math.floor((g.backdropAlpha or 0.8) * 100 + 0.5) or 80 end,
             function(v) local g = GetGlobal(); if g then g.backdropAlpha = v / 100 end; RefreshAB() end
         )
         controls.abGloss = EP.CreateCheckbox("ABGloss", "Show Gloss",
-            function() local g = GetGlobal(); return g and g.showGloss or false end,
+            function() local g = GetGlobal(); return g and g.showGloss ~= false end,
             function(v) local g = GetGlobal(); if g then g.showGloss = v end; RefreshAB() end
         )
         controls.abGlossAlpha = EP.CreateSlider("ABGlossAlpha", "Gloss Alpha", 0, 100, 5,
