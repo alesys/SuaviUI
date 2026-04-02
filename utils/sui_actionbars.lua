@@ -2255,11 +2255,19 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == "PLAYER_SPECIALIZATION_CHANGED" then
         -- Spec change reassigns spells to action bar slots.
-        -- Delay to let Blizzard finish updating slot contents.
+        -- SkinBar uses a settings cache and won't re-evaluate empty slots
+        -- unless the skin settings changed. Force re-evaluate visibility.
         C_Timer.After(0.5, function()
             if DISABLE_STANDARD_ACTIONBAR_CUSTOMIZATION then return end
             for barKey, _ in pairs(BUTTON_PATTERNS) do
-                SkinBar(barKey)
+                local effectiveSettings = GetEffectiveSettings(barKey)
+                if effectiveSettings then
+                    local buttons = GetBarButtons(barKey)
+                    for _, button in ipairs(buttons) do
+                        UpdateEmptySlotVisibility(button, effectiveSettings)
+                        UpdateButtonText(button, effectiveSettings)
+                    end
+                end
             end
         end)
     end
