@@ -472,6 +472,64 @@ function SuaviUI:DebugPrint(...)
     end
 end
 
+---------------------------------------------------------------------------
+-- MOTIVATIONAL MESSAGES
+-- Random friendly messages shown on login and periodically during play
+---------------------------------------------------------------------------
+do
+    local ACCENT = "|cffFF6AC1"
+    local MUTED = "|cff808084"
+    local RESET = "|r"
+
+    local messages = {
+        ACCENT .. "SuaviUI loves you." .. RESET,
+        MUTED .. "Remember to drink water." .. RESET,
+        ACCENT .. "You're doing great today." .. RESET,
+        MUTED .. "Stretch your wrists. They deserve it." .. RESET,
+        ACCENT .. "Every wipe is a lesson." .. RESET,
+        MUTED .. "Good posture = good DPS." .. RESET,
+        ACCENT .. "Your UI looks amazing, by the way." .. RESET,
+        MUTED .. "Take a deep breath. The boss will wait." .. RESET,
+        ACCENT .. "Today is your day to shine." .. RESET,
+        MUTED .. "Eyes off the screen for 20 seconds. Go." .. RESET,
+        ACCENT .. "You're braver than you believe." .. RESET,
+        MUTED .. "Snack break? Snack break." .. RESET,
+        ACCENT .. "The Loot Council believes in you." .. RESET,
+        MUTED .. "Stand up. Walk around. Come back stronger." .. RESET,
+        ACCENT .. "RNG is temporary. Skill is forever." .. RESET,
+        MUTED .. "Your raid group is lucky to have you." .. RESET,
+        ACCENT .. "Don't forget to have fun." .. RESET,
+        MUTED .. "Keyboard clean? Mouse clean? Soul clean?" .. RESET,
+        ACCENT .. "You've got this. Pull the boss." .. RESET,
+        MUTED .. "Blinking is a DPS increase. Trust me." .. RESET,
+    }
+
+    local lastIndex = 0
+
+    local function ShowRandomMessage()
+        local idx
+        repeat
+            idx = math.random(1, #messages)
+        until idx ~= lastIndex or #messages == 1
+        lastIndex = idx
+        local prefix = "|cffFF6AC1Suavi|r|cffEFF0EBUI|r "
+        DEFAULT_CHAT_FRAME:AddMessage(prefix .. messages[idx])
+    end
+
+    -- Show one on login, then every 30-45 minutes
+    local loginFrame = CreateFrame("Frame")
+    loginFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    loginFrame:SetScript("OnEvent", function(self, _, isInitialLogin)
+        if not isInitialLogin then return end
+        self:UnregisterEvent("PLAYER_ENTERING_WORLD")
+        -- Delay first message so it doesn't get buried in login spam
+        C_Timer.After(15, ShowRandomMessage)
+        -- Periodic timer: 30-45 min (randomized per session)
+        local interval = 1800 + math.random(0, 900)
+        C_Timer.NewTicker(interval, ShowRandomMessage)
+    end)
+end
+
 -- ADDON COMPARTMENT FUNCTIONS --
 function SuaviUI_CompartmentClick(addonName, buttonName)
     if buttonName == "RightButton" then

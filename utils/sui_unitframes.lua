@@ -2294,6 +2294,49 @@ end
 local AURA_THROTTLE = 0.15  -- Update every 150ms max
 local lastAuraUpdate = {}
 
+-- Normalize display-text values that may have been stored by older LEM dropdowns
+-- (e.g. "Top Left" → "TOPLEFT", "Right" → "RIGHT")
+local VALID_ANCHORS = {
+    TOPLEFT = true, TOP = true, TOPRIGHT = true,
+    LEFT = true, CENTER = true, RIGHT = true,
+    BOTTOMLEFT = true, BOTTOM = true, BOTTOMRIGHT = true,
+}
+
+local function NormalizeAnchor(v, fallback)
+    if not v then return fallback end
+    local upper = string.gsub(string.upper(v), " ", "")
+    return VALID_ANCHORS[upper] and upper or fallback
+end
+
+local function NormalizeGrow(v, fallback)
+    if not v then return fallback end
+    local upper = string.upper(v)
+    if upper == "LEFT" or upper == "RIGHT" or upper == "UP" or upper == "DOWN" then
+        return upper
+    end
+    return fallback
+end
+
+-- Map a user-facing anchor to the SetPoint args that place aura icons
+-- outside the frame edge. Flips the perpendicular axis so icons sit
+-- adjacent to the chosen edge rather than overlapping the frame.
+local AURA_ANCHOR_MAP = {
+    TOPLEFT     = { icon = "BOTTOMLEFT",  frame = "TOPLEFT",     bx =  1 },
+    TOP         = { icon = "BOTTOM",       frame = "TOP",         bx =  0 },
+    TOPRIGHT    = { icon = "BOTTOMRIGHT",  frame = "TOPRIGHT",    bx = -1 },
+    LEFT        = { icon = "RIGHT",        frame = "LEFT",        bx =  0 },
+    CENTER      = { icon = "CENTER",       frame = "CENTER",      bx =  0 },
+    RIGHT       = { icon = "LEFT",         frame = "RIGHT",       bx =  0 },
+    BOTTOMLEFT  = { icon = "TOPLEFT",      frame = "BOTTOMLEFT",  bx =  1 },
+    BOTTOM      = { icon = "TOP",          frame = "BOTTOM",      bx =  0 },
+    BOTTOMRIGHT = { icon = "TOPRIGHT",     frame = "BOTTOMRIGHT", bx = -1 },
+}
+
+local function GetAuraAnchorPoints(anchor)
+    local m = AURA_ANCHOR_MAP[anchor] or AURA_ANCHOR_MAP.TOPLEFT
+    return m.icon, m.frame, m.bx
+end
+
 -- Apply aura icon settings (for real-time updates without recreating icons)
 -- isDebuff: true for debuffs, false for buffs - uses per-type settings when available
 -- Duration text uses Blizzard's built-in countdown (handles secret values internally)
@@ -2463,17 +2506,28 @@ UpdateAuras = function(frame, forceNoThrottle)
     if not frame or not frame.unit then return end
     local unit = frame.unit
 
+    local unitKey = frame.unitKey
+    local buffPreviewActive = SUI_UF.auraPreviewMode[unitKey .. "_buff"]
+    local debuffPreviewActive = SUI_UF.auraPreviewMode[unitKey .. "_debuff"]
+
     if not UnitExists(unit) then
-        -- Hide all auras
-        if frame.buffIcons then
+        -- Hide real auras (but not preview icons)
+        if not buffPreviewActive and frame.buffIcons then
             for _, icon in ipairs(frame.buffIcons) do
                 icon:Hide()
             end
         end
-        if frame.debuffIcons then
+        if not debuffPreviewActive and frame.debuffIcons then
             for _, icon in ipairs(frame.debuffIcons) do
                 icon:Hide()
             end
+        end
+        -- Still refresh previews even without a real unit (Edit Mode)
+        if debuffPreviewActive then
+            SUI_UF:ShowAuraPreviewForFrame(frame, unitKey, "debuff")
+        end
+        if buffPreviewActive then
+            SUI_UF:ShowAuraPreviewForFrame(frame, unitKey, "buff")
         end
         return
     end
@@ -2501,22 +2555,17 @@ UpdateAuras = function(frame, forceNoThrottle)
     local showDebuffs = auraSettings.showDebuffs ~= false  -- default true
     local onlyMyDebuffs = auraSettings.onlyMyDebuffs ~= false  -- default true
 
-    -- Check if in preview mode for either aura type
-    local unitKey = frame.unitKey
-    local buffPreviewActive = SUI_UF.auraPreviewMode[unitKey .. "_buff"]
-    local debuffPreviewActive = SUI_UF.auraPreviewMode[unitKey .. "_debuff"]
-
     -- Debuff settings
-    local debuffAnchor = auraSettings.debuffAnchor or "TOPLEFT"
-    local debuffGrow = auraSettings.debuffGrow or "RIGHT"
+    local debuffAnchor = NormalizeAnchor(auraSettings.debuffAnchor, "TOPLEFT")
+    local debuffGrow = NormalizeGrow(auraSettings.debuffGrow, "RIGHT")
     local debuffMaxIcons = auraSettings.debuffMaxIcons or 16
     local debuffOffsetX = auraSettings.debuffOffsetX or 0
     local debuffOffsetY = auraSettings.debuffOffsetY or 2
     local debuffSpacing = auraSettings.debuffSpacing or auraSettings.iconSpacing or 2
 
     -- Buff settings
-    local buffAnchor = auraSettings.buffAnchor or "BOTTOMLEFT"
-    local buffGrow = auraSettings.buffGrow or "RIGHT"
+    local buffAnchor = NormalizeAnchor(auraSettings.buffAnchor, "BOTTOMLEFT")
+    local buffGrow = NormalizeGrow(auraSettings.buffGrow, "RIGHT")
     local buffMaxIcons = auraSettings.buffMaxIcons or 16
     local buffOffsetX = auraSettings.buffOffsetX or 0
     local buffOffsetY = auraSettings.buffOffsetY or -2
@@ -2677,28 +2726,12 @@ UpdateAuras = function(frame, forceNoThrottle)
                 yPos = yPos - idx * (iconSize + debuffSpacing)
             end
             
-            -- Map user anchor to frame anchor points (flip vertical only for outside positioning)
-            -- Border compensation: icons have 1px border extending beyond frame
-            local iconPoint, framePoint, borderOffsetX
-            if debuffAnchor == "TOPLEFT" then
-                iconPoint, framePoint, borderOffsetX = "BOTTOMLEFT", "TOPLEFT", 1
-            elseif debuffAnchor == "TOPRIGHT" then
-                iconPoint, framePoint, borderOffsetX = "BOTTOMRIGHT", "TOPRIGHT", -1
-            elseif debuffAnchor == "BOTTOMLEFT" then
-                iconPoint, framePoint, borderOffsetX = "TOPLEFT", "BOTTOMLEFT", 1
-            elseif debuffAnchor == "BOTTOMRIGHT" then
-                iconPoint, framePoint, borderOffsetX = "TOPRIGHT", "BOTTOMRIGHT", -1
-            else
-                -- Default fallback for invalid anchors
-                iconPoint, framePoint, borderOffsetX = "BOTTOMLEFT", "TOPLEFT", 1
-            end
+            local iconPoint, framePoint, borderOffsetX = GetAuraAnchorPoints(debuffAnchor)
 
             icon:ClearAllPoints()
-            if iconPoint and framePoint then
-                icon:SetPoint(iconPoint, frame, framePoint, xPos + (borderOffsetX or 0), yPos)
-            end
+            icon:SetPoint(iconPoint, frame, framePoint, xPos + borderOffsetX, yPos)
             icon:Show()
-            
+
             debuffIndex = debuffIndex + 1
         end
     end
@@ -2758,30 +2791,23 @@ UpdateAuras = function(frame, forceNoThrottle)
                 yPos = yPos - idx * (buffIconSize + buffSpacing)
             end
 
-            -- Map user anchor to frame anchor points (flip vertical only for outside positioning)
-            -- Border compensation: icons have 1px border extending beyond frame
-            local iconPoint, framePoint, borderOffsetX
-            if buffAnchor == "TOPLEFT" then
-                iconPoint, framePoint, borderOffsetX = "BOTTOMLEFT", "TOPLEFT", 1
-            elseif buffAnchor == "TOPRIGHT" then
-                iconPoint, framePoint, borderOffsetX = "BOTTOMRIGHT", "TOPRIGHT", -1
-            elseif buffAnchor == "BOTTOMLEFT" then
-                iconPoint, framePoint, borderOffsetX = "TOPLEFT", "BOTTOMLEFT", 1
-            elseif buffAnchor == "BOTTOMRIGHT" then
-                iconPoint, framePoint, borderOffsetX = "TOPRIGHT", "BOTTOMRIGHT", -1
-            else
-                -- Default fallback for invalid anchors
-                iconPoint, framePoint, borderOffsetX = "BOTTOMLEFT", "TOPLEFT", 1
-            end
+            local iconPoint, framePoint, borderOffsetX = GetAuraAnchorPoints(buffAnchor)
 
             icon:ClearAllPoints()
-            if iconPoint and framePoint then
-                icon:SetPoint(iconPoint, frame, framePoint, xPos + (borderOffsetX or 0), yPos)
-            end
+            icon:SetPoint(iconPoint, frame, framePoint, xPos + borderOffsetX, yPos)
             icon:Show()
 
             buffIndex = buffIndex + 1
         end
+    end
+
+    -- If preview is active, refresh preview icons so Edit Mode setting
+    -- changes (anchor, grow, size, spacing, etc.) are reflected immediately.
+    if debuffPreviewActive then
+        SUI_UF:ShowAuraPreviewForFrame(frame, unitKey, "debuff")
+    end
+    if buffPreviewActive then
+        SUI_UF:ShowAuraPreviewForFrame(frame, unitKey, "buff")
     end
 end
 
@@ -3041,6 +3067,14 @@ function SUI_UF:ShowPreview(unitKey)
             frame.healthBar:SetStatusBarColor(c[1], c[2], c[3], c[4] or 1)
         end
     end
+
+    -- Refresh aura previews if active
+    if self.auraPreviewMode[unitKey .. "_buff"] then
+        self:ShowAuraPreviewForFrame(frame, unitKey, "buff")
+    end
+    if self.auraPreviewMode[unitKey .. "_debuff"] then
+        self:ShowAuraPreviewForFrame(frame, unitKey, "debuff")
+    end
 end
 
 function SUI_UF:HidePreview(unitKey)
@@ -3159,16 +3193,16 @@ function SUI_UF:ShowAuraPreviewForFrame(frame, unitKey, auraType)
     local iconSize, anchor, grow, offsetX, offsetY, spacing, maxIcons
     if isDebuff then
         iconSize = auraSettings.iconSize or 22
-        anchor = auraSettings.debuffAnchor or "TOPLEFT"
-        grow = auraSettings.debuffGrow or "RIGHT"
+        anchor = NormalizeAnchor(auraSettings.debuffAnchor, "TOPLEFT")
+        grow = NormalizeGrow(auraSettings.debuffGrow, "RIGHT")
         offsetX = auraSettings.debuffOffsetX or 0
         offsetY = auraSettings.debuffOffsetY or 2
         spacing = auraSettings.debuffSpacing or 2
         maxIcons = auraSettings.debuffMaxIcons or 16
     else
         iconSize = auraSettings.buffIconSize or 22
-        anchor = auraSettings.buffAnchor or "BOTTOMLEFT"
-        grow = auraSettings.buffGrow or "RIGHT"
+        anchor = NormalizeAnchor(auraSettings.buffAnchor, "BOTTOMLEFT")
+        grow = NormalizeGrow(auraSettings.buffGrow, "RIGHT")
         offsetX = auraSettings.buffOffsetX or 0
         offsetY = auraSettings.buffOffsetY or -2
         spacing = auraSettings.buffSpacing or 2
@@ -3302,21 +3336,10 @@ function SUI_UF:ShowAuraPreviewForFrame(frame, unitKey, auraType)
             yPos = yPos - idx * (iconSize + spacing)
         end
 
-        -- Map user anchor to frame anchor points (flip vertical only for outside positioning)
-        -- Border compensation: icons have 1px border extending beyond frame
-        local iconPoint, framePoint, borderOffsetX
-        if anchor == "TOPLEFT" then
-            iconPoint, framePoint, borderOffsetX = "BOTTOMLEFT", "TOPLEFT", 1
-        elseif anchor == "TOPRIGHT" then
-            iconPoint, framePoint, borderOffsetX = "BOTTOMRIGHT", "TOPRIGHT", -1
-        elseif anchor == "BOTTOMLEFT" then
-            iconPoint, framePoint, borderOffsetX = "TOPLEFT", "BOTTOMLEFT", 1
-        elseif anchor == "BOTTOMRIGHT" then
-            iconPoint, framePoint, borderOffsetX = "TOPRIGHT", "BOTTOMRIGHT", -1
-        end
+        local iconPoint, framePoint, borderOffsetX = GetAuraAnchorPoints(anchor)
 
         icon:ClearAllPoints()
-        icon:SetPoint(iconPoint, frame, framePoint, xPos + (borderOffsetX or 0), yPos)
+        icon:SetPoint(iconPoint, frame, framePoint, xPos + borderOffsetX, yPos)
 
         -- Setup looping cooldown animation
         icon.cooldown:SetCooldown(previewStartTime, previewDuration)

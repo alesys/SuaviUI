@@ -35,6 +35,7 @@ local ANCHOR_POINT_OPTIONS = {
     { text = "Bottom Right", value = "BOTTOMRIGHT" },
 }
 
+
 -- Map user-friendly text to API format for normalization
 local ANCHOR_POINT_MAP = {
     ["Top Left"] = "TOPLEFT",

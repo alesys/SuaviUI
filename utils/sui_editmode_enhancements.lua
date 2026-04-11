@@ -14,16 +14,23 @@ if not LEM then return end
 -- Blizzard's ShowSelected() applies new NineSlice textures (alpha=1) which
 -- override the alpha=0 set by LEM's overlay-hide system.  We re-hide them.
 -------------------------------------------------------------------------------
-if EditModeSystemSelectionBaseMixin and EditModeSystemSelectionBaseMixin.ShowSelected then
-    hooksecurefunc(EditModeSystemSelectionBaseMixin, "ShowSelected", function(self)
-        if self.overlayHidden then
-            for _, region in ipairs({ self:GetRegions() }) do
-                if region:IsObjectType("Texture") then
-                    region:SetAlpha(0)
-                end
+local function rehideOverlayTextures(self)
+    if self.overlayHidden then
+        for _, region in ipairs({ self:GetRegions() }) do
+            if region:IsObjectType("Texture") then
+                region:SetAlpha(0)
             end
         end
-    end)
+    end
+end
+
+if EditModeSystemSelectionBaseMixin then
+    if EditModeSystemSelectionBaseMixin.ShowSelected then
+        hooksecurefunc(EditModeSystemSelectionBaseMixin, "ShowSelected", rehideOverlayTextures)
+    end
+    if EditModeSystemSelectionBaseMixin.ShowHighlighted then
+        hooksecurefunc(EditModeSystemSelectionBaseMixin, "ShowHighlighted", rehideOverlayTextures)
+    end
 end
 
 -------------------------------------------------------------------------------

@@ -828,7 +828,7 @@ local function BuildUnitFrameSettings(unitKey)
     })
     order = order + 1
     
-    -- Name Anchor
+    -- Name Anchor (9-point)
     local anchorOptions = (ns.Constants and ns.Constants.ANCHOR_POINT_OPTIONS) or {
         { text = "Top Left", value = "TOPLEFT" },
         { text = "Top", value = "TOP" },
@@ -840,23 +840,30 @@ local function BuildUnitFrameSettings(unitKey)
         { text = "Bottom", value = "BOTTOM" },
         { text = "Bottom Right", value = "BOTTOMRIGHT" },
     }
-    
+
+    local anchor9TextToValue, anchor9ValueToText = {}, {}
+    for _, opt in ipairs(anchorOptions) do
+        anchor9TextToValue[opt.text] = opt.value
+        anchor9ValueToText[opt.value] = opt.text
+    end
+
     table.insert(settings, {
         parentId = "CATEGORY_NAME_" .. unitKey,
         order = order,
         name = "Anchor",
         kind = LEM.SettingType.Dropdown,
-        default = ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.TEXT_ANCHOR or "TOPLEFT",
+        default = anchor9ValueToText[ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.TEXT_ANCHOR or "TOPLEFT"] or "Top Left",
         useOldStyle = true,
         values = anchorOptions,
         get = function(layoutName, layoutIndex)
             local s = GetUnitSettings(unitKey)
-            return s and s.nameAnchor or (ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.TEXT_ANCHOR or "TOPLEFT")
+            local v = s and s.nameAnchor or (ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.TEXT_ANCHOR or "TOPLEFT")
+            return anchor9ValueToText[v] or v
         end,
         set = function(layoutName, value, layoutIndex)
             local s = GetUnitSettings(unitKey)
             if s then
-                s.nameAnchor = value
+                s.nameAnchor = anchor9TextToValue[value] or value
                 RefreshUnitFrame(unitKey)
             end
         end,
@@ -1006,23 +1013,30 @@ local function BuildUnitFrameSettings(unitKey)
         { text = "Missing Percent (-25%)", value = "missing_percent" },
         { text = "Missing Value (-12.5k)", value = "missing_value" },
     }
-    
+
+    local healthStyleTextToValue, healthStyleValueToText = {}, {}
+    for _, opt in ipairs(healthStyleOptions) do
+        healthStyleTextToValue[opt.text] = opt.value
+        healthStyleValueToText[opt.value] = opt.text
+    end
+
     table.insert(settings, {
         parentId = "CATEGORY_HEALTH_" .. unitKey,
         order = order,
         name = "Display Style",
         kind = LEM.SettingType.Dropdown,
-        default = "percent",
+        default = healthStyleValueToText["percent"] or "Percent Only (75%)",
         useOldStyle = true,
         values = healthStyleOptions,
         get = function(layoutName, layoutIndex)
             local s = GetUnitSettings(unitKey)
-            return s and s.healthDisplayStyle or "percent"
+            local v = s and s.healthDisplayStyle or "percent"
+            return healthStyleValueToText[v] or v
         end,
         set = function(layoutName, value, layoutIndex)
             local s = GetUnitSettings(unitKey)
             if s then
-                s.healthDisplayStyle = value
+                s.healthDisplayStyle = healthStyleTextToValue[value] or value
                 RefreshUnitFrame(unitKey)
             end
         end,
@@ -1206,29 +1220,36 @@ local function BuildUnitFrameSettings(unitKey)
         { text = "Current (12.5k)", value = "current" },
         { text = "Both (12.5k | 75%)", value = "both" },
     }
-    
+
+    local powerFmtTextToValue, powerFmtValueToText = {}, {}
+    for _, opt in ipairs(powerTextFormatOptions) do
+        powerFmtTextToValue[opt.text] = opt.value
+        powerFmtValueToText[opt.value] = opt.text
+    end
+
     table.insert(settings, {
         parentId = "CATEGORY_POWER_TEXT_" .. unitKey,
         order = order,
         name = "Display Format",
         kind = LEM.SettingType.Dropdown,
-        default = "percent",
+        default = powerFmtValueToText["percent"] or "Percent (75%)",
         useOldStyle = true,
         values = powerTextFormatOptions,
         get = function(layoutName, layoutIndex)
             local s = GetUnitSettings(unitKey)
-            return s and s.powerTextFormat or "percent"
+            local v = s and s.powerTextFormat or "percent"
+            return powerFmtValueToText[v] or v
         end,
         set = function(layoutName, value, layoutIndex)
             local s = GetUnitSettings(unitKey)
             if s then
-                s.powerTextFormat = value
+                s.powerTextFormat = powerFmtTextToValue[value] or value
                 RefreshUnitFrame(unitKey)
             end
         end,
     })
     order = order + 1
-    
+
     -- Power Text Font Size
     table.insert(settings, {
         parentId = "CATEGORY_POWER_TEXT_" .. unitKey,
@@ -1253,24 +1274,25 @@ local function BuildUnitFrameSettings(unitKey)
         end,
     })
     order = order + 1
-    
+
     -- Power Text Anchor
     table.insert(settings, {
         parentId = "CATEGORY_POWER_TEXT_" .. unitKey,
         order = order,
         name = "Anchor",
         kind = LEM.SettingType.Dropdown,
-        default = ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.POWER_TEXT_ANCHOR or "BOTTOMRIGHT",
+        default = anchor9ValueToText[ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.POWER_TEXT_ANCHOR or "BOTTOMRIGHT"] or "Bottom Right",
         useOldStyle = true,
         values = anchorOptions,
         get = function(layoutName, layoutIndex)
             local s = GetUnitSettings(unitKey)
-            return s and s.powerTextAnchor or (ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.POWER_TEXT_ANCHOR or "BOTTOMRIGHT")
+            local v = s and s.powerTextAnchor or (ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.POWER_TEXT_ANCHOR or "BOTTOMRIGHT")
+            return anchor9ValueToText[v] or v
         end,
         set = function(layoutName, value, layoutIndex)
             local s = GetUnitSettings(unitKey)
             if s then
-                s.powerTextAnchor = value
+                s.powerTextAnchor = anchor9TextToValue[value] or value
                 RefreshUnitFrame(unitKey)
             end
         end,
@@ -1456,37 +1478,46 @@ local function BuildUnitFrameSettings(unitKey)
     })
     order = order + 1
     
-    -- Debuff Anchor
+    -- Debuff/Buff Anchor (9-point — icons placed outside the chosen edge)
     local auraAnchorOptions = (ns.Constants and ns.Constants.ANCHOR_POINT_OPTIONS) or {
         { text = "Top Left", value = "TOPLEFT" },
         { text = "Top Right", value = "TOPRIGHT" },
         { text = "Bottom Left", value = "BOTTOMLEFT" },
         { text = "Bottom Right", value = "BOTTOMRIGHT" },
     }
-    
+
+    -- LEM dropdown passes value.text (display name) to get/set, not value.value.
+    -- Build bidirectional lookup maps for anchor and grow dropdowns.
+    local anchorTextToValue, anchorValueToText = {}, {}
+    for _, opt in ipairs(auraAnchorOptions) do
+        anchorTextToValue[opt.text] = opt.value
+        anchorValueToText[opt.value] = opt.text
+    end
+
     table.insert(settings, {
         parentId = "CATEGORY_DEBUFFS_" .. unitKey,
         order = order,
         name = "Anchor",
         kind = LEM.SettingType.Dropdown,
-        default = ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.DEBUFF_ANCHOR or "TOPLEFT",
+        default = anchorValueToText[ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.DEBUFF_ANCHOR or "TOPLEFT"] or "Top Left",
         useOldStyle = true,
         values = auraAnchorOptions,
         get = function(layoutName, layoutIndex)
             local s = GetUnitSettings(unitKey)
-            return s and s.auras and s.auras.debuffAnchor or (ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.DEBUFF_ANCHOR or "TOPLEFT")
+            local v = s and s.auras and s.auras.debuffAnchor or (ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.DEBUFF_ANCHOR or "TOPLEFT")
+            return anchorValueToText[v] or v
         end,
         set = function(layoutName, value, layoutIndex)
             local s = GetUnitSettings(unitKey)
             if s then
                 if not s.auras then s.auras = {} end
-                s.auras.debuffAnchor = value
+                s.auras.debuffAnchor = anchorTextToValue[value] or value
                 RefreshUnitFrame(unitKey)
             end
         end,
     })
     order = order + 1
-    
+
     -- Debuff Grow Direction
     local growOptions = {
         { text = "Left", value = "LEFT" },
@@ -1494,24 +1525,31 @@ local function BuildUnitFrameSettings(unitKey)
         { text = "Up", value = "UP" },
         { text = "Down", value = "DOWN" },
     }
-    
+
+    local growTextToValue, growValueToText = {}, {}
+    for _, opt in ipairs(growOptions) do
+        growTextToValue[opt.text] = opt.value
+        growValueToText[opt.value] = opt.text
+    end
+
     table.insert(settings, {
         parentId = "CATEGORY_DEBUFFS_" .. unitKey,
         order = order,
         name = "Grow Direction",
         kind = LEM.SettingType.Dropdown,
-        default = "RIGHT",
+        default = growValueToText["RIGHT"] or "Right",
         useOldStyle = true,
         values = growOptions,
         get = function(layoutName, layoutIndex)
             local s = GetUnitSettings(unitKey)
-            return s and s.auras and s.auras.debuffGrow or "RIGHT"
+            local v = s and s.auras and s.auras.debuffGrow or "RIGHT"
+            return growValueToText[v] or v
         end,
         set = function(layoutName, value, layoutIndex)
             local s = GetUnitSettings(unitKey)
             if s then
                 if not s.auras then s.auras = {} end
-                s.auras.debuffGrow = value
+                s.auras.debuffGrow = growTextToValue[value] or value
                 RefreshUnitFrame(unitKey)
             end
         end,
@@ -1710,42 +1748,44 @@ local function BuildUnitFrameSettings(unitKey)
         order = order,
         name = "Anchor",
         kind = LEM.SettingType.Dropdown,
-        default = ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.BUFF_ANCHOR or "BOTTOMLEFT",
+        default = anchorValueToText[ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.BUFF_ANCHOR or "BOTTOMLEFT"] or "Bottom Left",
         useOldStyle = true,
         values = auraAnchorOptions,
         get = function(layoutName, layoutIndex)
             local s = GetUnitSettings(unitKey)
-            return s and s.auras and s.auras.buffAnchor or (ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.BUFF_ANCHOR or "BOTTOMLEFT")
+            local v = s and s.auras and s.auras.buffAnchor or (ns.Constants and ns.Constants.DEFAULTS and ns.Constants.DEFAULTS.BUFF_ANCHOR or "BOTTOMLEFT")
+            return anchorValueToText[v] or v
         end,
         set = function(layoutName, value, layoutIndex)
             local s = GetUnitSettings(unitKey)
             if s then
                 if not s.auras then s.auras = {} end
-                s.auras.buffAnchor = value
+                s.auras.buffAnchor = anchorTextToValue[value] or value
                 RefreshUnitFrame(unitKey)
             end
         end,
     })
     order = order + 1
-    
+
     -- Buff Grow Direction
     table.insert(settings, {
         parentId = "CATEGORY_BUFFS_" .. unitKey,
         order = order,
         name = "Grow Direction",
         kind = LEM.SettingType.Dropdown,
-        default = "RIGHT",
+        default = growValueToText["RIGHT"] or "Right",
         useOldStyle = true,
         values = growOptions,
         get = function(layoutName, layoutIndex)
             local s = GetUnitSettings(unitKey)
-            return s and s.auras and s.auras.buffGrow or "RIGHT"
+            local v = s and s.auras and s.auras.buffGrow or "RIGHT"
+            return growValueToText[v] or v
         end,
         set = function(layoutName, value, layoutIndex)
             local s = GetUnitSettings(unitKey)
             if s then
                 if not s.auras then s.auras = {} end
-                s.auras.buffGrow = value
+                s.auras.buffGrow = growTextToValue[value] or value
                 RefreshUnitFrame(unitKey)
             end
         end,

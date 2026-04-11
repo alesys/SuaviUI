@@ -34,15 +34,26 @@ local EQUIPMENT_SLOTS = {
 
 -- Color palette (Snazzy theme)
 local C = {
+    -- Backgrounds (matched to GUI.Colors)
     bg = { 0.157, 0.165, 0.212, 0.97 },        -- #282A36 Snazzy Background
     bgLight = { 0.188, 0.196, 0.247, 1 },      -- #303040 Slightly lighter
     bgDark = { 0.133, 0.141, 0.188, 1 },       -- #222430 Darker
     bgCard = { 0.170, 0.178, 0.228, 0.85 },    -- Card/container bg
+
+    -- Accent (matched to GUI.Colors)
     accent = { 1.0, 0.416, 0.757, 1 },         -- #FF6AC1 Snazzy Magenta
+
+    -- Text (matched to GUI.Colors)
     text = { 0.937, 0.941, 0.922, 1 },         -- #EFF0EB Snazzy Foreground
     textBright = { 0.945, 0.945, 0.941, 1 },   -- #F1F1F0 Bright white
     textMuted = { 0.502, 0.502, 0.518, 1 },    -- #808084 Muted
+
+    -- Borders (matched to GUI.Colors)
     border = { 0.220, 0.227, 0.275, 1 },       -- #383A46 Snazzy Border
+    borderLight = { 0.290, 0.298, 0.345, 1 },  -- #4A4C58 Light border
+
+    -- Section headers (matched to GUI.Colors.sectionHeader)
+    sectionHeader = { 0.604, 0.929, 0.996, 1 },-- #9AEDFE Snazzy Cyan
 
     -- Stat bar colors
     health = { 0.937, 0.267, 0.267, 1 },       -- Soft Red
@@ -136,7 +147,13 @@ local trackedItemNameFonts = {}  -- For item name text (line 1)
 -- Get global font from SUI settings
 ---------------------------------------------------------------------------
 local function GetGlobalFont()
-    local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
+    -- Use the same font as the options panel (GUI.FONT_PATH)
+    local SUI = _G.SuaviUI
+    if SUI and SUI.GUI and SUI.GUI.FONT_PATH then
+        return SUI.GUI.FONT_PATH
+    end
+    -- Fallback: try user setting
+    local SUICore = SUI and SUI.SUICore
     if SUICore and SUICore.db and SUICore.db.profile then
         local fontName = SUICore.db.profile.general and SUICore.db.profile.general.font
         if fontName then
@@ -491,16 +508,17 @@ local function CreateSlotOverlay(slotFrame, slotInfo, unit)
     else
         slotTextSize = settings.slotTextSize or ENCHANT_FONT
     end
-    local TEXT_WIDTH = math.floor(140 * scale)
+    local TEXT_WIDTH = math.floor(170 * scale)
     local FONT_FLAGS = "OUTLINE"  -- Thin black outline for readability
 
     -- Icon ilvl (small number inside slot icon, top-left corner)
     overlay.iconIlvl = overlay:CreateFontString(nil, "OVERLAY")
-    overlay.iconIlvl:SetFont(slotFont, 10, "OUTLINE")
+    overlay.iconIlvl:SetFont(slotFont, 9, "OUTLINE")
     overlay.iconIlvl:SetTextColor(1, 1, 1, 1)
     overlay.iconIlvl:SetJustifyH("LEFT")
-    overlay.iconIlvl:SetPoint("TOPLEFT", overlay, "TOPLEFT", 2, -2)
+    overlay.iconIlvl:SetPoint("TOPLEFT", overlay, "TOPLEFT", 1, -1)
     overlay.iconIlvl:SetWordWrap(false)
+    overlay.iconIlvl:SetWidth(slotFrame:GetWidth() - 4)
 
     -- Line 1: Item Name
     overlay.itemName = overlay:CreateFontString(nil, "OVERLAY")
@@ -548,38 +566,48 @@ local function CreateSlotOverlay(slotFrame, slotInfo, unit)
         table.insert(trackedEnchantFonts, overlay.enchant)
     end
 
+    -- Missing enchant warning icon (small caution triangle on slot corner)
+    overlay.noEnchantIcon = overlay:CreateTexture(nil, "OVERLAY")
+    overlay.noEnchantIcon:SetSize(12, 12)
+    overlay.noEnchantIcon:SetPoint("BOTTOMRIGHT", overlay, "BOTTOMRIGHT", -1, 1)
+    overlay.noEnchantIcon:SetTexture("Interface\\DialogFrame\\UI-Dialog-Icon-AlertNew")
+    overlay.noEnchantIcon:SetDesaturated(true)
+    overlay.noEnchantIcon:SetVertexColor(1.0, 0.65, 0.2, 0.85)
+    overlay.noEnchantIcon:Hide()
+
     -- Position text on INNER side of column (3-line vertical stack)
+    local lineGap = -2
     if slotInfo.side == "left" then
         -- Text on RIGHT (inner side)
         overlay.itemName:SetPoint("TOPLEFT", overlay, "TOPRIGHT", 4, 2)
         overlay.itemName:SetJustifyH("LEFT")
-        overlay.itemLevel:SetPoint("TOPLEFT", overlay.itemName, "BOTTOMLEFT", 0, -1)
+        overlay.itemLevel:SetPoint("TOPLEFT", overlay.itemName, "BOTTOMLEFT", 0, lineGap)
         overlay.itemLevel:SetJustifyH("LEFT")
-        overlay.enchant:SetPoint("TOPLEFT", overlay.itemLevel, "BOTTOMLEFT", 0, -1)
+        overlay.enchant:SetPoint("TOPLEFT", overlay.itemLevel, "BOTTOMLEFT", 0, lineGap)
         overlay.enchant:SetJustifyH("LEFT")
     elseif slotInfo.side == "right" then
         -- Text on LEFT (inner side)
         overlay.itemName:SetPoint("TOPRIGHT", overlay, "TOPLEFT", -4, 2)
         overlay.itemName:SetJustifyH("RIGHT")
-        overlay.itemLevel:SetPoint("TOPRIGHT", overlay.itemName, "BOTTOMRIGHT", 0, -1)
+        overlay.itemLevel:SetPoint("TOPRIGHT", overlay.itemName, "BOTTOMRIGHT", 0, lineGap)
         overlay.itemLevel:SetJustifyH("RIGHT")
-        overlay.enchant:SetPoint("TOPRIGHT", overlay.itemLevel, "BOTTOMRIGHT", 0, -1)
+        overlay.enchant:SetPoint("TOPRIGHT", overlay.itemLevel, "BOTTOMRIGHT", 0, lineGap)
         overlay.enchant:SetJustifyH("RIGHT")
     elseif slotInfo.id == INVSLOT_MAINHAND then
         -- MainHand weapon: Text on LEFT side (3-line stack)
         overlay.itemName:SetPoint("TOPRIGHT", overlay, "TOPLEFT", -4, 2)
         overlay.itemName:SetJustifyH("RIGHT")
-        overlay.itemLevel:SetPoint("TOPRIGHT", overlay.itemName, "BOTTOMRIGHT", 0, -1)
+        overlay.itemLevel:SetPoint("TOPRIGHT", overlay.itemName, "BOTTOMRIGHT", 0, lineGap)
         overlay.itemLevel:SetJustifyH("RIGHT")
-        overlay.enchant:SetPoint("TOPRIGHT", overlay.itemLevel, "BOTTOMRIGHT", 0, -1)
+        overlay.enchant:SetPoint("TOPRIGHT", overlay.itemLevel, "BOTTOMRIGHT", 0, lineGap)
         overlay.enchant:SetJustifyH("RIGHT")
     else
         -- SecondaryHand weapon: Text on RIGHT side (3-line stack)
         overlay.itemName:SetPoint("TOPLEFT", overlay, "TOPRIGHT", 4, 2)
         overlay.itemName:SetJustifyH("LEFT")
-        overlay.itemLevel:SetPoint("TOPLEFT", overlay.itemName, "BOTTOMLEFT", 0, -1)
+        overlay.itemLevel:SetPoint("TOPLEFT", overlay.itemName, "BOTTOMLEFT", 0, lineGap)
         overlay.itemLevel:SetJustifyH("LEFT")
-        overlay.enchant:SetPoint("TOPLEFT", overlay.itemLevel, "BOTTOMLEFT", 0, -1)
+        overlay.enchant:SetPoint("TOPLEFT", overlay.itemLevel, "BOTTOMLEFT", 0, lineGap)
         overlay.enchant:SetJustifyH("LEFT")
     end
 
@@ -760,17 +788,20 @@ local function UpdateSlotOverlay(overlay, unit)
             if enchantText then
                 overlay.enchant:SetText(enchantText)
                 overlay.enchant:SetTextColor(enchantColor[1], enchantColor[2], enchantColor[3], 1)
+                overlay.enchant:Show()
+                if overlay.noEnchantIcon then overlay.noEnchantIcon:Hide() end
             else
-                -- Enchantable slot but no enchant - show "No Enchant" in customizable color
-                overlay.enchant:SetText("No Enchant")
-                overlay.enchant:SetTextColor(noEnchantColor[1], noEnchantColor[2], noEnchantColor[3], 1)
+                -- Enchantable slot but no enchant — show warning icon on slot corner
+                overlay.enchant:Hide()
+                if overlay.noEnchantIcon then overlay.noEnchantIcon:Show() end
             end
-            overlay.enchant:Show()
         else
             overlay.enchant:Hide()
+            if overlay.noEnchantIcon then overlay.noEnchantIcon:Hide() end
         end
     else
         overlay.enchant:Hide()
+        if overlay.noEnchantIcon then overlay.noEnchantIcon:Hide() end
     end
 
     -- Update gem icons (actual textures, including empty sockets)
@@ -871,22 +902,20 @@ local function HideBlizzardDecorations()
     if CharacterFrameTitleText then CharacterFrameTitleText:Hide() end
     if CharacterFrame.TitleText then CharacterFrame.TitleText:Hide() end
 
-    -- Hide sidebar tab decorations (ornate corner textures in top-right)
+    -- Hide Blizzard's sidebar tabs entirely (replaced by header bar buttons)
     if PaperDollSidebarTabs then
-        if PaperDollSidebarTabs.DecorLeft then PaperDollSidebarTabs.DecorLeft:Hide() end
-        if PaperDollSidebarTabs.DecorRight then PaperDollSidebarTabs.DecorRight:Hide() end
-        -- Move sidebar tabs 30px right to align with extended panel
-        PaperDollSidebarTabs:ClearAllPoints()
-        PaperDollSidebarTabs:SetPoint("TOPRIGHT", CharacterFrame, "TOPRIGHT", 50, -30)
+        PaperDollSidebarTabs:SetAlpha(0)
+        PaperDollSidebarTabs:SetSize(1, 1)
+        PaperDollSidebarTabs:EnableMouse(false)
     end
 
-    -- Move close button 30px right to align with extended panel
+    -- Move close button to align with extended panel
     if CharacterFrame.CloseButton then
         CharacterFrame.CloseButton:ClearAllPoints()
         CharacterFrame.CloseButton:SetPoint("TOPRIGHT", CharacterFrame, "TOPRIGHT", 52, -5)
     end
 
-    -- Move bottom tabs (Character/Reputation/Currency) down 50px
+    -- Restyle bottom tabs (Character/Reputation/Currency) with Snazzy theme
     if CharacterFrameTab1 then
         CharacterFrameTab1:ClearAllPoints()
         CharacterFrameTab1:SetPoint("TOPLEFT", CharacterFrame, "BOTTOMLEFT", 11, -48)
@@ -1174,7 +1203,7 @@ local function RepositionSlots()
     local settings = GetSettings()
     if not CharacterFrameBg then return end  -- Need this frame as anchor
 
-    local vpad = 14  -- Vertical padding between slots
+    local vpad = 16  -- Vertical padding between slots
     local SLOT_SCALE = 0.90  -- Scale down slots to 90%
 
     -- All slots to scale
@@ -1195,7 +1224,7 @@ local function RepositionSlots()
 
     -- LEFT COLUMN: Head is anchor, others chain below
     CharacterHeadSlot:ClearAllPoints()
-    CharacterHeadSlot:SetPoint("TOPLEFT", CharacterFrameBg, "TOPLEFT", 20, -30)
+    CharacterHeadSlot:SetPoint("TOPLEFT", CharacterFrameBg, "TOPLEFT", 20, -46)
 
     CharacterNeckSlot:ClearAllPoints()
     CharacterNeckSlot:SetPoint("TOPLEFT", CharacterHeadSlot, "BOTTOMLEFT", 0, -vpad)
@@ -1217,7 +1246,7 @@ local function RepositionSlots()
 
     -- RIGHT COLUMN: Hands is anchor, others chain below (closer to stats panel)
     CharacterHandsSlot:ClearAllPoints()
-    CharacterHandsSlot:SetPoint("TOPLEFT", CharacterFrameBg, "TOPLEFT", 413, -30)
+    CharacterHandsSlot:SetPoint("TOPLEFT", CharacterFrameBg, "TOPLEFT", 413, -46)
 
     CharacterWaistSlot:ClearAllPoints()
     CharacterWaistSlot:SetPoint("TOPLEFT", CharacterHandsSlot, "BOTTOMLEFT", 0, -vpad)
@@ -1263,7 +1292,7 @@ local function PositionModelScene()
 
     -- Position model scene between slot columns
     CharacterModelScene:ClearAllPoints()
-    CharacterModelScene:SetPoint("TOPLEFT", CharacterFrame, "TOPLEFT", 86, -85)
+    CharacterModelScene:SetPoint("TOPLEFT", CharacterFrame, "TOPLEFT", 86, -46)
     CharacterModelScene:SetPoint("BOTTOMRIGHT", CharacterFrame, "BOTTOMRIGHT", -204, 65)
     CharacterModelScene:SetFrameLevel(2)
     CharacterModelScene:Show()
@@ -1285,9 +1314,9 @@ local function PositionStatsPanelForLayout()
 
     if statsPanel then
         statsPanel:ClearAllPoints()
-        statsPanel:SetPoint("TOPRIGHT", CharacterFrame, "TOPRIGHT", 42, -70)
-        statsPanel:SetPoint("BOTTOMRIGHT", CharacterFrame, "BOTTOMRIGHT", 42, -35)
-        statsPanel:SetWidth(160)
+        statsPanel:SetPoint("TOPRIGHT", CharacterFrame, "TOPRIGHT", 55, -62)  -- Below sidebar buttons
+        statsPanel:SetPoint("BOTTOMRIGHT", CharacterFrame, "BOTTOMRIGHT", 55, -35)
+        statsPanel:SetWidth(185)
         statsPanel:SetFrameLevel(10)
         statsPanel:Show()
 
@@ -1309,44 +1338,143 @@ local function SetupTitleArea()
         CharacterLevelText:Hide()
     end
 
-    -- Create top-left two-line display: Line 1 = Name, Line 2 = Level + Spec
+    -- Create header bar container (Snazzy card style)
     if not CharacterFrame._suiILvlDisplay then
-        local displayFrame = CreateFrame("Frame", nil, CharacterFrame)
-        displayFrame:SetSize(400, 30)
-        displayFrame:SetPoint("TOPLEFT", CharacterFrame, "TOPLEFT", 19, -10)  -- Aligned with first slot
-        displayFrame:SetFrameLevel(CharacterFrame:GetFrameLevel() + 10)
+        local headerBar = CreateFrame("Frame", nil, CharacterFrame, "BackdropTemplate")
+        headerBar:SetHeight(38)
+        headerBar:SetPoint("TOPLEFT", CharacterFrame, "TOPLEFT", 4, -4)
+        headerBar:SetPoint("TOPRIGHT", CharacterFrame, "TOPRIGHT", 24, -4)
+        headerBar:SetFrameLevel(CharacterFrame:GetFrameLevel() + 10)
+        headerBar:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8X8",
+            edgeFile = "Interface\\Buttons\\WHITE8X8",
+            edgeSize = 1,
+        })
+        headerBar:SetBackdropColor(C.bgDark[1], C.bgDark[2], C.bgDark[3], 1)
+        headerBar:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
 
-        -- Line 1: Character name
-        local nameText = displayFrame:CreateFontString(nil, "OVERLAY")
-        nameText:SetFont(font, 12, "")
-        nameText:SetPoint("TOPLEFT", displayFrame, "TOPLEFT", 0, 0)
+        -- Left side: Character name (class colored, larger)
+        local nameText = headerBar:CreateFontString(nil, "OVERLAY")
+        nameText:SetFont(font, 13, "")
+        nameText:SetPoint("LEFT", headerBar, "LEFT", 10, 5)
         nameText:SetJustifyH("LEFT")
 
-        -- Line 2: Level + Spec (right-aligned near right icons)
-        local specText = CharacterFrame:CreateFontString(nil, "OVERLAY")
-        specText:SetFont(font, 12, "")
-        specText:SetPoint("TOPRIGHT", CharacterFrame, "TOPRIGHT", -132, -10)  -- Aligned with right slot column
-        specText:SetJustifyH("RIGHT")
+        -- Left side below name: spec + class (muted, smaller)
+        local specText = headerBar:CreateFontString(nil, "OVERLAY")
+        specText:SetFont(font, 10, "")
+        specText:SetPoint("TOPLEFT", nameText, "BOTTOMLEFT", 0, -2)
+        specText:SetJustifyH("LEFT")
+        specText:SetTextColor(C.textMuted[1], C.textMuted[2], C.textMuted[3], 1)
 
-        displayFrame.text = nameText
-        displayFrame.specText = specText
-        CharacterFrame._suiILvlDisplay = displayFrame
+        headerBar.text = nameText
+        headerBar.specText = specText
+        CharacterFrame._suiILvlDisplay = headerBar
     end
 
-    -- Create center ilvl display (title bar) - shows equipped | overall
+    -- Create center ilvl display (inside header bar, right-aligned)
     if not CharacterFrame._quiCenterILvl then
-        local centerFrame = CreateFrame("Frame", nil, CharacterFrame)
-        centerFrame:SetSize(200, 20)
-        centerFrame:SetPoint("TOP", CharacterFrame, "TOP", -62, -10)  -- Title bar, shifted left over model
-        centerFrame:SetFrameLevel(CharacterFrame:GetFrameLevel() + 10)
+        local headerBar = CharacterFrame._suiILvlDisplay
+        local centerFrame = CreateFrame("Frame", nil, headerBar)
+        centerFrame:SetSize(160, 36)
+        centerFrame:SetPoint("RIGHT", headerBar, "RIGHT", -10, 0)
 
+        -- ilvl numbers (large, prominent)
         local centerText = centerFrame:CreateFontString(nil, "OVERLAY")
-        centerText:SetFont(font, 21, "OUTLINE")  -- Large font
-        centerText:SetPoint("CENTER")
-        centerText:SetJustifyH("CENTER")
+        centerText:SetFont(font, 18, "OUTLINE")
+        centerText:SetPoint("RIGHT", centerFrame, "RIGHT", 0, 0)
+        centerText:SetJustifyH("RIGHT")
+        centerText:SetWordWrap(false)
 
         centerFrame.text = centerText
         CharacterFrame._quiCenterILvl = centerFrame
+    end
+
+    -- Create sidebar navigation buttons above the stats panel (Stats / Titles / Equip)
+    if not CharacterFrame._suiSidebarButtons then
+        local sidebarDefs = {
+            { label = "Stats",  tab = PaperDollSidebarTab1 },
+            { label = "Titles", tab = PaperDollSidebarTab2 },
+            { label = "Equip",  tab = PaperDollSidebarTab3 },
+        }
+
+        local btnHeight = 20
+        local btnGap = 2
+        local panelWidth = 185  -- Must match stats panel width
+        local panelRightOffset = 55  -- Must match stats panel TOPRIGHT x offset
+
+        -- Container matches stats panel width, sits just above it
+        local btnContainer = CreateFrame("Frame", nil, CharacterFrame)
+        btnContainer:SetSize(panelWidth, btnHeight)
+        btnContainer:SetPoint("TOPRIGHT", CharacterFrame, "TOPRIGHT", panelRightOffset, -42)
+        btnContainer:SetFrameLevel(CharacterFrame:GetFrameLevel() + 12)
+
+        local btnWidth = math.floor((panelWidth - btnGap * (#sidebarDefs - 1)) / #sidebarDefs)
+        local buttons = {}
+        for i, def in ipairs(sidebarDefs) do
+            local btn = CreateFrame("Button", nil, btnContainer, "BackdropTemplate")
+            btn:SetSize(btnWidth, btnHeight)
+            btn:SetPoint("LEFT", btnContainer, "LEFT", (i - 1) * (btnWidth + btnGap), 0)
+            -- Styled to match GUI:CreateButton (bgLight bg, border, accent hover)
+            btn:SetBackdrop({
+                bgFile = "Interface\\Buttons\\WHITE8X8",
+                edgeFile = "Interface\\Buttons\\WHITE8X8",
+                edgeSize = 1,
+            })
+            btn:SetBackdropColor(C.bgLight[1], C.bgLight[2], C.bgLight[3], 1)
+            btn:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
+
+            local label = btn:CreateFontString(nil, "OVERLAY")
+            label:SetFont(font, 9, "")
+            label:SetPoint("CENTER")
+            label:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
+            label:SetText(def.label)
+            btn.label = label
+            btn.sidebarTab = def.tab
+            btn._isActive = false
+
+            btn:SetScript("OnClick", function(self)
+                if self.sidebarTab then
+                    self.sidebarTab:Click()
+                end
+                -- Update active state on all buttons
+                for _, b in ipairs(buttons) do
+                    if b == self then
+                        b._isActive = true
+                        b:SetBackdropColor(C.accent[1], C.accent[2], C.accent[3], 1)
+                        b:SetBackdropBorderColor(C.accent[1], C.accent[2], C.accent[3], 1)
+                        b.label:SetTextColor(C.bgDark[1], C.bgDark[2], C.bgDark[3], 1)
+                    else
+                        b._isActive = false
+                        b:SetBackdropColor(C.bgLight[1], C.bgLight[2], C.bgLight[3], 1)
+                        b:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
+                        b.label:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
+                    end
+                end
+            end)
+
+            btn:SetScript("OnEnter", function(self)
+                if not self._isActive then
+                    self:SetBackdropBorderColor(C.accent[1], C.accent[2], C.accent[3], 1)
+                end
+            end)
+            btn:SetScript("OnLeave", function(self)
+                if not self._isActive then
+                    self:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
+                end
+            end)
+
+            table.insert(buttons, btn)
+        end
+
+        -- Default: Stats active
+        if buttons[1] then
+            buttons[1]._isActive = true
+            buttons[1]:SetBackdropColor(C.accent[1], C.accent[2], C.accent[3], 1)
+            buttons[1]:SetBackdropBorderColor(C.accent[1], C.accent[2], C.accent[3], 1)
+            buttons[1].label:SetTextColor(C.bgDark[1], C.bgDark[2], C.bgDark[3], 1)
+        end
+
+        CharacterFrame._suiSidebarButtons = buttons
     end
 end
 
@@ -1430,26 +1558,30 @@ end
 CreateStatsPanel = function(parent, unit)
     local settings = GetSettings()
 
-    -- Create main panel frame
+    -- Create main panel frame (matches options panel content area)
     local panel = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     panel:SetSize(200, 400)
-
-    -- Snazzy card-style container backdrop
     panel:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8X8",
         edgeFile = "Interface\\Buttons\\WHITE8X8",
         edgeSize = 1,
     })
-    panel:SetBackdropColor(C.bgCard[1], C.bgCard[2], C.bgCard[3], C.bgCard[4])
-    panel:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 0.6)
+    panel:SetBackdropColor(C.bg[1], C.bg[2], C.bg[3], 0.97)
+    panel:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
 
     -- Create scroll frame for stats
     local scrollFrame = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 5, -5)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -25, 5)
+    scrollFrame:SetPoint("TOPLEFT", 4, -4)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -22, 4)
+
+    -- Style scrollbar
+    local scrollBar = scrollFrame.ScrollBar or _G[scrollFrame:GetName() .. "ScrollBar"]
+    if scrollBar then
+        scrollBar:SetWidth(8)
+    end
 
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetSize(130, 1)  -- Width matches scroll area (160 - 30 padding), height set dynamically
+    scrollChild:SetSize(155, 1)
     scrollFrame:SetScrollChild(scrollChild)
 
     panel.scrollChild = scrollChild
@@ -1469,11 +1601,16 @@ local trackedSectionBgs = {}
 
 -- Create a subtle background texture behind a stat section
 local function CreateSectionBg(parent, yTop, yBottom)
-    local bg = parent:CreateTexture(nil, "BACKGROUND")
-    bg:SetColorTexture(C.bgDark[1], C.bgDark[2], C.bgDark[3], 0.35)
-    bg:SetPoint("TOPLEFT", parent, "TOPLEFT", 2, yTop + 2)
+    local height = math.abs(yTop - yBottom) + 6
+    local bg = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    bg:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+    })
+    bg:SetBackdropColor(C.bgDark[1], C.bgDark[2], C.bgDark[3], 0.3)
+    bg:SetPoint("TOPLEFT", parent, "TOPLEFT", 2, yTop + 3)
     bg:SetPoint("RIGHT", parent, "RIGHT", -2, 0)
-    bg:SetHeight(math.abs(yTop - yBottom) + 4)
+    bg:SetHeight(height)
+    bg:SetFrameLevel(parent:GetFrameLevel())
     table.insert(trackedSectionBgs, bg)
     return bg
 end
@@ -1491,10 +1628,10 @@ local function RefreshCharacterPanelFonts()
 
     -- Get pixel-based sizes (with fallback to old multiplier settings for migration)
     local statsSize = settings.statsTextSize or (settings.textSize and math.floor(11 * settings.textSize)) or 11
-    local statsColor = settings.statsTextColor or settings.textColor or {0.953, 0.957, 0.965}
+    local statsColor = settings.statsTextColor or C.text
     local headerSize = settings.headerTextSize or (settings.headerSize and math.floor(12 * settings.headerSize)) or 12
 
-    -- Header color: use class color if enabled, otherwise use custom color
+    -- Header color: use class color if enabled, otherwise cyan (matches options panel)
     local headerColor
     if settings.headerClassColor then
         local _, class = UnitClass("player")
@@ -1502,10 +1639,10 @@ local function RefreshCharacterPanelFonts()
         if classColor then
             headerColor = {classColor.r, classColor.g, classColor.b}
         else
-            headerColor = settings.headerColor or {0.204, 0.827, 0.6}
+            headerColor = settings.headerColor or C.sectionHeader
         end
     else
-        headerColor = settings.headerColor or {0.204, 0.827, 0.6}
+        headerColor = settings.headerColor or C.sectionHeader
     end
 
     -- Clean up invalid references
@@ -1523,7 +1660,7 @@ local function RefreshCharacterPanelFonts()
         local cat = entry.cat
 
         if cat == "sectionHeader" then
-            fs:SetFont(font, math.max(headerSize - 2, 10), "THINOUTLINE")
+            fs:SetFont(font, math.max(headerSize - 1, 10), "")
             fs:SetTextColor(headerColor[1], headerColor[2], headerColor[3], 1)
             fs:SetShadowOffset(0, 0)
             fs:SetText(fs:GetText() or "")
@@ -1607,11 +1744,8 @@ local function RefreshCharacterPanelFonts()
     for _, fs in ipairs(trackedEnchantFonts) do
         if fs and fs.SetFont then
             fs:SetFont(font, slotTextSize, FONT_FLAGS)
-            -- Color based on text content
             local text = fs:GetText()
-            if text and text == "No Enchant" then
-                fs:SetTextColor(noEnchantColor[1], noEnchantColor[2], noEnchantColor[3], 1)
-            elseif text then
+            if text then
                 fs:SetTextColor(enchantColor[1], enchantColor[2], enchantColor[3], 1)
             end
             table.insert(validEnchants, fs)
@@ -1652,7 +1786,7 @@ local function CreateStatRow(parent, yOffset)
     local settings = GetSettings()
     local font = GetGlobalFont()
     local statsSize = settings.statsTextSize or 11
-    local statsColor = settings.statsTextColor or {0.953, 0.957, 0.965}
+    local statsColor = settings.statsTextColor or C.text
     local rowHeight = 14
     local fontSize = math.max(statsSize - 1, 8)
 
@@ -1670,6 +1804,8 @@ local function CreateStatRow(parent, yOffset)
     row.label:SetPoint("LEFT", row, "LEFT", 0, 0)
     row.label:SetTextColor(statsColor[1], statsColor[2], statsColor[3], 1)
     row.label:SetShadowOffset(0, 0)
+    row.label:SetWordWrap(false)
+    row.label:SetWidth(row:GetWidth() * 0.55)
     TrackFontString(row.label, "statLabel")
 
     row.value = row:CreateFontString(nil, "OVERLAY")
@@ -1689,9 +1825,10 @@ local function CreateSectionHeader(parent, text, yOffset)
     local settings = GetSettings()
     local font = GetGlobalFont()
     local headerSize = settings.headerTextSize or 12
-    local fontSize = math.max(headerSize - 2, 10)
-    local headerHeight = 14
-    -- Compute header color respecting class color toggle
+    local fontSize = math.max(headerSize - 1, 10)
+    local headerHeight = 18
+
+    -- Header color: cyan by default (matches options panel), or class color if toggled
     local headerColor
     if settings.headerClassColor then
         local _, class = UnitClass("player")
@@ -1699,36 +1836,29 @@ local function CreateSectionHeader(parent, text, yOffset)
         if classColor then
             headerColor = {classColor.r, classColor.g, classColor.b}
         else
-            headerColor = settings.headerColor or {0.204, 0.827, 0.6}
+            headerColor = settings.headerColor or C.sectionHeader
         end
     else
-        headerColor = settings.headerColor or {0.204, 0.827, 0.6}
+        headerColor = settings.headerColor or C.sectionHeader
     end
 
     local header = parent:CreateFontString(nil, "OVERLAY")
-    header:SetFont(font, fontSize, "THINOUTLINE")
+    header:SetFont(font, fontSize, "")
     header:SetPoint("TOPLEFT", parent, "TOPLEFT", 5, yOffset)
     header:SetTextColor(headerColor[1], headerColor[2], headerColor[3], 1)
     header:SetText(text)
     header:SetShadowOffset(0, 0)
     TrackFontString(header, "sectionHeader")
 
-    -- Snazzy Magenta accent pip (short highlight on the left)
-    local accentPip = parent:CreateTexture(nil, "ARTWORK")
-    accentPip:SetSize(24, 2)
-    accentPip:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -2)
-    accentPip:SetColorTexture(1.0, 0.416, 0.757, 0.85) -- #FF6AC1 Snazzy Magenta
-    table.insert(trackedAccentPips, accentPip)
-
-    -- Underline (extends from accent pip to the right, subtle)
+    -- Magenta underline (matches options panel CreateSectionHeader)
     local line = parent:CreateTexture(nil, "ARTWORK")
-    line:SetHeight(1)
-    line:SetPoint("LEFT", accentPip, "RIGHT", 0, 0)
+    line:SetHeight(2)
+    line:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -2)
     line:SetPoint("RIGHT", parent, "RIGHT", -5, 0)
-    line:SetColorTexture(headerColor[1], headerColor[2], headerColor[3], 0.2)
+    line:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.7)
     table.insert(trackedUnderlines, line)
 
-    local spacingAfterHeader = 4
+    local spacingAfterHeader = 5
     return header, headerHeight + spacingAfterHeader
 end
 
@@ -1739,7 +1869,7 @@ local function CreateStatBar(parent, yOffset, color)
     local settings = GetSettings()
     local font = GetGlobalFont()
     local statsSize = settings.statsTextSize or 11
-    local statsColor = settings.statsTextColor or {0.953, 0.957, 0.965}
+    local statsColor = settings.statsTextColor or C.text
     local barTextSize = math.max(statsSize - 2, 7)
     local rowHeight = 16
     local barHeight = 3
@@ -1760,6 +1890,8 @@ local function CreateStatBar(parent, yOffset, color)
     row.label:SetPoint("LEFT", row, "LEFT", 0, labelOffset)
     row.label:SetTextColor(statsColor[1], statsColor[2], statsColor[3], 1)
     row.label:SetShadowOffset(0, 0)
+    row.label:SetWordWrap(false)
+    row.label:SetWidth(row:GetWidth() * 0.45)
     TrackFontString(row.label, "barLabel")
 
     row.value = row:CreateFontString(nil, "OVERLAY")
@@ -1824,6 +1956,7 @@ local function UpdateStatsPanel(panel, unit)
         for _, bg in ipairs(trackedSectionBgs) do
             if bg and bg.Hide then
                 bg:Hide()
+                if bg.SetParent then bg:SetParent(nil) end
             end
         end
 
@@ -1862,7 +1995,7 @@ local function UpdateStatsPanel(panel, unit)
 
         local y = -5
         local ROW_HEIGHT = 14
-        local SECTION_GAP = 8
+        local SECTION_GAP = 10
         local BAR_HEIGHT = 16
 
     -- Helper to safely get stats (pcall for Midnight protection)
@@ -1910,7 +2043,7 @@ local function UpdateStatsPanel(panel, unit)
     y = y - ROW_HEIGHT
 
     CreateSectionBg(scrollChild, sectionStart, y)
-    y = y - 5
+    y = y - 8
 
     -- ATTRIBUTES
     sectionStart = y
@@ -2028,7 +2161,7 @@ local function UpdateStatsPanel(panel, unit)
     end
 
     CreateSectionBg(scrollChild, sectionStart, y)
-    y = y - 5
+    y = y - 8
 
     -- SECONDARY STATS
     sectionStart = y
@@ -2110,7 +2243,7 @@ local function UpdateStatsPanel(panel, unit)
     end
 
     CreateSectionBg(scrollChild, sectionStart, y)
-    y = y - 5
+    y = y - 8
 
     -- ATTACK
     sectionStart = y
@@ -2156,7 +2289,7 @@ local function UpdateStatsPanel(panel, unit)
     end
 
     CreateSectionBg(scrollChild, sectionStart, y)
-    y = y - 5
+    y = y - 8
 
     -- DEFENSE
     sectionStart = y
@@ -2221,7 +2354,7 @@ local function UpdateStatsPanel(panel, unit)
     end
 
     CreateSectionBg(scrollChild, sectionStart, y)
-    y = y - 5
+    y = y - 8
 
     -- GENERAL
     sectionStart = y
@@ -2261,7 +2394,7 @@ local function UpdateStatsPanel(panel, unit)
     scrollChild:SetHeight(contentHeight)
 
     -- Scale the stats panel to fit without scrollbar
-    panel:SetScale(0.92)
+    panel:SetScale(0.95)
 
     -- Check if scrollbar is needed and hide/show it accordingly
     local scrollFrame = panel.scrollFrame
@@ -2351,31 +2484,28 @@ local function UpdateILvlDisplay()
         r, g, b = classColor.r, classColor.g, classColor.b
     end
 
-    -- Line 1: Character name (class colored)
+    -- Header left: Character name (class colored)
     displayFrame.text:SetText(name)
     displayFrame.text:SetTextColor(r, g, b, 1)
 
-    -- Line 2: Level + Spec (class colored)
+    -- Header left below name: spec + class
     if displayFrame.specText then
-        local specLine = string.format("%d %s %s", level, specName, AbbreviateClassName(className))
-        displayFrame.specText:SetText(specLine)
-        displayFrame.specText:SetTextColor(r, g, b, 1)
+        local specLineStr = string.format("%s %s", specName, AbbreviateClassName(className))
+        displayFrame.specText:SetText(specLineStr)
     end
 
-    -- Update center ilvl display (above model) - shows equipped | overall with color coding
+    -- Header right: ilvl display (equipped | overall with color coding)
     local centerFrame = CharacterFrame._quiCenterILvl
     if centerFrame and centerFrame.text then
-        -- Get colors for each ilvl tier
         local eR, eG, eB = GetILvlColor(equipped)
         local oR, oG, oB = GetILvlColor(overall)
 
-        -- Format with color codes (one decimal point)
         local equippedHex = string.format("%02x%02x%02x", math.floor(eR*255), math.floor(eG*255), math.floor(eB*255))
         local overallHex = string.format("%02x%02x%02x", math.floor(oR*255), math.floor(oG*255), math.floor(oB*255))
         local equippedStr = string.format("%.1f", equipped)
         local overallStr = string.format("%.1f", overall)
 
-        local centerStr = string.format("|cff%s%s  |  |cff%s%s|r", equippedHex, equippedStr, overallHex, overallStr)
+        local centerStr = string.format("|cff%s%s |cff808084| |cff%s%s|r", equippedHex, equippedStr, overallHex, overallStr)
         centerFrame.text:SetText(centerStr)
     end
 end

@@ -2765,7 +2765,9 @@ function Dialog:Update(selection)
 			updateEyeButton(self.HideLabelButton, selection.overlayHidden)
 		else
 			self.HideLabelButton:Hide()
-			updateSelectionVisuals(selection, false)
+			-- Respect overlay-hidden state even for frames without the
+			-- per-frame toggle flag (global eye still applies to them).
+			updateSelectionVisuals(selection, selection.overlayHidden)
 		end
 	end
 	self:UpdateSettings()
@@ -3230,6 +3232,11 @@ local function resetSelectionIndicators()
 			selection.isSelected = false
 		else
 			selection:ShowHighlighted()
+			-- ShowHighlighted applies fresh NineSlice textures at alpha=1,
+			-- overriding the hide. Re-apply if overlays should stay hidden.
+			if keepHidden then
+				updateSelectionVisuals(selection, true)
+			end
 		end
 		updateSelectionKeyboard(selection)
 	end
@@ -3372,9 +3379,12 @@ local function selectSelection(selection)
 	end
 	if not selection.isSelected then
 		selection.parent:SetMovable(true)
-		-- Check if overlays are supposed to be hidden before showing
-		local shouldShowOverlay = not selection.overlayHidden
-		selection:ShowSelected(shouldShowOverlay)
+		selection:ShowSelected()
+		-- ShowSelected applies fresh NineSlice textures at alpha=1;
+		-- re-hide if overlay should stay hidden.
+		if selection.overlayHidden then
+			updateSelectionVisuals(selection, true)
+		end
 		selection.isSelected = true
 		if Internal.dialog then
 			Internal.dialog:Update(selection)

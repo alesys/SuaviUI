@@ -11729,7 +11729,7 @@ function GUI:InitializeOptions()
         local y = -10
         local PAD = 10
         local FORM_ROW = 30
-        local RB = ns.RB
+        local RB = ns.ResourceBars
 
         GUI:SetSearchContext({tabIndex = 12, tabName = "Resource Bars"})
 
