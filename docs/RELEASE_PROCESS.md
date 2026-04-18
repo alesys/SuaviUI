@@ -110,27 +110,34 @@ Special thanks to our testers: Vela, Pataz, and Ñora for their feedback and tes
 ```
 
 #### Step 6: Generate CurseForge Changelog
-After publishing the GitHub release, generate a plain-text changelog for CurseForge.
-The format is player-facing — no technical jargon, no code references.
+After publishing the GitHub release, generate a **Markdown** changelog for CurseForge.
+CurseForge renders Markdown in the project description and changelog fields, so this
+format is preferred over plain text. Keep it player-facing — no technical jargon, no
+code references.
 
-**CurseForge Changelog Template:**
-```
-vX.X.X — [Edition Name]
+**CurseForge Changelog Template (Markdown):**
+````markdown
+## vX.X.X — [Edition Name]
 
-[SECTION NAME IN CAPS]
-• Change description in plain English
-• Another change
+### [Section Name]
+- **Feature name** — what it does in plain English
+- Another change
 
-[ANOTHER SECTION]
-• More changes
-```
+### Fixes
+- Fixed thing that was broken
+- Another fix
+
+### [Another Section]
+- More changes
+````
 
 **Rules:**
-- Use bullet points (•), not markdown
-- Section names in ALL CAPS, no emoji
+- Use Markdown: `##` for the version heading, `###` for sections, `-` for bullets
+- Use **bold** sparingly to highlight feature names
+- Section titles in Title Case, no emoji
 - Keep descriptions short and player-friendly (what changed, not how)
-- Group by feature area (e.g., CHARACTER PANEL, UNIT FRAMES, ACTION BARS, EDIT MODE, OPTIONS)
-- Present it to the user in a code box so they can copy-paste to CurseForge
+- Group by feature area (e.g., New Feature, Fixes, Unit Frames, Action Bars, Options Panel)
+- Present it to the user inside a fenced code block so the raw Markdown is easy to copy-paste to CurseForge
 
 ### 3. Verification
 After release, verify:
