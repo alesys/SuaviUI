@@ -2879,6 +2879,23 @@ local defaults = {
             leaveCombatColor = {1, 0.98, 0.2, 1},      -- -Combat text color (#FFFA33 yellow)
         },
 
+        -- Cast History (icons for recently finished player casts)
+        castHistory = {
+            enabled          = false,
+            position         = { point = "CENTER", x = 0, y = -220 },
+            maxIcons         = 5,
+            iconTimeout      = 6.0,
+            direction        = "RIGHT_TO_LEFT",
+            iconSize         = 36,
+            spacing          = 4,
+            iconSkin         = "Square",
+            squareBorderSize = 2,
+            squareZoom       = 0,
+            includeItems     = true,
+            includeRacials   = true,
+            collapseRepeats  = true,
+        },
+
         -- Combat Timer (displays elapsed combat time)
         combatTimer = {
             enabled = false,       -- Opt-in feature (disabled by default)

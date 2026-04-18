@@ -147,13 +147,8 @@ local trackedItemNameFonts = {}  -- For item name text (line 1)
 -- Get global font from SUI settings
 ---------------------------------------------------------------------------
 local function GetGlobalFont()
-    -- Use the same font as the options panel (GUI.FONT_PATH)
-    local SUI = _G.SuaviUI
-    if SUI and SUI.GUI and SUI.GUI.FONT_PATH then
-        return SUI.GUI.FONT_PATH
-    end
-    -- Fallback: try user setting
-    local SUICore = SUI and SUI.SUICore
+    -- Use the user's configured font from settings
+    local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
     if SUICore and SUICore.db and SUICore.db.profile then
         local fontName = SUICore.db.profile.general and SUICore.db.profile.general.font
         if fontName then
@@ -165,6 +160,11 @@ local function GetGlobalFont()
                 end
             end
         end
+    end
+    -- Fallback: use the options panel font
+    local SUI = _G.SuaviUI
+    if SUI and SUI.GUI and SUI.GUI.FONT_PATH then
+        return SUI.GUI.FONT_PATH
     end
     return STANDARD_TEXT_FONT
 end
@@ -480,7 +480,7 @@ local function CreateSlotOverlay(slotFrame, slotInfo, unit)
 
     -- Base sizes (will be multiplied by scale)
     local ITEM_LEVEL_FONT = math.floor(12 * scale)
-    local ENCHANT_FONT = math.floor(9 * scale)
+    local ENCHANT_FONT = math.floor(7 * scale)
     local ENCHANT_WIDTH_LEFT = math.floor(110 * scale)
     local ENCHANT_WIDTH_RIGHT = math.floor(75 * scale)
     local GEM_SIZE = math.floor(12 * scale)
@@ -514,7 +514,7 @@ local function CreateSlotOverlay(slotFrame, slotInfo, unit)
     -- Icon ilvl (small number inside slot icon, top-left corner)
     overlay.iconIlvl = overlay:CreateFontString(nil, "OVERLAY")
     overlay.iconIlvl:SetFont(slotFont, 9, "OUTLINE")
-    overlay.iconIlvl:SetTextColor(1, 1, 1, 1)
+    overlay.iconIlvl:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
     overlay.iconIlvl:SetJustifyH("LEFT")
     overlay.iconIlvl:SetPoint("TOPLEFT", overlay, "TOPLEFT", 1, -1)
     overlay.iconIlvl:SetWordWrap(false)
@@ -523,8 +523,9 @@ local function CreateSlotOverlay(slotFrame, slotInfo, unit)
     -- Line 1: Item Name
     overlay.itemName = overlay:CreateFontString(nil, "OVERLAY")
     overlay.itemName:SetFont(slotFont, slotTextSize, FONT_FLAGS)
-    overlay.itemName:SetTextColor(1, 1, 1, 1)  -- Will be colored by quality
-    overlay.itemName:SetWordWrap(false)
+    overlay.itemName:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
+    overlay.itemName:SetWordWrap(true)
+    overlay.itemName:SetMaxLines(2)
     overlay.itemName:SetWidth(TEXT_WIDTH)
     -- Only track character panel fonts (not inspect) for font refresh
     if unit ~= "target" then
@@ -534,7 +535,7 @@ local function CreateSlotOverlay(slotFrame, slotInfo, unit)
     -- Line 2: Item Level + Upgrade Track
     overlay.itemLevel = overlay:CreateFontString(nil, "OVERLAY")
     overlay.itemLevel:SetFont(slotFont, slotTextSize, FONT_FLAGS)
-    overlay.itemLevel:SetTextColor(1, 1, 1, 1)
+    overlay.itemLevel:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
     overlay.itemLevel:SetWordWrap(false)
     if unit ~= "target" then
         table.insert(trackedILvlFonts, overlay.itemLevel)
@@ -559,7 +560,7 @@ local function CreateSlotOverlay(slotFrame, slotInfo, unit)
     end
     overlay.enchant = overlay:CreateFontString(nil, "OVERLAY")
     overlay.enchant:SetFont(slotFont, slotTextSize, FONT_FLAGS)
-    overlay.enchant:SetTextColor(enchantColor[1], enchantColor[2], enchantColor[3], 1)
+    overlay.enchant:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
     overlay.enchant:SetWordWrap(false)
     overlay.enchant:SetWidth(TEXT_WIDTH)
     if unit ~= "target" then
@@ -706,7 +707,7 @@ local function UpdateSlotOverlay(overlay, unit)
     local quality = GetSlotItemQuality(unit, slotId)
     local r, g, b = GetItemQualityColorRGB(quality)
 
-    -- Update item name (Line 1)
+    -- Update item name (Line 1) — quality colored
     if overlay.itemName then
         if showItemName and itemName then
             overlay.itemName:SetText(itemName)
@@ -743,7 +744,7 @@ local function UpdateSlotOverlay(overlay, unit)
             end
             if ilvlText then
                 overlay.itemLevel:SetText(ilvlText)
-                overlay.itemLevel:SetTextColor(1, 1, 1, 1)
+                overlay.itemLevel:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
                 overlay.itemLevel:Show()
             else
                 overlay.itemLevel:Hide()
@@ -787,7 +788,7 @@ local function UpdateSlotOverlay(overlay, unit)
         if isEnchantable then
             if enchantText then
                 overlay.enchant:SetText(enchantText)
-                overlay.enchant:SetTextColor(enchantColor[1], enchantColor[2], enchantColor[3], 1)
+                overlay.enchant:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
                 overlay.enchant:Show()
                 if overlay.noEnchantIcon then overlay.noEnchantIcon:Hide() end
             else
@@ -1031,7 +1032,7 @@ local function HideBlizzardDecorations()
             slot._quiBorderFrame:SetAllPoints(slot)
             slot._quiBorderFrame:SetBackdrop({
                 edgeFile = "Interface\\Buttons\\WHITE8X8",
-                edgeSize = 1,
+                edgeSize = 2,
             })
         end
     end
@@ -1504,6 +1505,7 @@ end
 ---------------------------------------------------------------------------
 -- Initialize slot overlays for character frame
 ---------------------------------------------------------------------------
+local RefreshCharacterPanelFonts  -- forward declaration (defined at line ~1629)
 local currentOverlayScale = nil
 
 local function InitializeCharacterOverlays(forceRecreate)
@@ -1538,6 +1540,9 @@ local function InitializeCharacterOverlays(forceRecreate)
 
     currentOverlayScale = newScale
     characterPaneInitialized = true
+
+    -- Refresh fonts to pick up user's selected font (overlays created before DB may be ready)
+    C_Timer.After(0.1, RefreshCharacterPanelFonts)
 end
 
 ---------------------------------------------------------------------------
@@ -1622,7 +1627,7 @@ end
 ---------------------------------------------------------------------------
 -- Refresh all character panel fonts
 ---------------------------------------------------------------------------
-local function RefreshCharacterPanelFonts()
+RefreshCharacterPanelFonts = function()
     local settings = GetSettings()
     local font = GetGlobalFont()
 
@@ -1660,12 +1665,12 @@ local function RefreshCharacterPanelFonts()
         local cat = entry.cat
 
         if cat == "sectionHeader" then
-            fs:SetFont(font, math.max(headerSize - 1, 10), "")
+            fs:SetFont(font, math.max(headerSize - 2, 9), "")
             fs:SetTextColor(headerColor[1], headerColor[2], headerColor[3], 1)
             fs:SetShadowOffset(0, 0)
             fs:SetText(fs:GetText() or "")
         elseif cat == "statLabel" or cat == "barLabel" then
-            local size = (cat == "barLabel") and math.max(statsSize - 2, 7) or math.max(statsSize - 1, 8)
+            local size = (cat == "barLabel") and math.max(statsSize - 3, 7) or math.max(statsSize - 2, 7)
             fs:SetFont(font, size, "")
             fs:SetTextColor(statsColor[1], statsColor[2], statsColor[3], 1)
             fs:SetShadowOffset(0, 0)
@@ -1716,7 +1721,7 @@ local function RefreshCharacterPanelFonts()
     end
 
     -- Unified slot text size for all 3 lines (same font, size, and outline)
-    local slotTextSize = settings.slotTextSize or 10
+    local slotTextSize = settings.slotTextSize or 7
     local FONT_FLAGS = "OUTLINE"  -- Thin black outline for readability
 
     -- Update item name text (Line 1)
@@ -1785,10 +1790,10 @@ end
 local function CreateStatRow(parent, yOffset)
     local settings = GetSettings()
     local font = GetGlobalFont()
-    local statsSize = settings.statsTextSize or 11
+    local statsSize = settings.statsTextSize or 9
     local statsColor = settings.statsTextColor or C.text
     local rowHeight = 14
-    local fontSize = math.max(statsSize - 1, 8)
+    local fontSize = math.max(statsSize - 2, 7)
 
     local row = CreateFrame("Frame", nil, parent)
     row:SetSize(parent:GetWidth() - 10, rowHeight)
@@ -1824,8 +1829,8 @@ end
 local function CreateSectionHeader(parent, text, yOffset)
     local settings = GetSettings()
     local font = GetGlobalFont()
-    local headerSize = settings.headerTextSize or 12
-    local fontSize = math.max(headerSize - 1, 10)
+    local headerSize = settings.headerTextSize or 10
+    local fontSize = math.max(headerSize - 2, 9)
     local headerHeight = 18
 
     -- Header color: cyan by default (matches options panel), or class color if toggled
@@ -1868,9 +1873,9 @@ end
 local function CreateStatBar(parent, yOffset, color)
     local settings = GetSettings()
     local font = GetGlobalFont()
-    local statsSize = settings.statsTextSize or 11
+    local statsSize = settings.statsTextSize or 9
     local statsColor = settings.statsTextColor or C.text
-    local barTextSize = math.max(statsSize - 2, 7)
+    local barTextSize = math.max(statsSize - 3, 7)
     local rowHeight = 16
     local barHeight = 3
     local labelOffset = 2
@@ -2488,9 +2493,9 @@ local function UpdateILvlDisplay()
     displayFrame.text:SetText(name)
     displayFrame.text:SetTextColor(r, g, b, 1)
 
-    -- Header left below name: spec + class
+    -- Header left below name: level + spec + class
     if displayFrame.specText then
-        local specLineStr = string.format("%s %s", specName, AbbreviateClassName(className))
+        local specLineStr = string.format("Level %d %s %s", level, specName, AbbreviateClassName(className))
         displayFrame.specText:SetText(specLineStr)
     end
 
@@ -2682,7 +2687,7 @@ local function UpdateFlyoutIlvls()
             if not button._suiIlvlText then
                 local fs = button:CreateFontString(nil, "OVERLAY")
                 fs:SetFont(fontPath, 10, "OUTLINE")
-                fs:SetTextColor(1, 1, 1, 1)
+                fs:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
                 fs:SetJustifyH("LEFT")
                 fs:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
                 fs:SetWordWrap(false)
@@ -2983,9 +2988,14 @@ local function HookCharacterFrame()
         end
         -- Hide Equipment Manager popup when leaving Character tab
         if equipMgrPopup then equipMgrPopup:Hide() end
-        -- Hide ilvl display and center ilvl on non-Character tabs
+        -- Hide ilvl display, center ilvl, and sidebar buttons on non-Character tabs
         if CharacterFrame._suiILvlDisplay then CharacterFrame._suiILvlDisplay:Hide() end
         if CharacterFrame._quiCenterILvl then CharacterFrame._quiCenterILvl:Hide() end
+        if CharacterFrame._suiSidebarButtons then
+            for _, btn in ipairs(CharacterFrame._suiSidebarButtons) do
+                btn:GetParent():Hide()
+            end
+        end
 
         -- Handle background and decorations based on skinning state
         if IsSkinningHandlingBackground() then
@@ -3062,9 +3072,14 @@ local function HookCharacterFrame()
                 for _, overlay in pairs(slotOverlays) do
                     if overlay then overlay:Show() end
                 end
-                -- Show ilvl display and center ilvl on Character tab
+                -- Show ilvl display, center ilvl, and sidebar buttons on Character tab
                 if CharacterFrame._suiILvlDisplay then CharacterFrame._suiILvlDisplay:Show() end
                 if CharacterFrame._quiCenterILvl then CharacterFrame._quiCenterILvl:Show() end
+                if CharacterFrame._suiSidebarButtons then
+                    for _, btn in ipairs(CharacterFrame._suiSidebarButtons) do
+                        btn:GetParent():Show()
+                    end
+                end
                 ScheduleUpdate()
                 -- Refresh equipment slot borders (may be reset by Blizzard on reopen)
                 if #allEquipmentSlots > 0 and UpdateEquipmentSlotBorder then

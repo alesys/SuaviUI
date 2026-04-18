@@ -109,6 +109,29 @@ gh release create vX.X.X "SuaviUI-vX.X.X.zip" \
 Special thanks to our testers: Vela, Pataz, and Ñora for their feedback and testing!
 ```
 
+#### Step 6: Generate CurseForge Changelog
+After publishing the GitHub release, generate a plain-text changelog for CurseForge.
+The format is player-facing — no technical jargon, no code references.
+
+**CurseForge Changelog Template:**
+```
+vX.X.X — [Edition Name]
+
+[SECTION NAME IN CAPS]
+• Change description in plain English
+• Another change
+
+[ANOTHER SECTION]
+• More changes
+```
+
+**Rules:**
+- Use bullet points (•), not markdown
+- Section names in ALL CAPS, no emoji
+- Keep descriptions short and player-friendly (what changed, not how)
+- Group by feature area (e.g., CHARACTER PANEL, UNIT FRAMES, ACTION BARS, EDIT MODE, OPTIONS)
+- Present it to the user in a code box so they can copy-paste to CurseForge
+
 ### 3. Verification
 After release, verify:
 - ✅ GitHub release published: `https://github.com/alesys/SuaviUI/releases/tag/vX.X.X`

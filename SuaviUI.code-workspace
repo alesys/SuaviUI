@@ -20,6 +20,27 @@
 		},
 		{
 			"path": "../QUI"
+		},
+		{
+			"path": "../MythicDungeonTools"
+		},
+		{
+			"path": "../Suavimarker"
+		},
+		{
+			"path": "../MRT"
+		},
+		{
+			"path": "../NorthernSkyRaidTools"
+		},
+		{
+			"path": "../SuaviLura"
+		},
+		{
+			"path": "../SuaviToes"
+		},
+		{
+			"path": "../SuaviDogoInterruptIndicator"
 		}
 	],
 	"settings": {

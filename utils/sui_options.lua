@@ -979,6 +979,39 @@ local function CreateGeneralQoLBuilders()
 
         y = y - 10
 
+        -- Cast History Section
+        local castHistoryHeader = GUI:CreateSectionHeader(tabContent, "Cast History")
+        castHistoryHeader:SetPoint("TOPLEFT", PADDING, y)
+        y = y - castHistoryHeader.gap
+
+        local castHistoryDesc = GUI:CreateLabel(tabContent,
+            "Displays icons for your recently finished spell casts. Position, size, flow direction, and skin are configured in Edit Mode.",
+            11, C.textMuted)
+        castHistoryDesc:SetPoint("TOPLEFT", PADDING, y)
+        castHistoryDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        castHistoryDesc:SetJustifyH("LEFT")
+        castHistoryDesc:SetWordWrap(true)
+        castHistoryDesc:SetHeight(30)
+        y = y - 38
+
+        local castHistoryDB = db.castHistory
+        if castHistoryDB then
+            local castHistoryCheck = GUI:CreateFormCheckbox(tabContent, "Enable Cast History", "enabled", castHistoryDB, function(val)
+                if _G.SuaviUI_RefreshCastHistory then _G.SuaviUI_RefreshCastHistory() end
+            end)
+            castHistoryCheck:SetPoint("TOPLEFT", PADDING, y)
+            castHistoryCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+            y = y - FORM_ROW
+
+            local editModeBtn = GUI:CreateButton(tabContent, "Configure in Edit Mode", 200, 28, function()
+                if _G.SuaviUI_OpenCastHistoryEditMode then _G.SuaviUI_OpenCastHistoryEditMode() end
+            end)
+            editModeBtn:SetPoint("TOPLEFT", PADDING, y)
+            y = y - 38
+        end
+
+        y = y - 10
+
         -- Automation Section
         local autoHeader = GUI:CreateSectionHeader(tabContent, "Automation")
         autoHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -1541,6 +1574,27 @@ local function CreateGeneralQoLBuilders()
         local debugHeader = GUI:CreateSectionHeader(tabContent, "Debug")
         debugHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - debugHeader.gap
+
+        -- SuaviUI Whispers
+        local whispersHeader = GUI:CreateSectionHeader(tabContent, "SuaviUI Whispers")
+        whispersHeader:SetPoint("TOPLEFT", PADDING, y)
+        y = y - whispersHeader.gap
+
+        local whispersDesc = GUI:CreateLabel(tabContent,
+            "Random motivational messages and wellness reminders during your session.",
+            11, C.textMuted)
+        whispersDesc:SetPoint("TOPLEFT", PADDING, y)
+        whispersDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        whispersDesc:SetJustifyH("LEFT")
+        whispersDesc:SetWordWrap(true)
+        whispersDesc:SetHeight(15)
+        y = y - 20
+
+        if db.general.suaviWhispers == nil then db.general.suaviWhispers = true end
+        local whispersCheck = GUI:CreateFormCheckbox(tabContent, "Enable SuaviUI Whispers", "suaviWhispers", db.general)
+        whispersCheck:SetPoint("TOPLEFT", PADDING, y)
+        whispersCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        y = y - FORM_ROW
 
         local debugDesc = GUI:CreateLabel(tabContent,
             "Enable debug mode to auto-open the castbar debug window when errors are reported.",
@@ -8232,13 +8286,15 @@ local function CreateUnitFrameBuilders()
         local function UpdateDarkModeWidgetStates()
             local darkModeOn = general.darkMode
             -- Default widgets: enabled when dark mode OFF
-            if defaultWidgets.healthColor then defaultWidgets.healthColor:SetEnabled(not darkModeOn) end
+            if defaultWidgets.healthColor then defaultWidgets.healthColor:SetEnabled(not darkModeOn and not general.defaultUseClassColor) end
             if defaultWidgets.bgColor then defaultWidgets.bgColor:SetEnabled(not darkModeOn) end
-            if defaultWidgets.opacity then defaultWidgets.opacity:SetEnabled(not darkModeOn) end
+            if defaultWidgets.healthOpacity then defaultWidgets.healthOpacity:SetEnabled(not darkModeOn) end
+            if defaultWidgets.bgOpacity then defaultWidgets.bgOpacity:SetEnabled(not darkModeOn) end
             -- Darkmode widgets: enabled when dark mode ON
             if darkModeWidgets.healthColor then darkModeWidgets.healthColor:SetEnabled(darkModeOn) end
             if darkModeWidgets.bgColor then darkModeWidgets.bgColor:SetEnabled(darkModeOn) end
-            if darkModeWidgets.opacity then darkModeWidgets.opacity:SetEnabled(darkModeOn) end
+            if darkModeWidgets.healthOpacity then darkModeWidgets.healthOpacity:SetEnabled(darkModeOn) end
+            if darkModeWidgets.bgOpacity then darkModeWidgets.bgOpacity:SetEnabled(darkModeOn) end
         end
 
         -- DEFAULT UNITFRAME COLORS section
@@ -8280,15 +8336,84 @@ local function CreateUnitFrameBuilders()
         defaultWidgets.bgColor = defBgColor
         y = y - FORM_ROW
 
-        -- Dark mode, opacity, and text color toggles: migrated to Edit Mode panel
+        -- Default opacity sliders (apply when Dark Mode is OFF)
+        local defHealthOpac = GUI:CreateFormSlider(tabContent, "Default Health Opacity", 0.1, 1.0, 0.05, "defaultHealthOpacity", general, RefreshNewUF)
+        defHealthOpac:SetPoint("TOPLEFT", PAD, y)
+        defHealthOpac:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        defaultWidgets.healthOpacity = defHealthOpac
+        y = y - FORM_ROW
+
+        local defBgOpac = GUI:CreateFormSlider(tabContent, "Default Background Opacity", 0.1, 1.0, 0.05, "defaultBgOpacity", general, RefreshNewUF)
+        defBgOpac:SetPoint("TOPLEFT", PAD, y)
+        defBgOpac:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        defaultWidgets.bgOpacity = defBgOpac
+        y = y - FORM_ROW
+
+        -- DARK MODE section
         y = y - 10
-        local ufEditModeTip = GUI:CreateLabel(tabContent, "Dark mode, opacity, and text color toggles are now in Edit Mode. Select any Suaviframe to access them.", 11, C.textMuted)
-        ufEditModeTip:SetPoint("TOPLEFT", PAD, y)
-        ufEditModeTip:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        ufEditModeTip:SetJustifyH("LEFT")
-        ufEditModeTip:SetWordWrap(true)
-        ufEditModeTip:SetHeight(30)
-        y = y - 40
+        local darkModeHeader = GUI:CreateSectionHeader(tabContent, "Dark Mode")
+        darkModeHeader:SetPoint("TOPLEFT", PAD, y)
+        y = y - darkModeHeader.gap
+
+        local darkModeDesc = GUI:CreateLabel(tabContent, "Override unit frame colors with a darker palette. Opacity sliders below apply only when Dark Mode is enabled.", 11, C.textMuted)
+        darkModeDesc:SetPoint("TOPLEFT", PAD, y)
+        darkModeDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        darkModeDesc:SetJustifyH("LEFT")
+        darkModeDesc:SetWordWrap(true)
+        darkModeDesc:SetHeight(30)
+        y = y - 38
+
+        local darkModeCheck = GUI:CreateFormCheckbox(tabContent, "Enable Dark Mode", "darkMode", general, function()
+            RefreshNewUF()
+            UpdateDarkModeWidgetStates()
+        end)
+        darkModeCheck:SetPoint("TOPLEFT", PAD, y)
+        darkModeCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        y = y - FORM_ROW
+
+        local dmHealthOpac = GUI:CreateFormSlider(tabContent, "Dark Mode Health Opacity", 0.1, 1.0, 0.05, "darkModeHealthOpacity", general, RefreshNewUF)
+        dmHealthOpac:SetPoint("TOPLEFT", PAD, y)
+        dmHealthOpac:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        darkModeWidgets.healthOpacity = dmHealthOpac
+        y = y - FORM_ROW
+
+        local dmBgOpac = GUI:CreateFormSlider(tabContent, "Dark Mode Background Opacity", 0.1, 1.0, 0.05, "darkModeBgOpacity", general, RefreshNewUF)
+        dmBgOpac:SetPoint("TOPLEFT", PAD, y)
+        dmBgOpac:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        darkModeWidgets.bgOpacity = dmBgOpac
+        y = y - FORM_ROW
+
+        -- Apply initial enable states based on current Dark Mode value
+        UpdateDarkModeWidgetStates()
+
+        -- MASTER TEXT COLORS section
+        y = y - 10
+        local masterTextHeader = GUI:CreateSectionHeader(tabContent, "Master Text Colors")
+        masterTextHeader:SetPoint("TOPLEFT", PAD, y)
+        y = y - masterTextHeader.gap
+
+        local masterTextDesc = GUI:CreateLabel(tabContent, "Apply class/reaction colors to text across all unit frames, overriding per-frame settings.", 11, C.textMuted)
+        masterTextDesc:SetPoint("TOPLEFT", PAD, y)
+        masterTextDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        masterTextDesc:SetJustifyH("LEFT")
+        masterTextDesc:SetWordWrap(true)
+        masterTextDesc:SetHeight(30)
+        y = y - 38
+
+        local colorAllName = GUI:CreateFormCheckbox(tabContent, "Color All Name Text", "masterColorNameText", general, RefreshNewUF)
+        colorAllName:SetPoint("TOPLEFT", PAD, y)
+        colorAllName:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        y = y - FORM_ROW
+
+        local colorAllHealth = GUI:CreateFormCheckbox(tabContent, "Color All Health Text", "masterColorHealthText", general, RefreshNewUF)
+        colorAllHealth:SetPoint("TOPLEFT", PAD, y)
+        colorAllHealth:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        y = y - FORM_ROW
+
+        local colorAllPower = GUI:CreateFormCheckbox(tabContent, "Color All Power Text", "masterColorPowerText", general, RefreshNewUF)
+        colorAllPower:SetPoint("TOPLEFT", PAD, y)
+        colorAllPower:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
+        y = y - FORM_ROW
 
         -- TOOLTIPS SECTION
         y = y - 10

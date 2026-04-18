@@ -473,47 +473,57 @@ function SuaviUI:DebugPrint(...)
 end
 
 ---------------------------------------------------------------------------
--- MOTIVATIONAL MESSAGES
--- Random friendly messages shown on login and periodically during play
+-- SUAVIUI WHISPERS
+-- Random friendly whispers shown on login and periodically during play
 ---------------------------------------------------------------------------
 do
-    local ACCENT = "|cffFF6AC1"
-    local MUTED = "|cff808084"
-    local RESET = "|r"
-
     local messages = {
-        ACCENT .. "SuaviUI loves you." .. RESET,
-        MUTED .. "Remember to drink water." .. RESET,
-        ACCENT .. "You're doing great today." .. RESET,
-        MUTED .. "Stretch your wrists. They deserve it." .. RESET,
-        ACCENT .. "Every wipe is a lesson." .. RESET,
-        MUTED .. "Good posture = good DPS." .. RESET,
-        ACCENT .. "Your UI looks amazing, by the way." .. RESET,
-        MUTED .. "Take a deep breath. The boss will wait." .. RESET,
-        ACCENT .. "Today is your day to shine." .. RESET,
-        MUTED .. "Eyes off the screen for 20 seconds. Go." .. RESET,
-        ACCENT .. "You're braver than you believe." .. RESET,
-        MUTED .. "Snack break? Snack break." .. RESET,
-        ACCENT .. "The Loot Council believes in you." .. RESET,
-        MUTED .. "Stand up. Walk around. Come back stronger." .. RESET,
-        ACCENT .. "RNG is temporary. Skill is forever." .. RESET,
-        MUTED .. "Your raid group is lucky to have you." .. RESET,
-        ACCENT .. "Don't forget to have fun." .. RESET,
-        MUTED .. "Keyboard clean? Mouse clean? Soul clean?" .. RESET,
-        ACCENT .. "You've got this. Pull the boss." .. RESET,
-        MUTED .. "Blinking is a DPS increase. Trust me." .. RESET,
+        "SuaviUI loves you.",
+        "Remember to drink water.",
+        "You're doing great today.",
+        "Stretch your wrists. They deserve it.",
+        "Every wipe is a lesson.",
+        "Good posture = good DPS.",
+        "Your UI looks amazing, by the way.",
+        "Take a deep breath. The boss will wait.",
+        "Today is your day to shine.",
+        "Eyes off the screen for 20 seconds. Go.",
+        "You're braver than you believe.",
+        "Snack break? Snack break.",
+        "The Loot Council believes in you.",
+        "Stand up. Walk around. Come back stronger.",
+        "RNG is temporary. Skill is forever.",
+        "Your raid group is lucky to have you.",
+        "Don't forget to have fun.",
+        "Keyboard clean? Mouse clean? Soul clean?",
+        "You've got this. Pull the boss.",
+        "Blinking is a DPS increase. Trust me.",
     }
 
     local lastIndex = 0
 
-    local function ShowRandomMessage()
+    local function IsEnabled()
+        local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
+        if SUICore and SUICore.db and SUICore.db.profile and SUICore.db.profile.general then
+            local val = SUICore.db.profile.general.suaviWhispers
+            if val == nil then return true end  -- default on
+            return val
+        end
+        return true
+    end
+
+    local function ShowWhisper()
+        if not IsEnabled() then return end
         local idx
         repeat
             idx = math.random(1, #messages)
         until idx ~= lastIndex or #messages == 1
         lastIndex = idx
-        local prefix = "|cffFF6AC1Suavi|r|cffEFF0EBUI|r "
-        DEFAULT_CHAT_FRAME:AddMessage(prefix .. messages[idx])
+        -- Whisper style: looks like a whisper from "SuaviUI"
+        local WHISPER_COLOR = "|cffFF6AC1"
+        local TAG = WHISPER_COLOR .. "[SuaviUI] whispers:|r "
+        local MSG_COLOR = "|cffEFF0EB"
+        DEFAULT_CHAT_FRAME:AddMessage(TAG .. MSG_COLOR .. messages[idx] .. "|r")
     end
 
     -- Show one on login, then every 30-45 minutes
@@ -522,11 +532,9 @@ do
     loginFrame:SetScript("OnEvent", function(self, _, isInitialLogin)
         if not isInitialLogin then return end
         self:UnregisterEvent("PLAYER_ENTERING_WORLD")
-        -- Delay first message so it doesn't get buried in login spam
-        C_Timer.After(15, ShowRandomMessage)
-        -- Periodic timer: 30-45 min (randomized per session)
+        C_Timer.After(15, ShowWhisper)
         local interval = 1800 + math.random(0, 900)
-        C_Timer.NewTicker(interval, ShowRandomMessage)
+        C_Timer.NewTicker(interval, ShowWhisper)
     end)
 end
 
