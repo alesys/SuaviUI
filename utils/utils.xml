@@ -49,6 +49,7 @@
     <Script file="sui_reticle.lua"/>
     <Script file="sui_combattext.lua"/>
     <Script file="sui_casthistory.lua"/>
+    <Script file="sui_statsframe.lua"/>
     <Script file="sui_combattimer.lua"/>
     <Script file="sui_keystone.lua"/>
     <Script file="sui_qol.lua"/>

@@ -49,6 +49,28 @@ local SKIN_OPTIONS = {
     { value = "Blizzard", text = "Blizzard Default" },
 }
 
+-- Build a LEM dropdown generator that correctly maps option.value <-> option.text.
+-- Needed because LEM's `values = ...` shortcut stores option.text in the setting
+-- rather than option.value, which breaks our enum-style settings.
+local function MakeDropdownGenerator(options, fallbackText)
+    return function(dropdown, rootDescription, settingObject)
+        local layoutName = LEM and LEM.GetActiveLayoutName and LEM.GetActiveLayoutName() or "Default"
+        local current = settingObject.get(layoutName)
+        local currentText = fallbackText
+        for _, opt in ipairs(options) do
+            if opt.value == current then currentText = opt.text; break end
+        end
+        dropdown:SetDefaultText(currentText)
+        for _, opt in ipairs(options) do
+            local optText, optValue = opt.text, opt.value
+            rootDescription:CreateButton(optText, function()
+                dropdown:SetDefaultText(optText)
+                settingObject.set(layoutName, optValue)
+            end)
+        end
+    end
+end
+
 ---------------------------------------------------------------------------
 -- DATABASE HELPERS
 ---------------------------------------------------------------------------
@@ -486,11 +508,17 @@ function SUI_CastHistory:Refresh()
     if not initialized then return end
     local s = GetSettings(); if not s then return end
     SizeHolder()
-    for _, icon in ipairs(slots) do ApplySkin(icon) end
     for _, icon in ipairs(pool) do ApplySkin(icon) end
-    RelayoutSlots()
-    if not s.enabled and not holder._editModePreviewActive then
-        ClearAllSlots()
+    if holder._editModePreviewActive then
+        -- Regenerate preview from scratch so direction / size / count changes
+        -- always produce a clean, correctly-anchored layout.
+        StartEditModePreview()
+    else
+        for _, icon in ipairs(slots) do ApplySkin(icon) end
+        RelayoutSlots()
+        if not s.enabled then
+            ClearAllSlots()
+        end
     end
 end
 
@@ -567,7 +595,7 @@ local function BuildEditModeSettings()
     table.insert(settings, {
         parentId = "CH_LAYOUT", order = order, name = "Flow Direction",
         kind = LEM.SettingType.Dropdown, default = "RIGHT_TO_LEFT", useOldStyle = true,
-        values = DIR_OPTIONS,
+        generator = MakeDropdownGenerator(DIR_OPTIONS, "Right to Left"),
         get = function() local s = GetSettings(); return s and s.direction or "RIGHT_TO_LEFT" end,
         set = function(_, value)
             local s = GetSettings(); if s then s.direction = value; SUI_CastHistory:Refresh() end
@@ -626,7 +654,7 @@ local function BuildEditModeSettings()
     table.insert(settings, {
         parentId = "CH_APPEARANCE", order = order, name = "Icon Skin",
         kind = LEM.SettingType.Dropdown, default = "Square", useOldStyle = true,
-        values = SKIN_OPTIONS,
+        generator = MakeDropdownGenerator(SKIN_OPTIONS, "SuaviUI Square"),
         get = function() local s = GetSettings(); return s and s.iconSkin or "Square" end,
         set = function(_, value)
             local s = GetSettings(); if s then s.iconSkin = value; SUI_CastHistory:Refresh() end

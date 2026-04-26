@@ -979,39 +979,6 @@ local function CreateGeneralQoLBuilders()
 
         y = y - 10
 
-        -- Cast History Section
-        local castHistoryHeader = GUI:CreateSectionHeader(tabContent, "Cast History")
-        castHistoryHeader:SetPoint("TOPLEFT", PADDING, y)
-        y = y - castHistoryHeader.gap
-
-        local castHistoryDesc = GUI:CreateLabel(tabContent,
-            "Displays icons for your recently finished spell casts. Position, size, flow direction, and skin are configured in Edit Mode.",
-            11, C.textMuted)
-        castHistoryDesc:SetPoint("TOPLEFT", PADDING, y)
-        castHistoryDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-        castHistoryDesc:SetJustifyH("LEFT")
-        castHistoryDesc:SetWordWrap(true)
-        castHistoryDesc:SetHeight(30)
-        y = y - 38
-
-        local castHistoryDB = db.castHistory
-        if castHistoryDB then
-            local castHistoryCheck = GUI:CreateFormCheckbox(tabContent, "Enable Cast History", "enabled", castHistoryDB, function(val)
-                if _G.SuaviUI_RefreshCastHistory then _G.SuaviUI_RefreshCastHistory() end
-            end)
-            castHistoryCheck:SetPoint("TOPLEFT", PADDING, y)
-            castHistoryCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local editModeBtn = GUI:CreateButton(tabContent, "Configure in Edit Mode", 200, 28, function()
-                if _G.SuaviUI_OpenCastHistoryEditMode then _G.SuaviUI_OpenCastHistoryEditMode() end
-            end)
-            editModeBtn:SetPoint("TOPLEFT", PADDING, y)
-            y = y - 38
-        end
-
-        y = y - 10
-
         -- Automation Section
         local autoHeader = GUI:CreateSectionHeader(tabContent, "Automation")
         autoHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -2952,6 +2919,35 @@ local function CreateGeneralQoLBuilders()
         inspectEnabled:SetPoint("TOPLEFT", PADDING, y)
         inspectEnabled:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
+
+        -- ═══════════════════════════════════════════════════════════════
+        -- SECTION: Live Stats Frame
+        -- ═══════════════════════════════════════════════════════════════
+        y = y - 10
+        GUI:SetSearchSection("Live Stats Frame")
+        local statsFrameHeader = GUI:CreateSectionHeader(tabContent, "Live Stats Frame")
+        statsFrameHeader:SetPoint("TOPLEFT", PADDING, y)
+        y = y - statsFrameHeader.gap
+
+        local statsFrameDesc = GUI:CreateLabel(tabContent,
+            "Standalone HUD frame that displays your stats in real-time, outside the character pane. Sections (Vitals, Attributes, Secondary, Attack, Defense, General) and appearance are configured in Edit Mode.",
+            11, C.textMuted)
+        statsFrameDesc:SetPoint("TOPLEFT", PADDING, y)
+        statsFrameDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        statsFrameDesc:SetJustifyH("LEFT")
+        statsFrameDesc:SetWordWrap(true)
+        statsFrameDesc:SetHeight(45)
+        y = y - 55
+
+        local statsFrameDB = db and db.statsFrame
+        if statsFrameDB then
+            local statsFrameToggle = GUI:CreateFormCheckbox(tabContent, "Enable Live Stats Frame", "enabled", statsFrameDB, function()
+                if _G.SuaviUI_RefreshStatsFrame then _G.SuaviUI_RefreshStatsFrame() end
+            end)
+            statsFrameToggle:SetPoint("TOPLEFT", PADDING, y)
+            statsFrameToggle:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+            y = y - FORM_ROW
+        end
 
         tabContent:SetHeight(math.abs(y) + 30)
     end
@@ -6239,97 +6235,62 @@ local function CreateCDKeybindsPage(parent)
             raiInfo2:SetPoint("TOPLEFT", PADDING, y)
             y = y - 30
 
-            -- Form rows (label on left, widget on right)
+            -- Enable toggle (main switch)
             local raiEnable = GUI:CreateFormCheckbox(content, "Enable", "enabled", raiDB, RefreshRAI)
             raiEnable:SetPoint("TOPLEFT", PADDING, y)
             raiEnable:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            local raiLock = GUI:CreateFormCheckbox(content, "Lock Position", "isLocked", raiDB, RefreshRAI)
-            raiLock:SetPoint("TOPLEFT", PADDING, y)
-            raiLock:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local raiSwipe = GUI:CreateFormCheckbox(content, "Cooldown Swipe", "cooldownSwipeEnabled", raiDB, RefreshRAI)
-            raiSwipe:SetPoint("TOPLEFT", PADDING, y)
-            raiSwipe:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local visibilityOptions = {
-                { value = "always", text = "Always" },
-                { value = "combat", text = "In Combat" },
-                { value = "hostile", text = "Hostile Target" },
-            }
-            local raiVisibility = GUI:CreateFormDropdown(content, "Visibility", visibilityOptions, "visibility", raiDB, RefreshRAI)
-            raiVisibility:SetPoint("TOPLEFT", PADDING, y)
-            raiVisibility:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local strataOptions = {
-                { value = "LOW", text = "Low" },
-                { value = "MEDIUM", text = "Medium" },
-                { value = "HIGH", text = "High" },
-                { value = "DIALOG", text = "Dialog" },
-            }
-            local raiStrata = GUI:CreateFormDropdown(content, "Frame Strata", strataOptions, "frameStrata", raiDB, RefreshRAI)
-            raiStrata:SetPoint("TOPLEFT", PADDING, y)
-            raiStrata:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local raiSize = GUI:CreateFormSlider(content, "Icon Size", 16, 400, 1, "iconSize", raiDB, RefreshRAI)
-            raiSize:SetPoint("TOPLEFT", PADDING, y)
-            raiSize:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local raiBorderWidth = GUI:CreateFormSlider(content, "Border Size", 0, 15, 1, "borderThickness", raiDB, RefreshRAI)
-            raiBorderWidth:SetPoint("TOPLEFT", PADDING, y)
-            raiBorderWidth:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local raiBorderColor = GUI:CreateFormColorPicker(content, "Border Color", "borderColor", raiDB, RefreshRAI)
-            raiBorderColor:SetPoint("TOPLEFT", PADDING, y)
-            raiBorderColor:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local raiKeybindShow = GUI:CreateFormCheckbox(content, "Show Keybind", "showKeybind", raiDB, RefreshRAI)
-            raiKeybindShow:SetPoint("TOPLEFT", PADDING, y)
-            raiKeybindShow:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local raiFontColor = GUI:CreateFormColorPicker(content, "Keybind Color", "keybindColor", raiDB, RefreshRAI)
-            raiFontColor:SetPoint("TOPLEFT", PADDING, y)
-            raiFontColor:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local anchorOptions = {
-                { value = "TOPLEFT", text = "Top Left" },
-                { value = "TOPRIGHT", text = "Top Right" },
-                { value = "BOTTOMLEFT", text = "Bottom Left" },
-                { value = "BOTTOMRIGHT", text = "Bottom Right" },
-                { value = "CENTER", text = "Center" },
-            }
-            local raiAnchor = GUI:CreateFormDropdown(content, "Keybind Anchor", anchorOptions, "keybindAnchor", raiDB, RefreshRAI)
-            raiAnchor:SetPoint("TOPLEFT", PADDING, y)
-            raiAnchor:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local raiFontSize = GUI:CreateFormSlider(content, "Keybind Size", 6, 48, 1, "keybindSize", raiDB, RefreshRAI)
-            raiFontSize:SetPoint("TOPLEFT", PADDING, y)
-            raiFontSize:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local raiOffsetX = GUI:CreateFormSlider(content, "Keybind X Offset", -50, 50, 1, "keybindOffsetX", raiDB, RefreshRAI)
-            raiOffsetX:SetPoint("TOPLEFT", PADDING, y)
-            raiOffsetX:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local raiOffsetY = GUI:CreateFormSlider(content, "Keybind Y Offset", -50, 50, 1, "keybindOffsetY", raiDB, RefreshRAI)
-            raiOffsetY:SetPoint("TOPLEFT", PADDING, y)
-            raiOffsetY:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
+            -- All other settings (size, border, keybind, visibility, etc.) live
+            -- in the Edit Mode sidebar for consistency with the other SuaviUI frames.
+            local raiEditModeTip = GUI:CreateLabel(content, "Position, size, border, keybind, and visibility settings are configured in Edit Mode. Select the Rotation Assist Icon to access them.", 11, C.textMuted)
+            raiEditModeTip:SetPoint("TOPLEFT", PADDING, y)
+            raiEditModeTip:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+            raiEditModeTip:SetJustifyH("LEFT")
+            raiEditModeTip:SetWordWrap(true)
+            raiEditModeTip:SetHeight(30)
+            y = y - 40
         else
             local noRAILabel = GUI:CreateLabel(content, "Rotation Assist Icon settings not available - database not loaded", 12, C.textMuted)
             noRAILabel:SetPoint("TOPLEFT", PADDING, y)
+            y = y - ROW_GAP
+        end
+
+        -- =====================================================
+        -- CAST HISTORY
+        -- =====================================================
+        y = y - 10
+        local castHistoryHeader = GUI:CreateSectionHeader(content, "CAST HISTORY")
+        castHistoryHeader:SetPoint("TOPLEFT", PADDING, y)
+        y = y - castHistoryHeader.gap
+
+        local castHistoryDesc = GUI:CreateLabel(content,
+            "Displays icons for your recently finished spell casts. Position, size, flow direction, and skin are configured in Edit Mode.",
+            11, C.textMuted)
+        castHistoryDesc:SetPoint("TOPLEFT", PADDING, y)
+        castHistoryDesc:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+        castHistoryDesc:SetJustifyH("LEFT")
+        castHistoryDesc:SetWordWrap(true)
+        castHistoryDesc:SetHeight(30)
+        y = y - 38
+
+        local castHistoryDB = db and db.castHistory
+        if castHistoryDB then
+            local castHistoryCheck = GUI:CreateFormCheckbox(content, "Enable Cast History", "enabled", castHistoryDB, function(val)
+                if _G.SuaviUI_RefreshCastHistory then _G.SuaviUI_RefreshCastHistory() end
+            end)
+            castHistoryCheck:SetPoint("TOPLEFT", PADDING, y)
+            castHistoryCheck:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
+            y = y - FORM_ROW
+
+            local castEditModeBtn = GUI:CreateButton(content, "Configure in Edit Mode", 200, 28, function()
+                if _G.SuaviUI_OpenCastHistoryEditMode then _G.SuaviUI_OpenCastHistoryEditMode() end
+            end)
+            castEditModeBtn:SetPoint("TOPLEFT", PADDING, y)
+            y = y - 38
+        else
+            local noCHLabel = GUI:CreateLabel(content, "Cast History settings not available - database not loaded", 12, C.textMuted)
+            noCHLabel:SetPoint("TOPLEFT", PADDING, y)
             y = y - ROW_GAP
         end
     else
@@ -10147,40 +10108,24 @@ local function CreateActionBarBuilders()
         -- Set search context
         GUI:SetSearchContext({tabIndex = 4, tabName = "Action Bars", subTabIndex = 4, subTabName = "Extra Buttons"})
 
-        -- Refresh callback
+        -- Refresh callback — calls the safe appearance-only path that doesn't
+        -- reparent the protected Blizzard frames.
         local function RefreshExtraButtons()
-            if _G.SuaviUI_RefreshExtraButtons then
-                _G.SuaviUI_RefreshExtraButtons()
+            if _G.SuaviUI_RefreshExtraButtonAppearance then
+                _G.SuaviUI_RefreshExtraButtonAppearance()
             end
         end
 
         -- Description
         local descLabel = GUI:CreateLabel(tabContent,
-            "Customize the Extra Action Button (boss encounters, quests) and Zone Ability Button (garrison, covenant, zone abilities) separately.",
+            "Positioning of the Extra Action Button (boss encounters, quests) and Zone Ability Button (garrison, covenant, zone abilities) is handled by Blizzard's Edit Mode. Use /editmode to move them. Scale, artwork, and fade settings live in the Edit Mode sidebar when the Extra Abilities system is selected.",
             11, C.textMuted)
         descLabel:SetPoint("TOPLEFT", PAD, y)
         descLabel:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         descLabel:SetJustifyH("LEFT")
         descLabel:SetWordWrap(true)
-        descLabel:SetHeight(30)
-        y = y - 40
-
-        -- Toggle Movers Button
-        local moverBtn = GUI:CreateButton(tabContent, "Toggle Position Movers", 200, 28, function()
-            if _G.SuaviUI_ToggleExtraButtonMovers then
-                _G.SuaviUI_ToggleExtraButtonMovers()
-            end
-        end)
-        moverBtn:SetPoint("TOPLEFT", PAD, y)
-        y = y - 35
-
-        local moverTip = GUI:CreateLabel(tabContent,
-            "Click to show draggable movers. Drag to position, use sliders for fine-tuning.",
-            10, C.textMuted)
-        moverTip:SetPoint("TOPLEFT", PAD, y)
-        moverTip:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        moverTip:SetJustifyH("LEFT")
-        y = y - 25
+        descLabel:SetHeight(60)
+        y = y - 70
 
         ---------------------------------------------------------
         -- SECTION: Extra Action Button
@@ -10195,47 +10140,6 @@ local function CreateActionBarBuilders()
                 "enabled", extraDB, RefreshExtraButtons)
             enableCheck:SetPoint("TOPLEFT", PAD, y)
             enableCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local scaleSlider = GUI:CreateFormSlider(tabContent, "Scale",
-                0.5, 2.0, 0.05, "scale", extraDB, RefreshExtraButtons)
-            scaleSlider:SetPoint("TOPLEFT", PAD, y)
-            scaleSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local xOffsetSlider = GUI:CreateFormSlider(tabContent, "X Offset",
-                -200, 200, 1, "offsetX", extraDB, RefreshExtraButtons)
-            xOffsetSlider:SetPoint("TOPLEFT", PAD, y)
-            xOffsetSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local yOffsetSlider = GUI:CreateFormSlider(tabContent, "Y Offset",
-                -200, 200, 1, "offsetY", extraDB, RefreshExtraButtons)
-            yOffsetSlider:SetPoint("TOPLEFT", PAD, y)
-            yOffsetSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local hideArtCheck = GUI:CreateFormCheckbox(tabContent, "Hide Button Artwork",
-                "hideArtwork", extraDB, RefreshExtraButtons)
-            hideArtCheck:SetPoint("TOPLEFT", PAD, y)
-            hideArtCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local fadeCheck = GUI:CreateFormCheckbox(tabContent, "Enable Mouseover Fade",
-                "fadeEnabled", extraDB, function()
-                    RefreshExtraButtons()
-                    if extraDB.fadeEnabled then
-                        GUI:ShowConfirmation({
-                            title = "Reload UI?",
-                            message = "Mouseover fade requires a reload to take effect.",
-                            acceptText = "Reload",
-                            cancelText = "Later",
-                            onAccept = function() SuaviUI:SafeReload() end,
-                        })
-                    end
-                end)
-            fadeCheck:SetPoint("TOPLEFT", PAD, y)
-            fadeCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
         end
         y = y - 15
@@ -10253,47 +10157,6 @@ local function CreateActionBarBuilders()
                 "enabled", zoneDB, RefreshExtraButtons)
             enableCheck:SetPoint("TOPLEFT", PAD, y)
             enableCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local scaleSlider = GUI:CreateFormSlider(tabContent, "Scale",
-                0.5, 2.0, 0.05, "scale", zoneDB, RefreshExtraButtons)
-            scaleSlider:SetPoint("TOPLEFT", PAD, y)
-            scaleSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local xOffsetSlider = GUI:CreateFormSlider(tabContent, "X Offset",
-                -200, 200, 1, "offsetX", zoneDB, RefreshExtraButtons)
-            xOffsetSlider:SetPoint("TOPLEFT", PAD, y)
-            xOffsetSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local yOffsetSlider = GUI:CreateFormSlider(tabContent, "Y Offset",
-                -200, 200, 1, "offsetY", zoneDB, RefreshExtraButtons)
-            yOffsetSlider:SetPoint("TOPLEFT", PAD, y)
-            yOffsetSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local hideArtCheck = GUI:CreateFormCheckbox(tabContent, "Hide Button Artwork",
-                "hideArtwork", zoneDB, RefreshExtraButtons)
-            hideArtCheck:SetPoint("TOPLEFT", PAD, y)
-            hideArtCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            y = y - FORM_ROW
-
-            local fadeCheck = GUI:CreateFormCheckbox(tabContent, "Enable Mouseover Fade",
-                "fadeEnabled", zoneDB, function()
-                    RefreshExtraButtons()
-                    if zoneDB.fadeEnabled then
-                        GUI:ShowConfirmation({
-                            title = "Reload UI?",
-                            message = "Mouseover fade requires a reload to take effect.",
-                            acceptText = "Reload",
-                            cancelText = "Later",
-                            onAccept = function() SuaviUI:SafeReload() end,
-                        })
-                    end
-                end)
-            fadeCheck:SetPoint("TOPLEFT", PAD, y)
-            fadeCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
         end
 

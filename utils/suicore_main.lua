@@ -1129,7 +1129,6 @@ local defaults = {
         -- Rotation Assist Icon (standalone icon showing next recommended ability)
         rotationAssistIcon = {
             enabled = false,
-            isLocked = true,
             iconSize = 56,
             visibility = "always",  -- "always", "combat", "hostile"
             frameStrata = "MEDIUM",
@@ -2894,6 +2893,46 @@ local defaults = {
             includeItems     = true,
             includeRacials   = true,
             collapseRepeats  = true,
+        },
+
+        -- Real-time Stats Frame (live HUD display of player stats)
+        statsFrame = {
+            enabled        = false,
+            position       = { point = "CENTER", x = 250, y = 0 },
+            width          = 180,
+            fontSize       = 11,
+            -- Section toggles (master per section)
+            showHealth     = true,
+            showAttributes = true,
+            showSecondary  = true,
+            showAttack     = false,
+            showDefense    = false,
+            showGeneral    = false,
+            -- Per-stat overrides — absence (or true) = visible, false = hidden.
+            -- Keys mirror the rows defined in sui_statsframe.lua's fetchers.
+            stats = {
+                -- Vitals
+                health = true, power = true,
+                -- Attributes
+                strength = true, agility = true, stamina = true, intellect = true,
+                -- Secondary
+                crit = true, haste = true, mastery = true, versatility = true,
+                -- Attack
+                attackPower = true, spellPower = true, attackSpeed = true,
+                -- Defense
+                armor = true, dodge = true, parry = true, block = true,
+                -- General
+                leech = true, speed = true, avoidance = true,
+            },
+            -- Appearance
+            showBackground   = true,
+            backgroundOpacity = 0.6,
+            -- Live Combat Updates: keep CharacterFrame logically visible (alpha 0,
+            -- mouse off) so Blizzard's secure event handler keeps updating the
+            -- character pane in real time during combat. Our Set* hooks then
+            -- capture clean (non-secret) strings live. Trade-off: a brief sound
+            -- on first show, slight conflict with the UI panel manager.
+            liveCombatStats  = false,
         },
 
         -- Combat Timer (displays elapsed combat time)

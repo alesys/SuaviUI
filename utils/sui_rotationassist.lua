@@ -4,6 +4,7 @@
 
 local ADDON_NAME, SUI = ...
 local LSM = LibStub("LibSharedMedia-3.0")
+local LEM = LibStub("LibEQOLEditMode-1.0", true)
 
 -- Locals for performance
 local GetTime = GetTime
@@ -86,28 +87,44 @@ local function GetKeybindForSpell(spellID)
     end
 
     -- Fallback: Find action buttons with this spell (try base spell too)
+    -- Mapping per Blizzard_ActionBar/Shared/MultiActionBars.xml `actionpage`
+    -- and `commandNamePrefix` attributes. Slots 13-24 are page-2 vehicle/possess
+    -- overrides — no user keybinds. Bars 2 and 3 (slots 49-72) had been
+    -- swapped previously, causing wrong-key reports (e.g. Cataclysm S1 → A1).
+    local function SlotToActionName(slot)
+        if slot <= 12 then
+            return "ACTIONBUTTON" .. slot
+        elseif slot <= 24 then
+            return nil
+        elseif slot <= 36 then
+            return "MULTIACTIONBAR3BUTTON" .. (slot - 24)
+        elseif slot <= 48 then
+            return "MULTIACTIONBAR4BUTTON" .. (slot - 36)
+        elseif slot <= 60 then
+            return "MULTIACTIONBAR2BUTTON" .. (slot - 48)
+        elseif slot <= 72 then
+            return "MULTIACTIONBAR1BUTTON" .. (slot - 60)
+        elseif slot >= 145 and slot <= 156 then
+            return "MULTIACTIONBAR5BUTTON" .. (slot - 144)
+        elseif slot >= 157 and slot <= 168 then
+            return "MULTIACTIONBAR6BUTTON" .. (slot - 156)
+        elseif slot >= 169 and slot <= 180 then
+            return "MULTIACTIONBAR7BUTTON" .. (slot - 168)
+        end
+        return nil
+    end
+
     local baseSpellID = FindBaseSpellByID and FindBaseSpellByID(spellID) or spellID
     local slots = C_ActionBar.FindSpellActionButtons(baseSpellID)
 
     if slots and #slots > 0 then
         for _, slot in ipairs(slots) do
-            -- Try to get keybind for this action slot
-            local actionName = "ACTIONBUTTON" .. slot
-            if slot > 12 and slot <= 24 then
-                actionName = "ACTIONBUTTON" .. (slot - 12)
-            elseif slot > 24 and slot <= 36 then
-                actionName = "MULTIACTIONBAR3BUTTON" .. (slot - 24)
-            elseif slot > 36 and slot <= 48 then
-                actionName = "MULTIACTIONBAR4BUTTON" .. (slot - 36)
-            elseif slot > 48 and slot <= 60 then
-                actionName = "MULTIACTIONBAR1BUTTON" .. (slot - 48)
-            elseif slot > 60 and slot <= 72 then
-                actionName = "MULTIACTIONBAR2BUTTON" .. (slot - 60)
-            end
-
-            local key1 = GetBindingKey(actionName)
-            if key1 then
-                return FormatKeybind(key1)
+            local actionName = SlotToActionName(slot)
+            if actionName then
+                local key1 = GetBindingKey(actionName)
+                if key1 then
+                    return FormatKeybind(key1)
+                end
             end
         end
     end
@@ -198,29 +215,7 @@ CreateIconFrame = function()
     iconFrame.keybindText:SetShadowOffset(1, -1)
     iconFrame.keybindText:SetShadowColor(0, 0, 0, 1)
 
-    -- Drag handlers
-    iconFrame:SetScript("OnDragStart", function(self)
-        local db = GetDB()
-        if db and not db.isLocked then
-            self:StartMoving()
-        end
-    end)
-
-    iconFrame:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-
-        -- Save position relative to screen center
-        local db = GetDB()
-        if db then
-            local selfX, selfY = self:GetCenter()
-            local parentX, parentY = UIParent:GetCenter()
-            if selfX and selfY and parentX and parentY then
-                db.positionX = selfX - parentX
-                db.positionY = selfY - parentY
-            end
-        end
-    end)
-
+    -- Dragging is handled by LibEQOLEditMode in Edit Mode only.
     -- Hide initially
     iconFrame:Hide()
 
@@ -451,7 +446,21 @@ RefreshIconFrame = function()
     local SafeSetBackdrop = SUICore and SUICore.SafeSetBackdrop
 
     if db.showBorder then
-        local borderColor = db.borderColor or { 0, 0, 0, 1 }
+        -- Sanitize borderColor — earlier versions of the LEM setter could have
+        -- written a malformed table (with an {r=,g=,b=,a=} object as element 1).
+        -- Repair it on read so SetBackdropBorderColor gets plain numbers.
+        local bc = db.borderColor
+        if type(bc) ~= "table" then
+            bc = { 0, 0, 0, 1 }
+        elseif type(bc[1]) == "table" then
+            local t = bc[1]
+            bc = { t.r or 0, t.g or 0, t.b or 0, t.a or 1 }
+            db.borderColor = bc
+        elseif type(bc[1]) ~= "number" then
+            bc = { 0, 0, 0, 1 }
+            db.borderColor = bc
+        end
+        local borderColor = bc
         local thickness = db.borderThickness or 2
         inset = thickness
 
@@ -460,21 +469,11 @@ RefreshIconFrame = function()
             edgeFile = "Interface\\Buttons\\WHITE8x8",
             edgeSize = thickness,
         }
-        if not db.isLocked then
-            -- Green border when unlocked
-            if SafeSetBackdrop then
-                SafeSetBackdrop(iconFrame, backdropInfo, { 0, 1, 0, 1 })
-            else
-                iconFrame:SetBackdrop(backdropInfo)
-                iconFrame:SetBackdropBorderColor(0, 1, 0, 1)
-            end
+        if SafeSetBackdrop then
+            SafeSetBackdrop(iconFrame, backdropInfo, borderColor)
         else
-            if SafeSetBackdrop then
-                SafeSetBackdrop(iconFrame, backdropInfo, borderColor)
-            else
-                iconFrame:SetBackdrop(backdropInfo)
-                iconFrame:SetBackdropBorderColor(borderColor[1], borderColor[2], borderColor[3], borderColor[4] or 1)
-            end
+            iconFrame:SetBackdrop(backdropInfo)
+            iconFrame:SetBackdropBorderColor(borderColor[1], borderColor[2], borderColor[3], borderColor[4] or 1)
         end
     else
         if SafeSetBackdrop then
@@ -498,8 +497,7 @@ RefreshIconFrame = function()
         iconFrame.cooldown:Hide()
     end
 
-    -- Lock/unlock state
-    iconFrame:EnableMouse(not db.isLocked or true) -- Always enable for visibility, but drag only when unlocked
+    iconFrame:EnableMouse(true)
 
     -- Keybind text styling
     if db.showKeybind then
@@ -516,8 +514,19 @@ RefreshIconFrame = function()
         local outline = db.keybindOutline and "OUTLINE" or ""
         iconFrame.keybindText:SetFont(fontPath, fontSize, outline)
 
-        local color = db.keybindColor or { 1, 1, 1, 1 }
-        iconFrame.keybindText:SetTextColor(color[1], color[2], color[3], color[4] or 1)
+        -- Sanitize keybindColor same as borderColor (repair pre-fix corruption).
+        local kc = db.keybindColor
+        if type(kc) ~= "table" then
+            kc = { 1, 1, 1, 1 }
+        elseif type(kc[1]) == "table" then
+            local t = kc[1]
+            kc = { t.r or 1, t.g or 1, t.b or 1, t.a or 1 }
+            db.keybindColor = kc
+        elseif type(kc[1]) ~= "number" then
+            kc = { 1, 1, 1, 1 }
+            db.keybindColor = kc
+        end
+        iconFrame.keybindText:SetTextColor(kc[1], kc[2], kc[3], kc[4] or 1)
 
         -- Anchor position
         local anchor = db.keybindAnchor or "BOTTOMRIGHT"
@@ -527,8 +536,12 @@ RefreshIconFrame = function()
         iconFrame.keybindText:SetPoint(anchor, iconFrame, anchor, offsetX, offsetY)
     end
 
-    -- Don't call UpdateVisibility() here - let OnUpdate show the frame
-    -- only after a spell has been fetched, to avoid empty border flash
+    -- Force a fresh spell check so visibility-setting changes take effect
+    -- immediately (otherwise the frame waits for the next ticker tick before
+    -- re-evaluating, and "always" mode wouldn't switch on until a new spell
+    -- recommendation changed).
+    lastSpellID = nil
+    DoUpdate()
 end
 
 --------------------------------------------------------------------------------
@@ -592,6 +605,295 @@ local function RefreshRotationAssistIcon()
 end
 
 _G.SuaviUI_RefreshRotationAssistIcon = RefreshRotationAssistIcon
+
+--------------------------------------------------------------------------------
+-- Edit Mode (LibEQOLEditMode) Integration
+--------------------------------------------------------------------------------
+
+local lemRegistered = false
+
+local function OnLEMPositionChanged(frame, layoutName, point, x, y)
+    -- LibEQOL can invoke with either 4 or 5 positional args; prefer GetCenter.
+    if not frame then return end
+    local db = GetDB(); if not db then return end
+    local selfX, selfY = frame:GetCenter()
+    local parentX, parentY = UIParent:GetCenter()
+    if selfX and selfY and parentX and parentY then
+        db.positionX = selfX - parentX
+        db.positionY = selfY - parentY
+    end
+end
+
+local ANCHOR_OPTIONS = {
+    { value = "TOPLEFT",     text = "Top Left" },
+    { value = "TOPRIGHT",    text = "Top Right" },
+    { value = "BOTTOMLEFT",  text = "Bottom Left" },
+    { value = "BOTTOMRIGHT", text = "Bottom Right" },
+    { value = "CENTER",      text = "Center" },
+}
+local VISIBILITY_OPTIONS = {
+    { value = "always",  text = "Always" },
+    { value = "combat",  text = "In Combat" },
+    { value = "hostile", text = "Hostile Target" },
+}
+local STRATA_OPTIONS = {
+    { value = "LOW",    text = "Low" },
+    { value = "MEDIUM", text = "Medium" },
+    { value = "HIGH",   text = "High" },
+    { value = "DIALOG", text = "Dialog" },
+}
+
+-- Build a LEM dropdown generator that correctly maps option.value <-> option.text.
+-- LEM's `values = ...` shortcut stores option.text in the setting instead of
+-- option.value, which breaks enum-style settings.
+local function MakeDropdownGenerator(options, fallbackText)
+    return function(dropdown, rootDescription, settingObject)
+        local layoutName = LEM and LEM.GetActiveLayoutName and LEM.GetActiveLayoutName() or "Default"
+        local current = settingObject.get(layoutName)
+        local currentText = fallbackText
+        for _, opt in ipairs(options) do
+            if opt.value == current then currentText = opt.text; break end
+        end
+        dropdown:SetDefaultText(currentText)
+        for _, opt in ipairs(options) do
+            local optText, optValue = opt.text, opt.value
+            rootDescription:CreateButton(optText, function()
+                dropdown:SetDefaultText(optText)
+                settingObject.set(layoutName, optValue)
+            end)
+        end
+    end
+end
+
+local function BuildLEMSettings()
+    local settings = {}
+    local order = 1
+    local function refresh() RefreshRotationAssistIcon() end
+    local function get(key, default)
+        return function()
+            local db = GetDB()
+            local v = db and db[key]
+            if v == nil then return default end
+            return v
+        end
+    end
+    local function set(key)
+        return function(_, value)
+            local db = GetDB()
+            if db then db[key] = value; refresh() end
+        end
+    end
+
+    -- ICON
+    table.insert(settings, {
+        order = order, name = "Icon", kind = LEM.SettingType.Collapsible,
+        id = "RAI_ICON", defaultCollapsed = false,
+    }); order = order + 1
+
+    table.insert(settings, {
+        parentId = "RAI_ICON", order = order, name = "Icon Size",
+        kind = LEM.SettingType.Slider, default = 56,
+        minValue = 16, maxValue = 200, valueStep = 1,
+        get = get("iconSize", 56), set = set("iconSize"),
+    }); order = order + 1
+
+    table.insert(settings, {
+        parentId = "RAI_ICON", order = order, name = "Frame Strata",
+        kind = LEM.SettingType.Dropdown, default = "MEDIUM", useOldStyle = true,
+        generator = MakeDropdownGenerator(STRATA_OPTIONS, "Medium"),
+        get = get("frameStrata", "MEDIUM"), set = set("frameStrata"),
+    }); order = order + 1
+
+    table.insert(settings, {
+        parentId = "RAI_ICON", order = order, name = "Visibility",
+        kind = LEM.SettingType.Dropdown, default = "always", useOldStyle = true,
+        generator = MakeDropdownGenerator(VISIBILITY_OPTIONS, "Always"),
+        get = get("visibility", "always"), set = set("visibility"),
+    }); order = order + 1
+
+    table.insert(settings, {
+        parentId = "RAI_ICON", order = order, name = "Cooldown Swipe",
+        kind = LEM.SettingType.Checkbox, default = true,
+        get = get("cooldownSwipeEnabled", true), set = set("cooldownSwipeEnabled"),
+    }); order = order + 1
+
+    -- BORDER
+    table.insert(settings, {
+        order = order, name = "Border", kind = LEM.SettingType.Collapsible,
+        id = "RAI_BORDER", defaultCollapsed = true,
+    }); order = order + 1
+
+    table.insert(settings, {
+        parentId = "RAI_BORDER", order = order, name = "Show Border",
+        kind = LEM.SettingType.Checkbox, default = true,
+        get = get("showBorder", true), set = set("showBorder"),
+    }); order = order + 1
+
+    table.insert(settings, {
+        parentId = "RAI_BORDER", order = order, name = "Border Size",
+        kind = LEM.SettingType.Slider, default = 2,
+        minValue = 0, maxValue = 15, valueStep = 1,
+        get = get("borderThickness", 2), set = set("borderThickness"),
+    }); order = order + 1
+
+    table.insert(settings, {
+        parentId = "RAI_BORDER", order = order, name = "Border Color",
+        kind = LEM.SettingType.Color, default = { 0, 0, 0, 1 },
+        get = function()
+            local db = GetDB()
+            local c = db and db.borderColor or { 0, 0, 0, 1 }
+            return c[1] or 0, c[2] or 0, c[3] or 0, c[4] or 1
+        end,
+        set = function(_, r, g, b, a)
+            local db = GetDB(); if not db then return end
+            if type(r) == "table" then
+                db.borderColor = { r.r or 0, r.g or 0, r.b or 0, r.a or 1 }
+            else
+                db.borderColor = { r or 0, g or 0, b or 0, a or 1 }
+            end
+            refresh()
+        end,
+    }); order = order + 1
+
+    -- KEYBIND
+    table.insert(settings, {
+        order = order, name = "Keybind", kind = LEM.SettingType.Collapsible,
+        id = "RAI_KEYBIND", defaultCollapsed = true,
+    }); order = order + 1
+
+    table.insert(settings, {
+        parentId = "RAI_KEYBIND", order = order, name = "Show Keybind",
+        kind = LEM.SettingType.Checkbox, default = true,
+        get = get("showKeybind", true), set = set("showKeybind"),
+    }); order = order + 1
+
+    table.insert(settings, {
+        parentId = "RAI_KEYBIND", order = order, name = "Keybind Size",
+        kind = LEM.SettingType.Slider, default = 13,
+        minValue = 6, maxValue = 48, valueStep = 1,
+        get = get("keybindSize", 13), set = set("keybindSize"),
+    }); order = order + 1
+
+    table.insert(settings, {
+        parentId = "RAI_KEYBIND", order = order, name = "Keybind Anchor",
+        kind = LEM.SettingType.Dropdown, default = "BOTTOMRIGHT", useOldStyle = true,
+        generator = MakeDropdownGenerator(ANCHOR_OPTIONS, "Bottom Right"),
+        get = get("keybindAnchor", "BOTTOMRIGHT"), set = set("keybindAnchor"),
+    }); order = order + 1
+
+    table.insert(settings, {
+        parentId = "RAI_KEYBIND", order = order, name = "Keybind X Offset",
+        kind = LEM.SettingType.Slider, default = -2,
+        minValue = -50, maxValue = 50, valueStep = 1,
+        get = get("keybindOffsetX", -2), set = set("keybindOffsetX"),
+    }); order = order + 1
+
+    table.insert(settings, {
+        parentId = "RAI_KEYBIND", order = order, name = "Keybind Y Offset",
+        kind = LEM.SettingType.Slider, default = 2,
+        minValue = -50, maxValue = 50, valueStep = 1,
+        get = get("keybindOffsetY", 2), set = set("keybindOffsetY"),
+    }); order = order + 1
+
+    table.insert(settings, {
+        parentId = "RAI_KEYBIND", order = order, name = "Keybind Color",
+        kind = LEM.SettingType.Color, default = { 1, 1, 1, 1 },
+        get = function()
+            local db = GetDB()
+            local c = db and db.keybindColor or { 1, 1, 1, 1 }
+            return c[1] or 1, c[2] or 1, c[3] or 1, c[4] or 1
+        end,
+        set = function(_, r, g, b, a)
+            local db = GetDB(); if not db then return end
+            if type(r) == "table" then
+                db.keybindColor = { r.r or 1, r.g or 1, r.b or 1, r.a or 1 }
+            else
+                db.keybindColor = { r or 1, g or 1, b or 1, a or 1 }
+            end
+            refresh()
+        end,
+    }); order = order + 1
+
+    return settings
+end
+
+local function RegisterWithLEM()
+    if not LEM or lemRegistered or not iconFrame then return end
+
+    iconFrame.editModeName = "Rotation Assist Icon"
+
+    local db = GetDB()
+    local defaults = {
+        point = "CENTER",
+        x = (db and db.positionX) or 0,
+        y = (db and db.positionY) or -180,
+    }
+
+    local ok = pcall(function()
+        LEM:AddFrame(iconFrame, OnLEMPositionChanged, defaults)
+        LEM:AddFrameSettings(iconFrame, BuildLEMSettings())
+        LEM:SetFrameDragEnabled(iconFrame, function()
+            return LEM.IsInEditMode and LEM:IsInEditMode() or false
+        end)
+        if LEM.SetFrameResetVisible then
+            LEM:SetFrameResetVisible(iconFrame, function()
+                return LEM.IsInEditMode and LEM:IsInEditMode() or false
+            end)
+        end
+
+        -- Preview: force-show the icon during Edit Mode with a placeholder
+        -- texture so the frame is visible even when no spell is recommended.
+        LEM:RegisterCallback("enter", function()
+            if not iconFrame then return end
+            iconFrame._suiEditModePreview = true
+            iconFrame.icon:SetTexture("Interface\\Icons\\Ability_Warrior_Savageblow")
+            iconFrame.icon:SetVertexColor(1, 1, 1, 1)
+            if iconFrame.cooldown then iconFrame.cooldown:Clear() end
+            if iconFrame.keybindText then iconFrame.keybindText:Hide() end
+            iconFrame:Show()
+        end)
+        LEM:RegisterCallback("exit", function()
+            if not iconFrame then return end
+            iconFrame._suiEditModePreview = nil
+            RefreshIconFrame()
+        end)
+    end)
+
+    if ok then
+        lemRegistered = true
+
+        -- Blue-border overlay for visual feedback (same idiom as other frames)
+        if not iconFrame._editModeOverlay then
+            local overlay = CreateFrame("Frame", nil, iconFrame, "BackdropTemplate")
+            overlay:SetAllPoints(iconFrame)
+            overlay:SetFrameLevel(iconFrame:GetFrameLevel() + 1)
+            overlay:SetBackdrop({
+                edgeFile = "Interface\\Buttons\\WHITE8x8",
+                edgeSize = 2,
+            })
+            overlay:SetBackdropBorderColor(0.3, 0.8, 1, 0.6)
+            overlay:Hide()
+            iconFrame._editModeOverlay = overlay
+        end
+    end
+end
+
+-- Hook the existing PLAYER_ENTERING_WORLD handler's frame creation: register
+-- with LEM once after CreateIconFrame runs. We do this via a retry timer
+-- because the initial event fires 0.5s deferred.
+local lemInitTries = 0
+local function TryRegisterLEM()
+    if lemRegistered then return end
+    if iconFrame then
+        RegisterWithLEM()
+        return
+    end
+    lemInitTries = lemInitTries + 1
+    if lemInitTries < 20 then
+        C_Timer.After(0.5, TryRegisterLEM)
+    end
+end
+C_Timer.After(1.0, TryRegisterLEM)
 
 --------------------------------------------------------------------------------
 -- Export

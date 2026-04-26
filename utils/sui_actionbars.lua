@@ -12,9 +12,14 @@ local LSM = LibStub("LibSharedMedia-3.0")
 
 local IS_MIDNIGHT = select(4, GetBuildInfo()) >= 120000
 
--- Extra action/zone ability frame reparenting. Previously disabled (session 4942)
--- due to taint from frame field writes. Field writes now on weak tables — safe to enable.
-local DISABLE_EXTRA_BUTTON_CUSTOMIZATION = false
+-- Extra action/zone ability frame reparenting is DISABLED.
+-- Reason: `blizzFrame:SetParent(holder)` on ExtraActionBarFrame/ZoneAbilityFrame
+-- taints those protected frames, which then propagates into Blizzard's
+-- EditMode:UpdateBottomActionBarPositions chain and blocks
+-- UIParentRightManagedFrameContainer:ClearAllPoints() (session 5854+).
+-- Positioning of these buttons now happens via Blizzard's native Edit Mode
+-- (ExtraAbilityContainer is already an Edit-Mode-managed system).
+local DISABLE_EXTRA_BUTTON_CUSTOMIZATION = true
 -- TAINT-FIX (session 4942 → refactored): all Blizzard frame field writes moved to
 -- module-level weak tables below.  Safe to enable.
 local DISABLE_STANDARD_ACTIONBAR_CUSTOMIZATION = false
@@ -2691,6 +2696,137 @@ do
         end)
     end)
 end
+
+---------------------------------------------------------------------------
+-- EXTRA ABILITIES (Extra Action Button + Zone Ability Button) EDIT MODE PANEL
+---------------------------------------------------------------------------
+-- Positioning is handled by Blizzard's native Edit Mode (ExtraAbilities
+-- system). SuaviUI injects scale / artwork / fade controls into Blizzard's
+-- dialog when the user selects that system. No reparenting, no SetParent,
+-- no custom holders — so none of the taint paths that blocked
+-- UIParentRightManagedFrameContainer:ClearAllPoints() run.
+
+local function ApplyExtraButtonAppearanceSafe(buttonType)
+    if InCombatLockdown() then
+        ActionBars.pendingExtraButtonRefresh = true
+        return
+    end
+    local settings = GetExtraButtonDB(buttonType)
+    if not settings then return end
+
+    local frameName = (buttonType == "extraActionButton") and "ExtraActionBarFrame" or "ZoneAbilityFrame"
+    local blizzFrame = _G[frameName]
+    if not blizzFrame then return end
+
+    if not settings.enabled then
+        -- User disabled customization — restore Blizzard defaults.
+        pcall(blizzFrame.SetScale, blizzFrame, 1.0)
+        if buttonType == "extraActionButton" and blizzFrame.button and blizzFrame.button.style then
+            blizzFrame.button.style:SetAlpha(1)
+        elseif buttonType == "zoneAbility" and blizzFrame.Style then
+            blizzFrame.Style:SetAlpha(1)
+        end
+        return
+    end
+
+    pcall(blizzFrame.SetScale, blizzFrame, settings.scale or 1.0)
+
+    if buttonType == "extraActionButton" and blizzFrame.button and blizzFrame.button.style then
+        blizzFrame.button.style:SetAlpha(settings.hideArtwork and 0 or 1)
+    elseif buttonType == "zoneAbility" and blizzFrame.Style then
+        blizzFrame.Style:SetAlpha(settings.hideArtwork and 0 or 1)
+    end
+end
+
+local function RefreshExtraButtonAppearance()
+    ApplyExtraButtonAppearanceSafe("extraActionButton")
+    ApplyExtraButtonAppearanceSafe("zoneAbility")
+end
+
+_G.SuaviUI_RefreshExtraButtonAppearance = RefreshExtraButtonAppearance
+
+-- Reapply on entering world (after UI reload / login)
+do
+    local f = CreateFrame("Frame")
+    f:RegisterEvent("PLAYER_ENTERING_WORLD")
+    f:SetScript("OnEvent", function()
+        C_Timer.After(1.0, RefreshExtraButtonAppearance)
+    end)
+end
+
+-- Inject SuaviUI controls into Blizzard's Extra Abilities Edit Mode dialog
+C_Timer.After(0.5, function()
+    local EP = ns.EditModePanels
+    if not EP or not Enum or not Enum.EditModeSystem then return end
+
+    local EXTRA_ABILITIES_SYSTEM = Enum.EditModeSystem.ExtraAbilities
+    if EXTRA_ABILITIES_SYSTEM == nil then return end
+
+    local function IsExtraAbilitiesSystem(sf)
+        return sf and sf.system == EXTRA_ABILITIES_SYSTEM
+    end
+
+    local extraControlKeys = {
+        "extraAbilities_dividerEA",
+        "extraAbilities_scaleEA",
+        "extraAbilities_artEA",
+        "extraAbilities_fadeEA",
+        "extraAbilities_dividerZA",
+        "extraAbilities_scaleZA",
+        "extraAbilities_artZA",
+        "extraAbilities_fadeZA",
+    }
+
+    local function MakeScaleGetter(bt)
+        return function() local db = GetExtraButtonDB(bt); return db and db.scale or 1.0 end
+    end
+    local function MakeScaleSetter(bt)
+        return function(v)
+            local db = GetExtraButtonDB(bt)
+            if db then db.scale = v; ApplyExtraButtonAppearanceSafe(bt) end
+        end
+    end
+    local function MakeArtGetter(bt)
+        return function() local db = GetExtraButtonDB(bt); return db and db.hideArtwork or false end
+    end
+    local function MakeArtSetter(bt)
+        return function(v)
+            local db = GetExtraButtonDB(bt)
+            if db then db.hideArtwork = v; ApplyExtraButtonAppearanceSafe(bt) end
+        end
+    end
+    local function MakeFadeGetter(bt)
+        return function() local db = GetExtraButtonDB(bt); return db and db.fadeEnabled or false end
+    end
+    local function MakeFadeSetter(bt)
+        return function(v)
+            local db = GetExtraButtonDB(bt)
+            if db then db.fadeEnabled = v end
+            -- Mouseover fade requires a reload to fully wire up.
+        end
+    end
+
+    local function InitExtraAbilityControls()
+        local c = EP.controls
+        c.extraAbilities_dividerEA = EP.CreateDivider("ExtraAbilities_EA", "Extra Action Button")
+        c.extraAbilities_scaleEA   = EP.CreateSlider("ExtraAbilities_Scale_EA", "Scale",
+            0.5, 2.0, 0.05, MakeScaleGetter("extraActionButton"), MakeScaleSetter("extraActionButton"))
+        c.extraAbilities_artEA     = EP.CreateCheckbox("ExtraAbilities_Art_EA", "Hide Button Artwork",
+            MakeArtGetter("extraActionButton"), MakeArtSetter("extraActionButton"))
+        c.extraAbilities_fadeEA    = EP.CreateCheckbox("ExtraAbilities_Fade_EA", "Enable Mouseover Fade (reload required)",
+            MakeFadeGetter("extraActionButton"), MakeFadeSetter("extraActionButton"))
+
+        c.extraAbilities_dividerZA = EP.CreateDivider("ExtraAbilities_ZA", "Zone Ability Button")
+        c.extraAbilities_scaleZA   = EP.CreateSlider("ExtraAbilities_Scale_ZA", "Scale",
+            0.5, 2.0, 0.05, MakeScaleGetter("zoneAbility"), MakeScaleSetter("zoneAbility"))
+        c.extraAbilities_artZA     = EP.CreateCheckbox("ExtraAbilities_Art_ZA", "Hide Button Artwork",
+            MakeArtGetter("zoneAbility"), MakeArtSetter("zoneAbility"))
+        c.extraAbilities_fadeZA    = EP.CreateCheckbox("ExtraAbilities_Fade_ZA", "Enable Mouseover Fade (reload required)",
+            MakeFadeGetter("zoneAbility"), MakeFadeSetter("zoneAbility"))
+    end
+
+    EP.RegisterSystem(IsExtraAbilitiesSystem, InitExtraAbilityControls, extraControlKeys)
+end)
 
 
 

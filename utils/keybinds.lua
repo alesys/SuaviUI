@@ -188,21 +188,40 @@ local function GetBT4BindingName(buttonNum)
     return nil
 end
 
--- Maps action slot numbers to WoW binding names (fallback)
+-- Maps action slot numbers to WoW binding names.
+-- Source: Blizzard_ActionBar/Shared/MultiActionBars.xml — each bar's
+-- `actionpage` attribute defines its slot range; the `commandNamePrefix`
+-- defines its binding name. (page * 12 - 11) .. (page * 12) is the slot range.
+--   Page 1  (slots 1-12)     ActionBar (Bar 1)            ACTIONBUTTON
+--   Page 3  (slots 25-36)    MultiBarRight (Bar 4)        MULTIACTIONBAR3
+--   Page 4  (slots 37-48)    MultiBarLeft (Bar 5)         MULTIACTIONBAR4
+--   Page 5  (slots 49-60)    MultiBarBottomRight (Bar 3)  MULTIACTIONBAR2
+--   Page 6  (slots 61-72)    MultiBarBottomLeft (Bar 2)   MULTIACTIONBAR1
+--   Page 13 (slots 145-156)  MultiBar5 (Bar 6)            MULTIACTIONBAR5
+--   Page 14 (slots 157-168)  MultiBar6 (Bar 7)            MULTIACTIONBAR6
+--   Page 15 (slots 169-180)  MultiBar7 (Bar 8)            MULTIACTIONBAR7
+-- Slots 13-24 are page 2 (vehicle/possess overrides) and have no user bindings.
 local function GetBindingNameFromActionSlot(slot)
     if not slot or slot < 1 then return nil end
     if slot <= 12 then
         return "ACTIONBUTTON" .. slot
     elseif slot <= 24 then
-        return "ACTIONBUTTON" .. (slot - 12)
+        -- Page 2: vehicle/possess overrides — no user binding.
+        return nil
     elseif slot <= 36 then
         return "MULTIACTIONBAR3BUTTON" .. (slot - 24)
     elseif slot <= 48 then
         return "MULTIACTIONBAR4BUTTON" .. (slot - 36)
     elseif slot <= 60 then
-        return "MULTIACTIONBAR1BUTTON" .. (slot - 48)
+        return "MULTIACTIONBAR2BUTTON" .. (slot - 48)
     elseif slot <= 72 then
-        return "MULTIACTIONBAR2BUTTON" .. (slot - 60)
+        return "MULTIACTIONBAR1BUTTON" .. (slot - 60)
+    elseif slot >= 145 and slot <= 156 then
+        return "MULTIACTIONBAR5BUTTON" .. (slot - 144)
+    elseif slot >= 157 and slot <= 168 then
+        return "MULTIACTIONBAR6BUTTON" .. (slot - 156)
+    elseif slot >= 169 and slot <= 180 then
+        return "MULTIACTIONBAR7BUTTON" .. (slot - 168)
     end
     return nil
 end

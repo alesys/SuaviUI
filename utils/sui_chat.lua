@@ -187,19 +187,47 @@ local function MakeURLsClickable(text)
 end
 
 ---------------------------------------------------------------------------
--- Hook chat frame AddMessage to process URLs
+-- Register chat message processing via ChatFrame_AddMessageEventFilter
+--
+-- Previously this module replaced chatFrame.AddMessage with a wrapper, which
+-- caused execution-context taint to leak into Blizzard's MessageEventHandler
+-- and poison subsequent calls like ChatFrameUtil.SetLastTellTarget.
+--
+-- ChatFrame_AddMessageEventFilter is Blizzard's sanctioned pipeline for
+-- modifying incoming chat text. Filters run before AddMessage and return
+-- the (possibly modified) message back to the secure handler, so no addon
+-- closure sits in the event handler's call chain.
 ---------------------------------------------------------------------------
-local function HookChatMessages(chatFrame)
-    if chatFrame.__quiChatMessageHooked then return end
-    chatFrame.__quiChatMessageHooked = true
+local CHAT_FILTER_EVENTS = {
+    "CHAT_MSG_SAY", "CHAT_MSG_EMOTE", "CHAT_MSG_YELL",
+    "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER",
+    "CHAT_MSG_RAID", "CHAT_MSG_RAID_LEADER", "CHAT_MSG_RAID_WARNING",
+    "CHAT_MSG_INSTANCE_CHAT", "CHAT_MSG_INSTANCE_CHAT_LEADER",
+    "CHAT_MSG_GUILD", "CHAT_MSG_OFFICER",
+    "CHAT_MSG_WHISPER", "CHAT_MSG_WHISPER_INFORM",
+    "CHAT_MSG_BN_WHISPER", "CHAT_MSG_BN_WHISPER_INFORM",
+    "CHAT_MSG_CHANNEL",
+    "CHAT_MSG_SYSTEM", "CHAT_MSG_LOOT", "CHAT_MSG_MONEY",
+    "CHAT_MSG_TRADESKILLS", "CHAT_MSG_OPENING", "CHAT_MSG_PET_INFO",
+    "CHAT_MSG_SKILL", "CHAT_MSG_ACHIEVEMENT", "CHAT_MSG_GUILD_ACHIEVEMENT",
+    "CHAT_MSG_TEXT_EMOTE", "CHAT_MSG_AFK", "CHAT_MSG_DND",
+    "CHAT_MSG_IGNORED", "CHAT_MSG_COMMUNITIES_CHANNEL",
+}
 
-    local origAddMessage = chatFrame.AddMessage
-    chatFrame.AddMessage = function(self, text, ...)
-        if text and type(text) == "string" then
-            text = AddTimestamp(text)
-            text = MakeURLsClickable(text)
-        end
-        return origAddMessage(self, text, ...)
+local function SuaviChatFilter(self, event, msg, ...)
+    if type(msg) ~= "string" then return false end
+    local processed = AddTimestamp(msg)
+    processed = MakeURLsClickable(processed)
+    return false, processed, ...
+end
+
+local filtersRegistered = false
+local function RegisterChatFilters()
+    if filtersRegistered then return end
+    if type(ChatFrame_AddMessageEventFilter) ~= "function" then return end
+    filtersRegistered = true
+    for _, event in ipairs(CHAT_FILTER_EVENTS) do
+        ChatFrame_AddMessageEventFilter(event, SuaviChatFilter)
     end
 end
 
@@ -996,10 +1024,9 @@ local function SkinChatFrame(chatFrame)
     -- Apply font styling (always enabled)
     StyleFontStrings(chatFrame)
 
-    -- Hook URL detection
-    if settings.urls and settings.urls.enabled then
-        HookChatMessages(chatFrame)
-    end
+    -- Register global chat message filter once (handles URL clickability and
+    -- timestamps for all chat frames without replacing AddMessage).
+    RegisterChatFilters()
 
     -- Setup message fade (only if enabled)
     if settings.fade and settings.fade.enabled then

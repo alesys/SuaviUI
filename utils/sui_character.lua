@@ -6,6 +6,45 @@ local ADDON_NAME, ns = ...
 local SUI = ns.SUI or {}
 ns.SUI = SUI
 
+-- IsSecretValue: WoW 12.x returns "secret values" from stat APIs (UnitStat,
+-- GetCritChance, GetCombatRating, etc.) during combat in groups. Comparing or
+-- doing arithmetic on a secret value throws — silently aborting the stats
+-- rebuild and leaving the panel empty for the user. SafeStat() returns 0 for
+-- any secret-tainted reading so the row still renders with a neutral value
+-- instead of disappearing entirely.
+local IsSecretValue = function(v) return ns.Utils and ns.Utils.IsSecretValue and ns.Utils.IsSecretValue(v) or false end
+local function SafeStat(v)
+    if v == nil or IsSecretValue(v) then return 0 end
+    if type(v) == "number" then return v end
+    return 0
+end
+
+-- Per-stat cache of last good (non-secret) numeric reading. Lets the panel
+-- keep showing values during combat in groups when live API calls return
+-- secrets we can't display or compute on.
+local lastGood = {}
+local function CachedStat(cacheKey, func, ...)
+    if type(func) ~= "function" then return lastGood[cacheKey], true end
+    local ok, result = pcall(func, ...)
+    if ok and result ~= nil and not IsSecretValue(result) and type(result) == "number" then
+        lastGood[cacheKey] = result
+        return result, false
+    end
+    return lastGood[cacheKey], true
+end
+-- Same for APIs that return (base, effective, posBuff, negBuff) — caches the
+-- effective value (return #2) which is what we display.
+local function CachedStatEffective(cacheKey, func, ...)
+    if type(func) ~= "function" then return lastGood[cacheKey], true end
+    local ok, _, eff = pcall(func, ...)
+    if ok and eff ~= nil and not IsSecretValue(eff) and type(eff) == "number" then
+        lastGood[cacheKey] = eff
+        return eff, false
+    end
+    return lastGood[cacheKey], true
+end
+ns.SUI.CharStatCache = { CachedStat = CachedStat, CachedStatEffective = CachedStatEffective }
+
 ---------------------------------------------------------------------------
 -- Module Constants
 ---------------------------------------------------------------------------
@@ -2003,10 +2042,14 @@ local function UpdateStatsPanel(panel, unit)
         local SECTION_GAP = 10
         local BAR_HEIGHT = 16
 
-    -- Helper to safely get stats (pcall for Midnight protection)
+    -- Helper to safely get stats (pcall for Midnight protection).
+    -- Also sanitizes secret values so downstream arithmetic / math.min etc.
+    -- doesn't blow up the panel during combat in groups.
     local function SafeGetStat(func, ...)
         local ok, result = pcall(func, ...)
-        return ok and result or 0
+        if not ok then return 0 end
+        if IsSecretValue(result) then return 0 end
+        return result or 0
     end
 
     -- HEALTH & RESOURCE
@@ -2064,8 +2107,22 @@ local function UpdateStatsPanel(panel, unit)
     }
 
     for _, stat in ipairs(stats) do
-        local statValue, effectiveStat, posBuff, negBuff = UnitStat(unit, stat.statIndex)
-        if effectiveStat and effectiveStat > 0 then
+        -- Use the cached effective stat so combat-in-groups secret values fall
+        -- back to the last known good reading instead of dropping the row.
+        local effectiveStat, isStale = CachedStatEffective("char_attr_" .. stat.statIndex, UnitStat, unit, stat.statIndex)
+        effectiveStat = SafeStat(effectiveStat)
+        -- For tooltip math we still need raw values, but if stale we fall back
+        -- to no-buff display to avoid arithmetic on secret values.
+        local statValue, posBuff, negBuff = effectiveStat, 0, 0
+        if not isStale then
+            local rs, re, rp, rn = UnitStat(unit, stat.statIndex)
+            statValue = SafeStat(rs)
+            posBuff   = SafeStat(rp)
+            negBuff   = SafeStat(rn)
+        end
+        -- Always render the row so the panel is never empty. Even if the
+        -- value is 0 (cold cache during combat), the user sees the structure.
+        do
             row = CreateStatRow(scrollChild, y)
             row.label:SetText(stat.label)
             row.value:SetText(FormatNumber(effectiveStat))
@@ -2183,8 +2240,11 @@ local function UpdateStatsPanel(panel, unit)
     local statFormat = settings.secondaryStatFormat or "percent"
 
     for _, stat in ipairs(secondaryStats) do
-        local percentValue = SafeGetStat(stat.percentFunc)
-        local ratingValue = SafeGetStat(stat.ratingFunc)
+      local rowOk = pcall(function()
+        -- Cached values keep the bars showing real numbers during combat in
+        -- groups (otherwise live API returns secrets → SafeGetStat → 0%).
+        local percentValue = CachedStat("char_sec_pct_" .. stat.statKey, stat.percentFunc) or 0
+        local ratingValue  = CachedStat("char_sec_rat_" .. stat.statKey, stat.ratingFunc)  or 0
         row = CreateStatBar(scrollChild, y, stat.color)
         row.label:SetText(stat.label)
 
@@ -2243,7 +2303,7 @@ local function UpdateStatsPanel(panel, unit)
                 row.tooltip2 = format(CR_VERSATILITY_TOOLTIP, versatilityDamageBonus, versatilityDamageTakenReduction, BreakUpLargeNumbers(ratingValue), versatilityDamageBonus, versatilityDamageTakenReduction)
             end
         end
-        
+      end)  -- close per-row pcall (secondary stats)
         y = y - BAR_HEIGHT
     end
 
@@ -2262,7 +2322,10 @@ local function UpdateStatsPanel(panel, unit)
     }
 
     for _, stat in ipairs(attackStats) do
-        local value = SafeGetStat(stat.func)
+      pcall(function()
+        -- Cache the reading so combat-secret values fall back to the last
+        -- known good number; otherwise the row would disappear in groups.
+        local value = CachedStat("char_atk_" .. stat.statKey, stat.func) or 0
         if value and value > 0 then
             row = CreateStatRow(scrollChild, y)
             row.label:SetText(stat.label)
@@ -2288,9 +2351,10 @@ local function UpdateStatsPanel(panel, unit)
                 local meleeHaste = GetMeleeHaste()
                 row.tooltip2 = format(STAT_ATTACK_SPEED_BASE_TOOLTIP, BreakUpLargeNumbers(meleeHaste))
             end
-            
+
             y = y - ROW_HEIGHT
         end
+      end)  -- close per-row pcall (attack stats)
     end
 
     CreateSectionBg(scrollChild, sectionStart, y)
@@ -2301,10 +2365,12 @@ local function UpdateStatsPanel(panel, unit)
     _, headerHeight = CreateSectionHeader(scrollChild, "Defense", y)
     y = y - headerHeight
 
-    local baselineArmor, effectiveArmor = UnitArmor(unit)
-    local dodge = SafeGetStat(GetDodgeChance)
-    local parry = SafeGetStat(GetParryChance)
-    local block = SafeGetStat(GetBlockChance)
+    -- Cached so combat-secrets don't blank the values.
+    local effectiveArmor = CachedStatEffective("char_def_armor", UnitArmor, unit) or 0
+    local dodge = CachedStat("char_def_dodge", GetDodgeChance) or 0
+    local parry = CachedStat("char_def_parry", GetParryChance) or 0
+    local block = CachedStat("char_def_block", GetBlockChance) or 0
+    local baselineArmor = effectiveArmor
 
     local defenseStats = {
         { label = "Armor", value = FormatNumber(effectiveArmor or 0), statKey = "ARMOR" },
@@ -2314,6 +2380,7 @@ local function UpdateStatsPanel(panel, unit)
     }
 
     for _, stat in ipairs(defenseStats) do
+      pcall(function()
         row = CreateStatRow(scrollChild, y)
         row.label:SetText(stat.label)
         row.value:SetText(stat.value)
@@ -2354,7 +2421,7 @@ local function UpdateStatsPanel(panel, unit)
                 end
             end
         end
-        
+      end)  -- close per-row pcall (defense stats)
         y = y - ROW_HEIGHT
     end
 
@@ -2366,8 +2433,9 @@ local function UpdateStatsPanel(panel, unit)
     _, headerHeight = CreateSectionHeader(scrollChild, "General", y)
     y = y - headerHeight
 
-    local leech = SafeGetStat(GetLifesteal)
-    local speed = SafeGetStat(GetSpeed)
+    -- Cached so combat-secrets keep showing the last known value.
+    local leech = CachedStat("char_gen_leech", GetLifesteal) or 0
+    local speed = CachedStat("char_gen_speed", GetSpeed) or 0
 
     local generalStats = {
         { label = "Leech", value = FormatPercent(leech), statKey = "LIFESTEAL" },
@@ -2375,10 +2443,11 @@ local function UpdateStatsPanel(panel, unit)
     }
 
     for _, stat in ipairs(generalStats) do
+      pcall(function()
         row = CreateStatRow(scrollChild, y)
         row.label:SetText(stat.label)
         row.value:SetText(stat.value)
-        
+
         -- Set tooltips (Blizzard format)
         if stat.statKey == "LIFESTEAL" then
             local lifesteal = GetLifesteal()
@@ -2389,7 +2458,7 @@ local function UpdateStatsPanel(panel, unit)
             row.tooltip = HIGHLIGHT_FONT_COLOR_CODE .. format(PAPERDOLLFRAME_TOOLTIP_FORMAT, STAT_SPEED) .. " " .. format("%.2F%%", speedValue) .. FONT_COLOR_CODE_CLOSE
             row.tooltip2 = format(CR_SPEED_TOOLTIP, BreakUpLargeNumbers(GetCombatRating(CR_SPEED)), GetCombatRatingBonus(CR_SPEED))
         end
-        
+      end)  -- close per-row pcall (general stats)
         y = y - ROW_HEIGHT
     end
     CreateSectionBg(scrollChild, sectionStart, y)

@@ -421,65 +421,11 @@ function AB_EditMode:Initialize()
     -- Register all existing frames
     self:RegisterAllFrames()
     
-    -- Hook into Edit Mode enter/exit for any special handling
-    LEM:RegisterCallback("enter", function()
-        -- Hide ExtraAbilityContainer (Blizzard default) since we manage buttons separately
-        if _G.ExtraAbilityContainer then
-            _G.ExtraAbilityContainer:Hide()
-        end
-        
-        -- Force buttons to show when entering Edit Mode for positioning
-        local abdb = GetActionBarsDB()
-        if abdb and abdb.bars then
-            for buttonType, settings in pairs(abdb.bars) do
-                if buttonType == "extraActionButton" or buttonType == "zoneAbility" then
-                    settings._editModeActive = true
-                    RefreshButton(buttonType)
-                    
-                    -- Show overlay and ensure frame is visible and interactable
-                    local frame = self.registeredFrames[buttonType]
-                    if frame then
-                        if not InCombatLockdown() and not (frame.IsProtected and frame:IsProtected()) then
-                            frame:SetFrameStrata("MEDIUM")  -- Match resource powerbar strata
-                            frame:Show()
-                            if frame._editModeOverlay then
-                                frame._editModeOverlay:Show()
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end)
-    
-    LEM:RegisterCallback("exit", function()
-        -- Show ExtraAbilityContainer again when exiting Edit Mode
-        if _G.ExtraAbilityContainer then
-            _G.ExtraAbilityContainer:Show()
-        end
-        
-        -- Clear edit mode flag when exiting
-        local abdb = GetActionBarsDB()
-        if abdb and abdb.bars then
-            for buttonType, settings in pairs(abdb.bars) do
-                if buttonType == "extraActionButton" or buttonType == "zoneAbility" then
-                    settings._editModeActive = nil
-                    RefreshButton(buttonType)
-                    
-                    -- Hide overlay and restore normal frame strata
-                    local frame = self.registeredFrames[buttonType]
-                    if frame then
-                        if not InCombatLockdown() and not (frame.IsProtected and frame:IsProtected()) then
-                            frame:SetFrameStrata("MEDIUM")  -- Normal strata when not in Edit Mode
-                            if frame._editModeOverlay then
-                                frame._editModeOverlay:Hide()
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end)
+    -- Note: Extra Action and Zone Ability buttons are now positioned via
+    -- Blizzard's native Edit Mode (ExtraAbilityContainer is Edit-Mode-managed).
+    -- SuaviUI no longer reparents/repositions those frames, so the previous
+    -- `ExtraAbilityContainer:Hide()` and frame:Show() calls have been removed —
+    -- they were themselves ADDON_ACTION_BLOCKED sources.
 end
 
 ---------------------------------------------------------------------------
