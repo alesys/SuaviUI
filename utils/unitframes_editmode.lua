@@ -1093,7 +1093,71 @@ local function BuildUnitFrameSettings(unitKey)
         end,
     })
     order = order + 1
-    
+
+    -- Health Text Anchor
+    table.insert(settings, {
+        parentId = "CATEGORY_HEALTH_" .. unitKey,
+        order = order,
+        name = "Anchor",
+        kind = LEM.SettingType.Dropdown,
+        default = anchor9ValueToText["RIGHT"] or "Right",
+        useOldStyle = true,
+        values = anchorOptions,
+        get = function(layoutName, layoutIndex)
+            local s = GetUnitSettings(unitKey)
+            local v = s and s.healthAnchor or "RIGHT"
+            return anchor9ValueToText[v] or v
+        end,
+        set = function(layoutName, value, layoutIndex)
+            local s = GetUnitSettings(unitKey)
+            if s then
+                s.healthAnchor = anchor9TextToValue[value] or value
+                RefreshUnitFrame(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+
+    -- Health Text X Offset
+    table.insert(settings, {
+        parentId = "CATEGORY_HEALTH_" .. unitKey,
+        order = order,
+        name = "X Offset",
+        kind = LEM.SettingType.Slider,
+        default = -4,
+        minValue = -100, maxValue = 100, valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
+        get = function(layoutName, layoutIndex)
+            local s = GetUnitSettings(unitKey)
+            return s and s.healthOffsetX or -4
+        end,
+        set = function(layoutName, value, layoutIndex)
+            local s = GetUnitSettings(unitKey)
+            if s then s.healthOffsetX = value; RefreshUnitFrame(unitKey) end
+        end,
+    })
+    order = order + 1
+
+    -- Health Text Y Offset
+    table.insert(settings, {
+        parentId = "CATEGORY_HEALTH_" .. unitKey,
+        order = order,
+        name = "Y Offset",
+        kind = LEM.SettingType.Slider,
+        default = 0,
+        minValue = -50, maxValue = 50, valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
+        get = function(layoutName, layoutIndex)
+            local s = GetUnitSettings(unitKey)
+            return s and s.healthOffsetY or 0
+        end,
+        set = function(layoutName, value, layoutIndex)
+            local s = GetUnitSettings(unitKey)
+            if s then s.healthOffsetY = value; RefreshUnitFrame(unitKey) end
+        end,
+    })
+    order = order + 1
+
     ---------------------------------------------------------------------------
     -- ABSORB INDICATOR CATEGORY
     ---------------------------------------------------------------------------
@@ -1298,7 +1362,47 @@ local function BuildUnitFrameSettings(unitKey)
         end,
     })
     order = order + 1
-    
+
+    -- Power Text X Offset
+    table.insert(settings, {
+        parentId = "CATEGORY_POWER_TEXT_" .. unitKey,
+        order = order,
+        name = "X Offset",
+        kind = LEM.SettingType.Slider,
+        default = -4,
+        minValue = -100, maxValue = 100, valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
+        get = function(layoutName, layoutIndex)
+            local s = GetUnitSettings(unitKey)
+            return s and s.powerTextOffsetX or -4
+        end,
+        set = function(layoutName, value, layoutIndex)
+            local s = GetUnitSettings(unitKey)
+            if s then s.powerTextOffsetX = value; RefreshUnitFrame(unitKey) end
+        end,
+    })
+    order = order + 1
+
+    -- Power Text Y Offset
+    table.insert(settings, {
+        parentId = "CATEGORY_POWER_TEXT_" .. unitKey,
+        order = order,
+        name = "Y Offset",
+        kind = LEM.SettingType.Slider,
+        default = 2,
+        minValue = -50, maxValue = 50, valueStep = 1,
+        formatter = function(value) return string.format("%d", value) end,
+        get = function(layoutName, layoutIndex)
+            local s = GetUnitSettings(unitKey)
+            return s and s.powerTextOffsetY or 2
+        end,
+        set = function(layoutName, value, layoutIndex)
+            local s = GetUnitSettings(unitKey)
+            if s then s.powerTextOffsetY = value; RefreshUnitFrame(unitKey) end
+        end,
+    })
+    order = order + 1
+
     -- Power Text Use Power Color
     table.insert(settings, {
         parentId = "CATEGORY_POWER_TEXT_" .. unitKey,

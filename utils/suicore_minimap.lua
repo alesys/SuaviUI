@@ -163,8 +163,23 @@ local function UpdateBackdrop()
     local fullSize = settings.size + (settings.borderSize * 2)
     backdrop:SetSize(fullSize, fullSize)
     
-    -- Apply border color
-    local r, g, b, a = unpack(settings.borderColor)
+    -- Apply border color (sanitize against pre-fix corruption: earlier
+    -- versions of the LEM setter could write `{ {r=,g=,b=,a=}, nil, nil, 1 }`
+    -- instead of plain numbers, breaking SetColorTexture and hiding the
+    -- minimap entirely when Edit Mode tried to render it).
+    local bc = settings.borderColor
+    if type(bc) ~= "table" then
+        bc = { 0, 0, 0, 1 }
+        settings.borderColor = bc
+    elseif type(bc[1]) == "table" then
+        local t = bc[1]
+        bc = { t.r or 0, t.g or 0, t.b or 0, t.a or 1 }
+        settings.borderColor = bc
+    elseif type(bc[1]) ~= "number" then
+        bc = { 0, 0, 0, 1 }
+        settings.borderColor = bc
+    end
+    local r, g, b, a = bc[1] or 0, bc[2] or 0, bc[3] or 0, bc[4] or 1
     if settings.useClassColorBorder then
         local color = GetClassColor()
         if color then

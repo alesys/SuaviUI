@@ -255,14 +255,26 @@ local function BuildMinimapSettings()
         get = function(layoutName)
             local mm = GetMinimapDB()
             local c = mm and mm.borderColor or {0, 0, 0, 1}
-            return c[1], c[2], c[3], c[4] or 1
+            -- Defensive: if the entry was previously written in the broken
+            -- {table, nil, nil, 1} format, GetMinimapDB sanitizes it on read,
+            -- but guard here too just in case.
+            if type(c[1]) == "table" then
+                local t = c[1]
+                return t.r or 0, t.g or 0, t.b or 0, t.a or 1
+            end
+            return c[1] or 0, c[2] or 0, c[3] or 0, c[4] or 1
         end,
         set = function(layoutName, r, g, b, a)
             local mm = GetMinimapDB()
-            if mm then
-                mm.borderColor = {r, g, b, a or 1}
-                RefreshMinimap()
+            if not mm then return end
+            -- LEM's color picker passes `{r=,g=,b=,a=}` as the second arg,
+            -- not four separate numbers. Handle both formats.
+            if type(r) == "table" then
+                mm.borderColor = { r.r or 0, r.g or 0, r.b or 0, r.a or 1 }
+            else
+                mm.borderColor = { r or 0, g or 0, b or 0, a or 1 }
             end
+            RefreshMinimap()
         end,
     })
     order = order + 1

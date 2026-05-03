@@ -2895,6 +2895,12 @@ local defaults = {
             collapseRepeats  = true,
         },
 
+        -- Bonus Roll prompt position (movable in Edit Mode)
+        bonusRoll = {
+            enabled  = true,
+            position = { point = "CENTER", x = 0, y = -150 },
+        },
+
         -- Real-time Stats Frame (live HUD display of player stats)
         statsFrame = {
             enabled        = false,

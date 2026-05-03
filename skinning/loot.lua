@@ -984,21 +984,19 @@ local function DisableBlizzardLoot()
 
     -- Disable Blizzard Roll Frames
     if db.lootRoll and db.lootRoll.enabled then
-        -- Hide the container
-        if GroupLootContainer then
-            GroupLootContainer:UnregisterAllEvents()
-            GroupLootContainer:Hide()
-            -- Hook to keep it hidden when Blizzard tries to show frames
-            if not GroupLootContainer._quiHooked then
-                hooksecurefunc(GroupLootContainer, "Show", function(self)
-                    self:Hide()
-                end)
-                GroupLootContainer._quiHooked = true
-            end
-        end
+        -- IMPORTANT: do NOT hide GroupLootContainer itself. It has no visual
+        -- content of its own — it's a positioning anchor managed by
+        -- UIParentBottomManagedFrameTemplate. The BonusRollFrame is anchored
+        -- to GroupLootContainer.BOTTOM (see GroupLootFrame.lua line 88), and
+        -- if the container is :Hide()'d the panel manager won't position it
+        -- correctly, causing the bonus roll prompt to render off-screen or
+        -- behind other UI elements.
+        --
+        -- Instead, only hide the individual roll dialogs (GroupLootFrame1-4)
+        -- that have visible content we want to replace with our custom UI.
 
         -- Hide individual roll frames as they're created
-        local numRollFrames = NUM_GROUP_LOOT_FRAMES or 4  -- Default to 4 if not defined
+        local numRollFrames = NUM_GROUP_LOOT_FRAMES or 4
         for i = 1, numRollFrames do
             local frame = _G["GroupLootFrame"..i]
             if frame then
