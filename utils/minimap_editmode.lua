@@ -380,10 +380,12 @@ local function BuildMinimapSettings()
         order = order,
         name = "Show Progress Report (Missions)",
         kind = LEM.SettingType.Checkbox,
-        default = false,
+        default = true,
         get = function(layoutName)
             local mm = GetMinimapDB()
-            return mm and mm.showMissions or false
+            if not mm then return true end
+            if mm.showMissions == nil then return true end
+            return mm.showMissions
         end,
         set = function(layoutName, value)
             local mm = GetMinimapDB()

@@ -3200,7 +3200,9 @@ local defaults = {
             showCraftingOrder = false,
             showAddonCompartment = false,
             showDifficulty = false,
-            showMissions = false,
+            -- On by default: in Midnight this button is the only obvious way in
+            -- to the Omnium Folio, and hiding it left users with no entry point.
+            showMissions = true,
             showCalendar = true,
             showTracking = false,
 
