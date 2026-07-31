@@ -3301,3 +3301,121 @@ Datatexts:Register("experience", {
 
 
 
+
+---=================================================================================
+--- OMNIUM FOLIO DATATEXT
+--- Midnight's Omnium Folio (internally "Runes of Power"). Data layer lives in
+--- utils/sui_omnium.lua.
+---=================================================================================
+
+Datatexts:Register("omnium", {
+    displayName = "Omnium",
+    category = "Character",
+    description = "Displays unspent Omnium Folio points and owned Omnium",
+
+    OnEnable = function(slotFrame, settings)
+        local frame = CreateFrame("Frame", nil, slotFrame)
+        frame:SetAllPoints()
+
+        local text = slotFrame.text
+        if not text then
+            text = slotFrame:CreateFontString(nil, "OVERLAY")
+            text:SetPoint("CENTER")
+            slotFrame.text = text
+        end
+
+        local Omnium = ns.SUI and ns.SUI.Omnium
+
+        local function Update()
+            if not Omnium or not Omnium:IsUnlocked() then
+                local label = GetLabel("Omnium: ", "Om: ", slotFrame.shortLabel, slotFrame.noLabel)
+                local r, g, b = GetValueColor()
+                text:SetFormattedText("%s|cff%02x%02x%02x%s|r", label, r, g, b, "N/A")
+                return
+            end
+
+            local points = Omnium:GetUnspentPoints()
+            local label = GetLabel("Omnium: ", "Om: ", slotFrame.shortLabel, slotFrame.noLabel)
+            local r, g, b = GetValueColor()
+
+            -- Highlight in yellow while there is something worth spending on
+            if Omnium:CanPurchase() then
+                text:SetFormattedText("%s|cffFFD100%d|r", label, points)
+            else
+                text:SetFormattedText("%s|cff%02x%02x%02x%d|r", label, r, g, b, points)
+            end
+        end
+
+        frame.Update = Update
+
+        -- Events: currency changes when points are earned or spent
+        frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+        frame:RegisterEvent("TRAIT_TREE_CURRENCY_INFO_UPDATED")
+        frame:RegisterEvent("TRAIT_CONFIG_UPDATED")
+        frame:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
+        frame:SetScript("OnEvent", function(self, event)
+            if event == "PLAYER_ENTERING_WORLD" then
+                -- Trait data is not populated on the first frame after login
+                C_Timer.After(3, Update)
+            else
+                Update()
+            end
+        end)
+
+        -- Tooltip
+        slotFrame:EnableMouse(true)
+        slotFrame:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+            GameTooltip:ClearLines()
+            GameTooltip:AddLine("Omnium Folio", 1, 1, 1)
+            GameTooltip:AddLine(" ")
+
+            if not Omnium or not Omnium:IsUnlocked() then
+                GameTooltip:AddLine("Not unlocked on this character", 0.7, 0.7, 0.7)
+                GameTooltip:Show()
+                return
+            end
+
+            local points, spent = Omnium:GetTreeCurrency()
+            GameTooltip:AddDoubleLine("Unspent Points:", tostring(points or 0), 1, 1, 1, 1, 1, 1)
+            if spent then
+                GameTooltip:AddDoubleLine("Spent Points:", tostring(spent), 1, 1, 1, 0.7, 0.7, 0.7)
+            end
+
+            local name, icon, owned = Omnium:GetCurrencyInfo()
+            if name and owned then
+                local iconMarkup = icon and format("|T%s:14:14:0:0|t ", tostring(icon)) or ""
+                GameTooltip:AddDoubleLine(name .. ":", iconMarkup .. tostring(owned), 1, 1, 1, 1, 1, 1)
+            end
+
+            GameTooltip:AddLine(" ")
+            if Omnium:CanPurchase() then
+                GameTooltip:AddLine("You have points ready to spend!", 1, 0.82, 0)
+            else
+                GameTooltip:AddLine("Nothing available to purchase", 0.7, 0.7, 0.7)
+            end
+
+            GameTooltip:AddLine(" ")
+            local ar, ag, ab = GetValueColor(); ar, ag, ab = ar/255, ag/255, ab/255
+            GameTooltip:AddLine("|cffFFFFFFLeft Click:|r Open Omnium Folio", ar, ag, ab)
+            GameTooltip:Show()
+        end)
+        slotFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+        -- Click
+        slotFrame:RegisterForClicks("AnyUp")
+        slotFrame:SetScript("OnClick", function(self, button)
+            if InCombatLockdown() then return end
+            if button == "LeftButton" and Omnium then
+                Omnium:Open()
+            end
+        end)
+
+        Update()
+        return frame
+    end,
+
+    OnDisable = function(frame)
+        frame:UnregisterAllEvents()
+    end,
+})

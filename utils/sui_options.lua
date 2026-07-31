@@ -807,6 +807,67 @@ local function CreateGeneralQoLBuilders()
 
         y = y - 10
 
+        -- Omnium Folio Section (Midnight)
+        local omniumHeader = GUI:CreateSectionHeader(tabContent, "Omnium Folio")
+        omniumHeader:SetPoint("TOPLEFT", PADDING, y)
+        y = y - omniumHeader.gap
+
+        local omniumDesc = GUI:CreateLabel(tabContent,
+            "Midnight's Runes of Power tree. Add the Omnium datatext to a datapanel to track unspent points.",
+            11, C.textMuted)
+        omniumDesc:SetPoint("TOPLEFT", PADDING, y)
+        omniumDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+        omniumDesc:SetJustifyH("LEFT")
+        omniumDesc:SetWordWrap(true)
+        omniumDesc:SetHeight(28)
+        y = y - 38
+
+        local omniumDB = db.omnium
+        if omniumDB then
+            local omniumSkinCheck = GUI:CreateFormCheckbox(tabContent, "Skin Omnium Folio Frame", "skinFolio", omniumDB, function(val)
+                if _G.SuaviUI_RefreshOmniumFolioSkin then _G.SuaviUI_RefreshOmniumFolioSkin() end
+            end)
+            omniumSkinCheck:SetPoint("TOPLEFT", PADDING, y)
+            omniumSkinCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+            y = y - FORM_ROW
+
+            local omniumAlertCheck = GUI:CreateFormCheckbox(tabContent, "Glow Minimap Button When Spendable", "alertEnabled", omniumDB, function(val)
+                if _G.SuaviUI_RefreshOmniumAlert then _G.SuaviUI_RefreshOmniumAlert() end
+            end)
+            omniumAlertCheck:SetPoint("TOPLEFT", PADDING, y)
+            omniumAlertCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+            y = y - FORM_ROW
+
+            local omniumColorPicker  -- Forward declare
+
+            local omniumClassColorCheck = GUI:CreateFormCheckbox(tabContent, "Use Class Color for Glow", "alertUseClassColor", omniumDB, function(val)
+                if _G.SuaviUI_RefreshOmniumAlert then _G.SuaviUI_RefreshOmniumAlert() end
+                if omniumColorPicker and omniumColorPicker.SetEnabled then
+                    omniumColorPicker:SetEnabled(not val)
+                end
+            end)
+            omniumClassColorCheck:SetPoint("TOPLEFT", PADDING, y)
+            omniumClassColorCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+            y = y - FORM_ROW
+
+            omniumColorPicker = GUI:CreateFormColorPicker(tabContent, "Glow Color", "alertColor", omniumDB, function()
+                if _G.SuaviUI_RefreshOmniumAlert then _G.SuaviUI_RefreshOmniumAlert() end
+            end)
+            omniumColorPicker:SetPoint("TOPLEFT", PADDING, y)
+            omniumColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+            if omniumColorPicker.SetEnabled then
+                omniumColorPicker:SetEnabled(not omniumDB.alertUseClassColor)
+            end
+            y = y - FORM_ROW
+
+            local omniumChatCheck = GUI:CreateFormCheckbox(tabContent, "Chat Notice When Spendable", "alertChatMessage", omniumDB, nil)
+            omniumChatCheck:SetPoint("TOPLEFT", PADDING, y)
+            omniumChatCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+            y = y - FORM_ROW
+        end
+
+        y = y - 10
+
         -- Automation Section
         local autoHeader = GUI:CreateSectionHeader(tabContent, "Automation")
         autoHeader:SetPoint("TOPLEFT", PADDING, y)

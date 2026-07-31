@@ -970,12 +970,16 @@ local function UpdateButtonVisibility()
         end
     end
     
-    -- Expansion landing page button (missions) - position at left side
+    -- Expansion landing page button (missions / Omnium Folio in Midnight)
+    -- Position at left side by default, offset and scale are user-configurable.
     if ExpansionLandingPageMinimapButton then
         if settings.showMissions then
             ExpansionLandingPageMinimapButton:SetParent(Minimap)
             ExpansionLandingPageMinimapButton:ClearAllPoints()
-            ExpansionLandingPageMinimapButton:SetPoint("LEFT", Minimap, "LEFT", -5, 0)
+            ExpansionLandingPageMinimapButton:SetPoint("LEFT", Minimap, "LEFT",
+                settings.missionsXOffset or -5,
+                settings.missionsYOffset or 0)
+            ExpansionLandingPageMinimapButton:SetScale(settings.missionsScale or 1.0)
             ExpansionLandingPageMinimapButton:Show()
             -- Re-run Blizzard's icon init so .title/.description are populated
             -- (reparenting can skip the normal event-driven initialization)
@@ -991,8 +995,14 @@ local function UpdateButtonVisibility()
             ExpansionLandingPageMinimapButton:SetParent(hiddenButtonParent)
             ExpansionLandingPageMinimapButton:Hide()
         end
+
+        -- The Omnium alert glow lives on this button — resync it with the new
+        -- visibility so it never pulses on a hidden button.
+        if _G.SuaviUI_RefreshOmniumAlert then
+            _G.SuaviUI_RefreshOmniumAlert()
+        end
     end
-    
+
     -- Calendar - position at top right (next to addon compartment if shown)
     if GameTimeFrame then
         if settings.showCalendar then

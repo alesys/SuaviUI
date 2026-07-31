@@ -2966,6 +2966,15 @@ local defaults = {
             onlyShowInEncounters = false,  -- If true, only show during boss encounters (not general combat)
         },
 
+        -- Omnium Folio (Midnight "Runes of Power" tree)
+        omnium = {
+            skinFolio = true,               -- Apply SuaviUI skin to the folio frame
+            alertEnabled = true,            -- Glow the minimap button when points are spendable
+            alertUseClassColor = false,     -- If true, glow uses the player class color
+            alertColor = {1, 0.82, 0, 1},   -- Default gold glow
+            alertChatMessage = false,       -- Also print a one-time chat notice
+        },
+
         -- Cooldown Manager Effects
         cooldownSwipe = {
             showBuffSwipe = false,      -- Buff/aura duration swipe (Essential/Utility)
@@ -3194,6 +3203,11 @@ local defaults = {
             showMissions = false,
             showCalendar = true,
             showTracking = false,
+
+            -- Expansion landing page button (Omnium Folio in Midnight)
+            missionsScale = 1.0,
+            missionsXOffset = -5,
+            missionsYOffset = 0,
 
             -- Dungeon Eye (LFG Queue Status Button) - repositions to minimap when in queue
             dungeonEye = {
@@ -3840,6 +3854,8 @@ function SUICore:OnProfileChanged(event, db, profileKey)
         safeCall(_G.SuaviUI_RefreshCastHistory)
         safeCall(_G.SuaviUI_RefreshCombatText)
         safeCall(_G.SuaviUI_RefreshCombatTimer)
+        safeCall(_G.SuaviUI_RefreshOmniumAlert)
+        safeCall(_G.SuaviUI_RefreshOmniumFolioSkin)
         safeCall(_G.SuaviUI_RefreshCrosshair)
         safeCall(_G.SuaviUI_RefreshCustomGlows)
         safeCall(_G.SuaviUI_RefreshCooldownEffects)

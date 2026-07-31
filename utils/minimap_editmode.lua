@@ -374,7 +374,7 @@ local function BuildMinimapSettings()
     })
     order = order + 1
 
-    -- showMissions (Garrison/order hall)
+    -- showMissions (Garrison/order hall, Omnium Folio in Midnight)
     table.insert(settings, {
         parentId = "CATEGORY_HIDE_ELEMENTS",
         order = order,
@@ -389,6 +389,78 @@ local function BuildMinimapSettings()
             local mm = GetMinimapDB()
             if mm then
                 mm.showMissions = value
+                RefreshMinimap()
+            end
+        end,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_HIDE_ELEMENTS",
+        order = order,
+        name = "Progress Report Scale",
+        kind = LEM.SettingType.Slider,
+        default = 1.0,
+        minValue = 0.5,
+        maxValue = 2.0,
+        valueStep = 0.01,
+        formatter = function(value) return string.format("%.0f%%", value * 100) end,
+        get = function(layoutName)
+            local mm = GetMinimapDB()
+            return mm and mm.missionsScale or 1.0
+        end,
+        set = function(layoutName, value)
+            local mm = GetMinimapDB()
+            if mm then
+                mm.missionsScale = value
+                RefreshMinimap()
+            end
+        end,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_HIDE_ELEMENTS",
+        order = order,
+        name = "Progress Report X Offset",
+        kind = LEM.SettingType.Slider,
+        default = -5,
+        minValue = -100,
+        maxValue = 100,
+        valueStep = 1,
+        formatter = function(value) return string.format("%d px", value) end,
+        get = function(layoutName)
+            local mm = GetMinimapDB()
+            return mm and mm.missionsXOffset or -5
+        end,
+        set = function(layoutName, value)
+            local mm = GetMinimapDB()
+            if mm then
+                mm.missionsXOffset = value
+                RefreshMinimap()
+            end
+        end,
+    })
+    order = order + 1
+
+    table.insert(settings, {
+        parentId = "CATEGORY_HIDE_ELEMENTS",
+        order = order,
+        name = "Progress Report Y Offset",
+        kind = LEM.SettingType.Slider,
+        default = 0,
+        minValue = -100,
+        maxValue = 100,
+        valueStep = 1,
+        formatter = function(value) return string.format("%d px", value) end,
+        get = function(layoutName)
+            local mm = GetMinimapDB()
+            return mm and mm.missionsYOffset or 0
+        end,
+        set = function(layoutName, value)
+            local mm = GetMinimapDB()
+            if mm then
+                mm.missionsYOffset = value
                 RefreshMinimap()
             end
         end,

@@ -12,4 +12,5 @@
     <Script file="overrideactionbar.lua"/>
     <Script file="objectivetracker.lua"/>
     <Script file="instanceframes.lua"/>
+    <Script file="omniumfolio.lua"/>
 </Ui>
