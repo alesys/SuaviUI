@@ -2944,8 +2944,9 @@ local defaults = {
         -- Combat Timer (displays elapsed combat time)
         combatTimer = {
             enabled = false,       -- Opt-in feature (disabled by default)
-            xOffset = 0,           -- Horizontal offset from screen center
-            yOffset = -150,        -- Vertical offset (below center by default)
+            -- Position is now managed by Edit Mode drag (LibEQOLEditMode).
+            -- Legacy xOffset/yOffset are migrated into `position` on first load.
+            position = { point = "CENTER", x = 0, y = -150 },
             width = 80,            -- Frame width
             height = 30,           -- Frame height
             fontSize = 16,         -- Font size for timer text
@@ -3798,6 +3799,79 @@ function SUICore:OnProfileChanged(event, db, profileKey)
                 end
             end
         end
+    end)
+
+    -- Comprehensive module refresh batch — fires after the staggered
+    -- per-module refreshes above so everything that reads from the profile
+    -- picks up the new values. Without this, switching specs (via LibDualSpec)
+    -- left many modules on the previous profile's settings until /reload:
+    -- action bars, keybinds, castbars, cast history, custom glows, rotation
+    -- assist, datapanels, combat text/timer, crosshair, character pane fonts,
+    -- chat, etc. Each call is pcall-wrapped so one module failing doesn't
+    -- block the rest.
+    C_Timer.After(0.5, function()
+        local function safeCall(fn)
+            if type(fn) == "function" then
+                pcall(fn)
+            end
+        end
+
+        -- Action bars + keybinds + rotation assist
+        safeCall(_G.SuaviUI_RefreshActionBars)
+        safeCall(_G.SuaviUI_RefreshKeybinds)
+        safeCall(_G.SuaviUI_RefreshRotationHelper)
+        safeCall(_G.SuaviUI_RefreshRotationAssistIcon)
+        safeCall(_G.SuaviUI_RefreshExtraButtons)
+        safeCall(_G.SuaviUI_RefreshExtraButtonAppearance)
+
+        -- CDM (custom bars + visibility + mouseover)
+        safeCall(_G.SuaviUI_RefreshBuffBar)
+        safeCall(_G.SuaviUI_RefreshCDMMouseover)
+        safeCall(_G.SuaviUI_RefreshUnitframesVisibility)
+        safeCall(_G.SuaviUI_RefreshUnitframesMouseover)
+        safeCall(_G.SuaviUI_RefreshCustomTrackersVisibility)
+        safeCall(_G.SuaviUI_RefreshCustomTrackersMouseover)
+        safeCall(_G.SuaviUI_RefreshCustomTrackerKeybinds)
+
+        -- Castbars (all units)
+        safeCall(_G.SuaviUI_RefreshCastbars)
+
+        -- Combat HUD & helpers
+        safeCall(_G.SuaviUI_RefreshCastHistory)
+        safeCall(_G.SuaviUI_RefreshCombatText)
+        safeCall(_G.SuaviUI_RefreshCombatTimer)
+        safeCall(_G.SuaviUI_RefreshCrosshair)
+        safeCall(_G.SuaviUI_RefreshCustomGlows)
+        safeCall(_G.SuaviUI_RefreshCooldownEffects)
+        safeCall(_G.SuaviUI_RefreshCooldownSwipe)
+
+        -- Datapanels / character / chat / panels
+        safeCall(_G.SuaviUI_RefreshDatapanels)
+        safeCall(_G.SuaviUI_RefreshCharacterPane)
+        safeCall(_G.SuaviUI_RefreshCharacterPanelFonts)
+        safeCall(_G.SuaviUI_RefreshChat)
+        safeCall(_G.SuaviUI_RefreshUIHider)
+        safeCall(_G.SuaviUI_RefreshBuffBorders)
+        safeCall(_G.SuaviUI_RefreshRaidBuffColors)
+
+        -- Key tracker (M+ keystone overlay)
+        safeCall(_G.SuaviUI_RefreshKeyTrackerColors)
+        safeCall(_G.SuaviUI_RefreshKeyTrackerFonts)
+
+        -- Skinning color/font reapply (cheap; only does work if data exists)
+        safeCall(_G.SuaviUI_RefreshAlertColors)
+        safeCall(_G.SuaviUI_RefreshCharacterFrameColors)
+        safeCall(_G.SuaviUI_RefreshGameMenuColors)
+        safeCall(_G.SuaviUI_RefreshGameMenuFontSize)
+        safeCall(_G.SuaviUI_RefreshInspectColors)
+        safeCall(_G.SuaviUI_RefreshInstanceFramesColors)
+        safeCall(_G.SuaviUI_RefreshKeystoneColors)
+        safeCall(_G.SuaviUI_RefreshLootColors)
+        safeCall(_G.SuaviUI_RefreshMPlusTimerColors)
+        safeCall(_G.SuaviUI_RefreshObjectiveTracker)
+        safeCall(_G.SuaviUI_RefreshOverrideActionBarColors)
+        safeCall(_G.SuaviUI_RefreshPowerBarAltColors)
+        safeCall(_G.SuaviUI_RefreshReadyCheckColors)
     end)
 
     -- Refresh Spec Profiles tab if options panel is open

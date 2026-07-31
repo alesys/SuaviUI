@@ -125,15 +125,35 @@ end
 -- Use _G.ToPlain (WoW API) or pcall(tonumber) instead
 ---------------------------------------------------------------------------
 -- Convert value to plain number (handles secret values from Midnight API)
--- Simpler approach: trust type check, don't over-validate
+-- Secret numbers pass type(v)=="number" but throw on arithmetic/string.format,
+-- so they must be rejected here — callers feed the result to string.format.
 local function SafeToNumber(v)
+    if IsSecretValue(v) then return nil end
     if v == nil then return nil end
-    -- If already a number, return it directly (trust type check)
     if type(v) == "number" then return v end
     -- Try tonumber for non-number types
     local ok, n = pcall(tonumber, v)
-    if ok and type(n) == "number" then return n end
+    if ok and type(n) == "number" and not IsSecretValue(n) then return n end
     return nil
+end
+
+-- Stringify for debug logging without risking a secret-value throw
+local function SafeToString(v)
+    if IsSecretValue(v) then return "<secret>" end
+    local ok, s = pcall(tostring, v)
+    return ok and s or "<?>"
+end
+
+-- Neutralize a previously-installed engine timer on the StatusBar. There is no
+-- ClearTimerDuration API, and whether manual SetValue overrides an active timer
+-- is undocumented — installing a zero duration stops the engine from fighting
+-- subsequent manual fills (preview mode, non-secret casts).
+local function ClearEngineTimer(castbar)
+    if castbar._timerInstalled and castbar.statusBar and castbar.statusBar.SetTimerDuration
+        and C_DurationUtil and C_DurationUtil.CreateDuration then
+        pcall(castbar.statusBar.SetTimerDuration, castbar.statusBar, C_DurationUtil.CreateDuration(), 0, 0)
+    end
+    castbar._timerInstalled = nil
 end
 
 ---------------------------------------------------------------------------
@@ -847,6 +867,58 @@ local function ClearPreviewSimulation(castbar)
 end
 
 ---------------------------------------------------------------------------
+-- PREVIEW RECONCILIATION
+-- Starts/stops the looping preview simulation to match the current state.
+-- Must be called after any IN-PLACE refresh: the mixin refresh path
+-- (ApplyLayout/ApplySettings) never recreates the castbar, so nothing else
+-- starts the simulation when previewMode is enabled.
+---------------------------------------------------------------------------
+function SUI_Castbar:UpdatePreview(castbar, unitKey)
+    if not castbar then return end
+
+    -- Boss castbars are stored under boss1-boss5 but share "boss" settings
+    if unitKey and unitKey:match("^boss%d+$") then
+        unitKey = "boss"
+    end
+    local settings = GetUnitSettings(unitKey)
+    local castSettings = settings and settings.castbar
+    if not castSettings then return end
+
+    -- Real casts always take priority over preview
+    if castbar.unit and (UnitCastingInfo(castbar.unit) or UnitChannelInfo(castbar.unit)) then
+        return
+    end
+
+    -- Inside Edit Mode the edit-mode module drives previews via the mixin
+    if LEM and LEM.IsInEditMode and LEM:IsInEditMode() then return end
+
+    local shouldPreview = (castSettings.enabled and castSettings.previewMode) and true or false
+    if unitKey == "boss" then
+        -- Boss previews additionally require the boss FRAME preview to be active
+        local SUI_UF = self.unitFramesModule
+        local idx = castbar.bossIndex
+        shouldPreview = (shouldPreview and idx and SUI_UF and SUI_UF.previewMode
+            and SUI_UF.previewMode["boss" .. idx]) and true or false
+    end
+
+    if shouldPreview then
+        -- (Re)start only if the simulation isn't running — restarting on every
+        -- settings tick would visibly reset the animation mid-drag.
+        if not castbar.isPreviewSimulation or not castbar:GetScript("OnUpdate") then
+            SimulateCast(castbar, castSettings, unitKey, castbar.bossIndex)
+            local onUpdate = castbar.bossOnUpdate or castbar.playerOnUpdate or castbar.castbarOnUpdate
+            if onUpdate then
+                castbar:SetScript("OnUpdate", onUpdate)
+            end
+        end
+        castbar:Show()
+    elseif castbar.isPreviewSimulation then
+        ClearPreviewSimulation(castbar)
+        castbar:SetScript("OnUpdate", nil)
+    end
+end
+
+---------------------------------------------------------------------------
 -- EMPOWERED CAST HELPERS
 ---------------------------------------------------------------------------
 local function UpdateEmpoweredStages(bar, numStages)
@@ -1359,6 +1431,7 @@ local function HandleNoCast(castbar, castSettings, isPlayer, onUpdateHandler)
             end
 
             -- Clear timer-driven state
+            ClearEngineTimer(castbar)
             castbar.timerDriven = false
             castbar.durationObj = nil
 
@@ -1397,62 +1470,24 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
         if spellName or channelName or isInEmpoweredHold then
             -- Real cast - use real cast data
 
-            -- Handle timer-driven mode (non-player units with secret timing)
+            -- Handle timer-driven mode (non-player units with secret timing).
+            -- The engine animates the bar via SetTimerDuration; only the time text
+            -- needs updating. Remaining time from a secret duration object is itself
+            -- SECRET — SafeToNumber rejects it and we blank the text (bar still runs).
+            -- Do NOT reconstruct remaining time from statusBar:GetValue(): those reads
+            -- are SecretReturnsForAspect=BarValue and the arithmetic would throw.
             if self.timerDriven and not isPlayer then
-                -- Engine is driving the animation via SetTimerDuration
-                -- Just update time text by reading remaining time
-
                 local remaining = nil
-
-                -- Method 1: Try duration object GetRemainingDuration first
-                if self.durationObj then
-                    local getter = self.durationObj.GetRemainingDuration or self.durationObj.GetRemaining
-                    if getter then
-                        local okRem, rem = pcall(getter, self.durationObj)
-                        if okRem and rem ~= nil then
-                            remaining = SafeToNumber(rem)
-                        end
+                if self.durationObj and self.durationObj.GetRemainingDuration then
+                    local okRem, rem = pcall(self.durationObj.GetRemainingDuration, self.durationObj)
+                    if okRem then
+                        remaining = SafeToNumber(rem)
                     end
                 end
-
-                -- Method 2: Fall back to StatusBar extraction
-                if remaining == nil and self.statusBar and self.statusBar.GetValue and self.statusBar.GetMinMaxValues then
-                    local okV, value = pcall(self.statusBar.GetValue, self.statusBar)
-                    local okMM, minV, maxV = pcall(self.statusBar.GetMinMaxValues, self.statusBar)
-
-                    if okV and okMM then
-                        value = SafeToNumber(value)
-                        minV = SafeToNumber(minV) or 0
-                        maxV = SafeToNumber(maxV)
-
-                        if value and maxV and maxV > minV then
-                            local span = maxV - minV
-
-                            -- Detect countdown vs countup
-                            -- If value is closer to max, bar is counting down
-                            local assumeCountdown = self._assumeCountdown
-                            if assumeCountdown == nil then
-                                local distMin = math.abs(value - minV)
-                                local distMax = math.abs(maxV - value)
-                                assumeCountdown = (distMax < distMin)
-                                self._assumeCountdown = assumeCountdown
-                            end
-
-                            if assumeCountdown then
-                                remaining = value - minV
-                            else
-                                remaining = maxV - value
-                            end
-
-                            if remaining < 0 then remaining = 0 end
-                            if remaining > span then remaining = span end
-                        end
-                    end
-                end
-
-                -- Update time text (throttled) - only if we have valid remaining
                 if remaining ~= nil then
                     UpdateThrottledText(self, elapsed, self.timeText, remaining)
+                elseif self.timeText then
+                    self.timeText:SetText("")
                 end
                 return
             end
@@ -1671,19 +1706,26 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
                 -- Engine-driven animation for non-player units with secret timing
                 -- Use SetTimerDuration to let the engine animate the bar
                 if self.statusBar and self.statusBar.SetTimerDuration then
-                    -- Determine direction: 0=fill (casts), 1=drain (channels that should drain)
+                    -- direction: ElapsedTime fills (casts), RemainingTime drains (channels).
+                    -- Signature verified against SimpleStatusBarAPIDocumentation.lua and
+                    -- Blizzard's usage in EncounterTimelineTimerEvent.lua — no fallback
+                    -- call: a 1-arg retry would default to ElapsedTime and silently turn
+                    -- a draining channel into a filling bar.
                     local channelFillForward = castSettings and castSettings.channelFillForward
-                    local direction = (isChanneled and not channelFillForward) and 1 or 0
-                    local ok = pcall(self.statusBar.SetTimerDuration, self.statusBar, durationObj, 0, direction)
-                    if not ok then
-                        -- Fallback: try without direction parameter
-                        pcall(self.statusBar.SetTimerDuration, self.statusBar, durationObj)
-                    end
+                    local interpolation = (Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.Immediate) or 0
+                    local drain = (Enum.StatusBarTimerDirection and Enum.StatusBarTimerDirection.RemainingTime) or 1
+                    local fill = (Enum.StatusBarTimerDirection and Enum.StatusBarTimerDirection.ElapsedTime) or 0
+                    local direction = (isChanneled and not channelFillForward) and drain or fill
+                    pcall(self.statusBar.SetTimerDuration, self.statusBar, durationObj, interpolation, direction)
+                    self._timerInstalled = true
                 end
                 -- Don't store timing values - we'll read progress from the StatusBar
                 self.castStartTime = nil
                 self.castEndTime = nil
             else
+                -- Entering manual mode: neutralize any engine timer left by a
+                -- previous timer-driven cast so it doesn't fight SetValue.
+                ClearEngineTimer(self)
                 -- Normal mode: store timing values for OnUpdate calculation
                 -- Adjust end time for empowered hold time
                 endTime = AdjustEmpoweredEndTime(self, isPlayer, isEmpowered, endTime)
@@ -1739,6 +1781,7 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
                 return
             end
             if isPlayer then ClearEmpoweredState(self) end
+            ClearEngineTimer(self)
             self.timerDriven = false
             self.durationObj = nil
             self.activeCastGUID = nil
@@ -1754,6 +1797,7 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
                 return
             end
             if isPlayer then ClearEmpoweredState(self) end
+            ClearEngineTimer(self)
             self.timerDriven = false
             self.durationObj = nil
             self.activeCastGUID = nil
@@ -1768,6 +1812,7 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
                 return
             end
             if isPlayer then ClearEmpoweredState(self) end
+            ClearEngineTimer(self)
             self.timerDriven = false
             self.durationObj = nil
             self.activeCastGUID = nil
@@ -1786,7 +1831,7 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
                 C_Timer.After(0.1, function()
                     if not UnitCastingInfo(self.unit) and not UnitChannelInfo(self.unit) then
                         SimulateCast(self, castSettings, self.unitKey)
-                        self:SetScript("OnUpdate", onUpdateHandler)
+                        self:SetScript("OnUpdate", CastBar_OnUpdate)
                     end
                 end)
             else
@@ -1801,6 +1846,7 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
                 return
             end
             if isPlayer then ClearEmpoweredState(self) end
+            ClearEngineTimer(self)
             self.timerDriven = false
             self.durationObj = nil
             self.activeCastGUID = nil
@@ -1819,7 +1865,7 @@ function SUI_Castbar:SetupCastbar(castbar, unit, unitKey, castSettings)
                 C_Timer.After(0.1, function()
                     if not UnitCastingInfo(self.unit) and not UnitChannelInfo(self.unit) then
                         SimulateCast(self, castSettings, self.unitKey)
-                        self:SetScript("OnUpdate", onUpdateHandler)
+                        self:SetScript("OnUpdate", CastBar_OnUpdate)
                     end
                 end)
             else
@@ -2250,11 +2296,34 @@ function SUI_Castbar:CreateBossCastbar(unitFrame, unit, bossIndex)
         -- Check if actually casting (real cast takes priority)
         local spellName = UnitCastingInfo(self.unit)
         local channelName = UnitChannelInfo(self.unit)
-        
+
         if spellName or channelName then
+            -- Engine-driven mode: cast timing is a secret value (common for boss units).
+            -- The StatusBar animates itself via SetTimerDuration; we only read back the
+            -- remaining time for the time-text label. When the duration object carries
+            -- secret values, GetRemainingDuration returns a SECRET number — SafeToNumber
+            -- rejects it, and we blank the text (the bar still animates correctly).
+            -- Do NOT reconstruct remaining time from statusBar:GetValue(): those reads
+            -- are SecretReturnsForAspect=BarValue and the arithmetic would throw.
+            if self.timerDriven then
+                local remaining = nil
+                if self.durationObj and self.durationObj.GetRemainingDuration then
+                    local okRem, rem = pcall(self.durationObj.GetRemainingDuration, self.durationObj)
+                    if okRem then
+                        remaining = SafeToNumber(rem)
+                    end
+                end
+                if remaining ~= nil then
+                    UpdateThrottledText(self, elapsed, self.timeText, remaining)
+                elseif self.timeText then
+                    self.timeText:SetText("")
+                end
+                return
+            end
+
             -- Real cast - use real cast data
             if not self.startTime or not self.endTime then return end
-            
+
             local ufdb = GetDB()
             local uncapped = ufdb and ufdb.general and ufdb.general.smootherAnimation
             
@@ -2327,44 +2396,82 @@ function SUI_Castbar:CreateBossCastbar(unitFrame, unit, bossIndex)
     
     -- Cast function
     function anchorFrame:Cast()
-        -- Check if actually casting
-        local spellName, text, texture, startTimeMS, endTimeMS, _, _, notInterruptible = UnitCastingInfo(self.unit)
-        local isChanneled = false
-        
-        if not spellName then
-            spellName, text, texture, startTimeMS, endTimeMS, _, notInterruptible = UnitChannelInfo(self.unit)
-            if spellName then
-                isChanneled = true
+        -- Check if actually casting. GetCastInfo() also detects secret/redacted
+        -- timing values (common for boss units) and returns a duration object we
+        -- can use to drive the bar via the engine instead of manual GetTime() math.
+        local spellName, text, texture, startTimeMS, endTimeMS, notInterruptible, unitSpellID, isChanneled, channelStages, durationObj, hasSecretTiming = GetCastInfo(self, self.unit)
+
+        if ns.CB_EditMode and ns.CB_EditMode.LogDebug then
+            -- spellName/startTimeMS/endTimeMS may be SECRET (tostring on a secret throws),
+            -- so they must go through SafeToString. The rest are addon-computed values.
+            ns.CB_EditMode:LogDebug(string.format(
+                "BossCast: unit=%s spellName=%s isChanneled=%s startTimeMS=%s endTimeMS=%s hasSecretTiming=%s durationObj=%s",
+                tostring(self.unit), SafeToString(spellName), tostring(isChanneled),
+                SafeToString(startTimeMS), SafeToString(endTimeMS), tostring(hasSecretTiming), tostring(durationObj ~= nil)))
+        end
+
+        local canShowCast = false
+        local useTimerDriven = false
+        local startTime, endTime
+
+        if spellName then
+            if hasSecretTiming and durationObj and self.statusBar and self.statusBar.SetTimerDuration then
+                -- Secret timing: let the engine animate the bar
+                useTimerDriven = true
+                canShowCast = true
+            elseif startTimeMS and endTimeMS then
+                -- Normal mode: timing values are accessible
+                local success
+                success, startTime, endTime = pcall(function()
+                    return startTimeMS / 1000, endTimeMS / 1000
+                end)
+                canShowCast = success
+            elseif durationObj and self.statusBar and self.statusBar.SetTimerDuration then
+                -- Fallback: timing not explicitly secret but also not accessible, try engine-driven
+                useTimerDriven = true
+                canShowCast = true
             end
         end
 
         -- If actually casting, show real cast (preview is hidden during real casts)
-        if spellName and startTimeMS and endTimeMS then
-            -- Use pcall to handle Midnight secret values (pass type checks but fail arithmetic)
-            local success, startTime, endTime = pcall(function()
-                return startTimeMS / 1000, endTimeMS / 1000
-            end)
-            if not success then return end
-
+        if canShowCast then
             -- Clear preview simulation
             if self.isPreviewSimulation then
                 ClearPreviewSimulation(self)
             end
 
-            local now = GetTime()
-            self.startTime = startTime
-            self.endTime = endTime
             self.isChanneled = isChanneled
             self.notInterruptible = notInterruptible
+            self.timerDriven = useTimerDriven
+            self.durationObj = durationObj
+            self._assumeCountdown = nil
 
-            if self.startTime < now - 5 then
-                local dur = self.endTime - self.startTime
-                if dur and dur > 0 then
-                    self.startTime = now
-                    self.endTime = now + dur
-                end
+            if useTimerDriven then
+                -- Engine-driven animation: let SetTimerDuration drive the StatusBar.
+                -- direction: ElapsedTime fills (casts), RemainingTime drains (channels).
+                -- No 1-arg fallback: it would default to ElapsedTime and silently turn
+                -- a draining channel into a filling bar.
+                local channelFillForward = castSettings and castSettings.channelFillForward
+                local interpolation = (Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.Immediate) or 0
+                local drain = (Enum.StatusBarTimerDirection and Enum.StatusBarTimerDirection.RemainingTime) or 1
+                local fill = (Enum.StatusBarTimerDirection and Enum.StatusBarTimerDirection.ElapsedTime) or 0
+                local direction = (isChanneled and not channelFillForward) and drain or fill
+                pcall(self.statusBar.SetTimerDuration, self.statusBar, durationObj, interpolation, direction)
+                self._timerInstalled = true
+                self.startTime = nil
+                self.endTime = nil
+            else
+                -- Entering manual mode: neutralize any engine timer left by a
+                -- previous timer-driven cast so it doesn't fight SetValue.
+                ClearEngineTimer(self)
+                -- Trust the API's start/end times (they already reflect pushback).
+                -- Rebasing "stale" times here would visibly restart long boss casts
+                -- whenever Cast() re-enters (e.g. UNIT_SPELLCAST_SUCCEEDED of a
+                -- concurrent instant) — Blizzard's CastingBarFrame never rebases.
+                self.startTime = startTime
+                self.endTime = endTime
             end
-            
+
             -- Ensure status bar has texture
             local currentSettings = GetUnitSettings(self.unitKey)
             local currentCastSettings = currentSettings and currentSettings.castbar or castSettings
@@ -2395,6 +2502,9 @@ function SUI_Castbar:CreateBossCastbar(unitFrame, unit, bossIndex)
             self:Show()
         else
             -- No real cast - check if preview mode is enabled AND boss frame preview is active
+            ClearEngineTimer(self)
+            self.timerDriven = false
+            self.durationObj = nil
             C_Timer.After(0.1, function()
                 if not UnitCastingInfo(self.unit) and not UnitChannelInfo(self.unit) then
                     local settings = GetUnitSettings(self.unitKey)
@@ -2424,16 +2534,34 @@ function SUI_Castbar:CreateBossCastbar(unitFrame, unit, bossIndex)
     anchorFrame:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTED", unit)
     anchorFrame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", unit)
     anchorFrame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", unit)
+    anchorFrame:RegisterUnitEvent("UNIT_SPELLCAST_DELAYED", unit)
+    anchorFrame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_UPDATE", unit)
     anchorFrame:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTIBLE", unit)
     anchorFrame:RegisterUnitEvent("UNIT_SPELLCAST_NOT_INTERRUPTIBLE", unit)
     anchorFrame:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", unit)
-    
+    -- Empowered casts (Blizzard registers these for every unit, not just player)
+    anchorFrame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_START", unit)
+    anchorFrame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_UPDATE", unit)
+    anchorFrame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_STOP", unit)
+    -- Catch casts already in progress when the boss unit appears: UNIT_SPELLCAST_START
+    -- only fires at cast begin, so a boss mid-cast at engage/reload shows no bar without
+    -- these. Blizzard's boss spellbar polls and synthesizes a START on exactly these
+    -- events (TargetFrame.lua:1281, CastingBarFrame.lua:135).
+    anchorFrame:RegisterEvent("INSTANCE_ENCOUNTER_ENGAGE_UNIT")
+    anchorFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+
     anchorFrame:SetScript("OnEvent", function(self, event, eventUnit)
-        if event == "UNIT_SPELLCAST_START" or event == "UNIT_SPELLCAST_CHANNEL_START" then
+        if event == "UNIT_SPELLCAST_START" or event == "UNIT_SPELLCAST_CHANNEL_START"
+            or event == "UNIT_SPELLCAST_DELAYED" or event == "UNIT_SPELLCAST_CHANNEL_UPDATE"
+            or event == "UNIT_SPELLCAST_EMPOWER_START" or event == "UNIT_SPELLCAST_EMPOWER_UPDATE" then
             self:Cast()
-        elseif event == "UNIT_SPELLCAST_STOP" or event == "UNIT_SPELLCAST_CHANNEL_STOP" 
+        elseif event == "UNIT_SPELLCAST_STOP" or event == "UNIT_SPELLCAST_CHANNEL_STOP"
             or event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_INTERRUPTED"
-            or event == "UNIT_SPELLCAST_SUCCEEDED" then
+            or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_EMPOWER_STOP" then
+            self:Cast()
+        elseif event == "INSTANCE_ENCOUNTER_ENGAGE_UNIT" or event == "PLAYER_ENTERING_WORLD" then
+            -- Cast() re-derives everything from GetCastInfo and hides when idle,
+            -- so it naturally implements Blizzard's catch-up-or-hide behavior.
             self:Cast()
         elseif event == "UNIT_SPELLCAST_INTERRUPTIBLE" then
             self.notInterruptible = false
@@ -2444,10 +2572,19 @@ function SUI_Castbar:CreateBossCastbar(unitFrame, unit, bossIndex)
         end
     end)
 
-    -- Apply preview if enabled AND boss frame preview is active
+    -- Creation-time catch-up: on a mid-fight /reload the frame is built ~0.5s after
+    -- PLAYER_LOGIN and may have missed PLAYER_ENTERING_WORLD entirely.
+    if UnitExists(unit) then
+        anchorFrame:Cast()
+    end
+
+    -- Apply preview if enabled AND boss frame preview is active.
+    -- Real casts take priority: the creation-time Cast() above may have just
+    -- configured a live cast — don't let SimulateCast stomp its state.
     local SUI_UF = SUI_Castbar.unitFramesModule
     local bossFramePreviewActive = SUI_UF and SUI_UF.previewMode and SUI_UF.previewMode["boss" .. bossIndex]
-    if castSettings.previewMode and bossFramePreviewActive then
+    if castSettings.previewMode and bossFramePreviewActive
+        and not (UnitCastingInfo(unit) or UnitChannelInfo(unit)) then
         SimulateCast(anchorFrame, castSettings, "boss", bossIndex)
         -- Start OnUpdate handler for preview
         if anchorFrame.bossOnUpdate then
@@ -2546,6 +2683,8 @@ function SUI_Castbar:RefreshCastbar(castbar, unitKey, castSettings, unitFrame)
 
     if castbar and castbar._castbarMixin and castbar._castbarMixin.Refresh then
         castbar._castbarMixin:Refresh(nil, true)
+        -- In-place refresh never recreates the bar, so reconcile preview here
+        self:UpdatePreview(castbar, unitKey)
         return
     end
     
@@ -2588,6 +2727,9 @@ function SUI_Castbar:RefreshBossCastbar(castbar, bossKey, castSettings, unitFram
         UpdateIconPosition(castbar, castSettings, iconSize, iconScale, iconBorderSize)
         UpdateStatusBarPosition(castbar, castSettings, barHeight, iconSize, iconScale, borderSize)
         UpdateCastbarElements(castbar, "boss", castSettings)
+        -- In-place refresh never recreates the bar, so reconcile preview here
+        -- (this is what makes ShowPreview("boss") actually play the simulation)
+        self:UpdatePreview(castbar, bossKey)
         return
     end
     
@@ -2612,12 +2754,11 @@ _G.SuaviUI_RefreshCastbar = function(unitKey)
     SUI_UF:RefreshFrame(unitKey)
 end
 
--- Refresh all castbars (used by HUD Layering options)
+-- Refresh all castbars (used by HUD Layering options and profile-change refresh)
 _G.SuaviUI_RefreshCastbars = function()
     local SUI_UF = SUI_Castbar.unitFramesModule
     if not SUI_UF then return end
-    -- Refresh player and target castbars
-    for _, unitKey in ipairs({"player", "target"}) do
+    for _, unitKey in ipairs({"player", "target", "targettarget", "focus", "pet", "boss"}) do
         SUI_UF:RefreshFrame(unitKey)
     end
 end

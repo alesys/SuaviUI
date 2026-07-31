@@ -12,14 +12,18 @@ local LSM = LibStub("LibSharedMedia-3.0")
 
 local IS_MIDNIGHT = select(4, GetBuildInfo()) >= 120000
 
--- Extra action/zone ability frame reparenting is DISABLED.
--- Reason: `blizzFrame:SetParent(holder)` on ExtraActionBarFrame/ZoneAbilityFrame
--- taints those protected frames, which then propagates into Blizzard's
--- EditMode:UpdateBottomActionBarPositions chain and blocks
--- UIParentRightManagedFrameContainer:ClearAllPoints() (session 5854+).
--- Positioning of these buttons now happens via Blizzard's native Edit Mode
--- (ExtraAbilityContainer is already an Edit-Mode-managed system).
-local DISABLE_EXTRA_BUTTON_CUSTOMIZATION = true
+-- Extra action / zone ability customization.
+-- Reason for the original DISABLE: `blizzFrame:SetParent(holder)` on
+-- ExtraActionBarFrame / ZoneAbilityFrame taints those protected frames,
+-- which then propagates into Blizzard's EditMode:UpdateBottomActionBarPositions
+-- chain and blocks UIParentRightManagedFrameContainer:ClearAllPoints()
+-- (session 5854+).
+--
+-- v0.3.23 fix: keep the customization (so the user gets the two separate
+-- movers in Edit Mode) but DROP the SetParent call. We only re-anchor via
+-- hooksecurefunc on the blizz frame's SetPoint — that's non-secure and
+-- doesn't propagate taint into the Edit Mode managed-frame container.
+local DISABLE_EXTRA_BUTTON_CUSTOMIZATION = false
 -- TAINT-FIX (session 4942 → refactored): all Blizzard frame field writes moved to
 -- module-level weak tables below.  Safe to enable.
 local DISABLE_STANDARD_ACTIONBAR_CUSTOMIZATION = false
@@ -429,12 +433,17 @@ local function CreateExtraButtonHolder(buttonType, displayName)
     local settings = GetExtraButtonDB(buttonType)
     if not settings then return nil, nil end
 
-    -- Create holder frame (MUST be movable for LEM dragging)
+    -- Create holder frame (MUST be movable for LEM dragging).
+    -- The holder is invisible (no backdrop / no texture) and acts purely as a
+    -- position anchor. Mouse interaction lives on the `mover` overlay below
+    -- (and on LEM's Selection overlay during Edit Mode), so EnableMouse must
+    -- stay false — otherwise the invisible holder silently eats clicks within
+    -- its 64x64 bounding box.
     local holder = CreateFrame("Frame", "SUI_" .. buttonType .. "Holder", UIParent)
     holder:SetSize(64, 64)
     holder:SetMovable(true)
     holder:SetClampedToScreen(true)
-    holder:EnableMouse(true)
+    holder:EnableMouse(false)
     holder:RegisterForDrag("LeftButton")
 
     -- Load saved position or default to center-bottom
@@ -538,12 +547,16 @@ local function ApplyExtraButtonSettings(buttonType)
     local offsetX = settings.offsetX or 0
     local offsetY = settings.offsetY or 0
 
-    -- Reparent to our holder and position
-    blizzFrame:SetParent(holder)
+    -- TAINT-SAFE: anchor (SetPoint), but DO NOT reparent. SetParent on a
+    -- protected frame from addon context taints it and cascades into Edit Mode
+    -- layout. SetPoint is non-secure and safe even across parents — Blizzard's
+    -- ExtraAbilityContainer keeps managing the parent / show state, while we
+    -- override only the visual position.
     blizzFrame:ClearAllPoints()
     blizzFrame:SetPoint("CENTER", holder, "CENTER", offsetX, offsetY)
 
-    -- Update holder size to match scaled frame
+    -- Size the holder to roughly match the scaled blizz frame so the LEM
+    -- mover overlay has the right hitbox.
     local width = (blizzFrame:GetWidth() or 64) * scale
     local height = (blizzFrame:GetHeight() or 64) * scale
     holder:SetSize(math.max(width, 64), math.max(height, 64))
@@ -577,7 +590,10 @@ local function ApplyExtraButtonSettings(buttonType)
         local function SetHolderVisible(isVisible)
             if isVisible then
                 holder:Show()
-                holder:EnableMouse(true)
+                -- Holder mouse stays disabled — the invisible holder must never
+                -- intercept clicks. The `mover` overlay (shown in Edit Mode /
+                -- via toggle) and LEM's Selection overlay handle drag.
+                holder:EnableMouse(false)
                 -- TAINT-FIX: Don't call Show()/Hide()/EnableMouse() on protected
                 -- ExtraActionBarFrame. Alpha 0/1 controls visibility.
                 if blizzFrame then
@@ -643,7 +659,8 @@ local function ApplyExtraButtonSettings(buttonType)
                         local ss = GetExtraButtonDB(buttonType)
                         if not (ss and (ss._editModeActive or ss.alwaysShow)) then
                             holder:Show()
-                            holder:EnableMouse(true)
+                            -- Holder mouse stays disabled — see CreateExtraButtonHolder.
+                            holder:EnableMouse(false)
                             -- TAINT-FIX: Don't call Show()/EnableMouse() on protected
                             -- ExtraActionBarFrame. Alpha 0/1 controls visibility;
                             -- Blizzard manages mouse interaction natively.

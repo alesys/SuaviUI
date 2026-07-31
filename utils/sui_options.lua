@@ -788,193 +788,21 @@ local function CreateGeneralQoLBuilders()
             combatTimerCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- Encounters-only mode toggle
-            local encountersOnlyCheck = GUI:CreateFormCheckbox(tabContent, "Only Show In Encounters", "onlyShowInEncounters", combatTimerDB, function(val)
-                if _G.SuaviUI_RefreshCombatTimer then _G.SuaviUI_RefreshCombatTimer() end
+            local combatTimerTip = GUI:CreateLabel(tabContent,
+                "Position, size, font, colors, and border are configured in Edit Mode.",
+                11, C.textMuted)
+            combatTimerTip:SetPoint("TOPLEFT", PADDING, y)
+            combatTimerTip:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
+            combatTimerTip:SetJustifyH("LEFT")
+            combatTimerTip:SetWordWrap(true)
+            combatTimerTip:SetHeight(15)
+            y = y - 22
+
+            local combatTimerEditModeBtn = GUI:CreateButton(tabContent, "Configure in Edit Mode", 200, 28, function()
+                if _G.SuaviUI_OpenCombatTimerEditMode then _G.SuaviUI_OpenCombatTimerEditMode() end
             end)
-            encountersOnlyCheck:SetPoint("TOPLEFT", PADDING, y)
-            encountersOnlyCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            -- Preview toggle
-            local previewState = { enabled = _G.SuaviUI_IsCombatTimerPreviewMode and _G.SuaviUI_IsCombatTimerPreviewMode() or false }
-            local previewCheck = GUI:CreateFormCheckbox(tabContent, "Preview Combat Timer", "enabled", previewState, function(val)
-                if _G.SuaviUI_ToggleCombatTimerPreview then
-                    _G.SuaviUI_ToggleCombatTimerPreview(val)
-                end
-            end)
-            previewCheck:SetPoint("TOPLEFT", PADDING, y)
-            previewCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            -- Frame size settings
-            local timerWidthSlider = GUI:CreateFormSlider(tabContent, "Frame Width", 40, 200, 1, "width", combatTimerDB, function()
-                if _G.SuaviUI_RefreshCombatTimer then _G.SuaviUI_RefreshCombatTimer() end
-            end)
-            timerWidthSlider:SetPoint("TOPLEFT", PADDING, y)
-            timerWidthSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local timerHeightSlider = GUI:CreateFormSlider(tabContent, "Frame Height", 20, 100, 1, "height", combatTimerDB, function()
-                if _G.SuaviUI_RefreshCombatTimer then _G.SuaviUI_RefreshCombatTimer() end
-            end)
-            timerHeightSlider:SetPoint("TOPLEFT", PADDING, y)
-            timerHeightSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local timerFontSizeSlider = GUI:CreateFormSlider(tabContent, "Font Size", 12, 32, 1, "fontSize", combatTimerDB, function()
-                if _G.SuaviUI_RefreshCombatTimer then _G.SuaviUI_RefreshCombatTimer() end
-            end)
-            timerFontSizeSlider:SetPoint("TOPLEFT", PADDING, y)
-            timerFontSizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local timerXOffsetSlider = GUI:CreateFormSlider(tabContent, "X Position Offset", -2000, 2000, 1, "xOffset", combatTimerDB, function()
-                if _G.SuaviUI_RefreshCombatTimer then _G.SuaviUI_RefreshCombatTimer() end
-            end)
-            timerXOffsetSlider:SetPoint("TOPLEFT", PADDING, y)
-            timerXOffsetSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local timerYOffsetSlider = GUI:CreateFormSlider(tabContent, "Y Position Offset", -2000, 2000, 1, "yOffset", combatTimerDB, function()
-                if _G.SuaviUI_RefreshCombatTimer then _G.SuaviUI_RefreshCombatTimer() end
-            end)
-            timerYOffsetSlider:SetPoint("TOPLEFT", PADDING, y)
-            timerYOffsetSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            -- Text color with class color toggle
-            local timerColorPicker  -- Forward declare
-
-            local useClassColorTextCheck = GUI:CreateFormCheckbox(tabContent, "Use Class Color for Text", "useClassColorText", combatTimerDB, function(val)
-                if _G.SuaviUI_RefreshCombatTimer then _G.SuaviUI_RefreshCombatTimer() end
-                -- Enable/disable text color picker based on toggle
-                if timerColorPicker and timerColorPicker.SetEnabled then
-                    timerColorPicker:SetEnabled(not val)
-                end
-            end)
-            useClassColorTextCheck:SetPoint("TOPLEFT", PADDING, y)
-            useClassColorTextCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            timerColorPicker = GUI:CreateFormColorPicker(tabContent, "Timer Text Color", "textColor", combatTimerDB, function()
-                if _G.SuaviUI_RefreshCombatTimer then _G.SuaviUI_RefreshCombatTimer() end
-            end)
-            timerColorPicker:SetPoint("TOPLEFT", PADDING, y)
-            timerColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            -- Initial state based on setting
-            if timerColorPicker.SetEnabled then
-                timerColorPicker:SetEnabled(not combatTimerDB.useClassColorText)
-            end
-            y = y - FORM_ROW
-
-            -- Font selection with custom toggle
-            -- Create font dropdown first, then the toggle (so toggle callback can reference it)
-            local fontList = GetFontList()
-            local timerFontDropdown  -- Forward declare
-
-            local useCustomFontCheck = GUI:CreateFormCheckbox(tabContent, "Use Custom Font", "useCustomFont", combatTimerDB, function(val)
-                if _G.SuaviUI_RefreshCombatTimer then _G.SuaviUI_RefreshCombatTimer() end
-                -- Enable/disable font dropdown based on toggle
-                if timerFontDropdown and timerFontDropdown.SetEnabled then
-                    timerFontDropdown:SetEnabled(val)
-                end
-            end)
-            useCustomFontCheck:SetPoint("TOPLEFT", PADDING, y)
-            useCustomFontCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            timerFontDropdown = GUI:CreateFormDropdown(tabContent, "Font", fontList, "font", combatTimerDB, function()
-                if _G.SuaviUI_RefreshCombatTimer then _G.SuaviUI_RefreshCombatTimer() end
-            end)
-            timerFontDropdown:SetPoint("TOPLEFT", PADDING, y)
-            timerFontDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            -- Limit dropdown height to 8 items (scrollable)
-            if timerFontDropdown.menuFrame then
-                timerFontDropdown.menuFrame:SetClipsChildren(true)
-            end
-            -- Initial state based on setting
-            if timerFontDropdown.SetEnabled then
-                timerFontDropdown:SetEnabled(combatTimerDB.useCustomFont == true)
-            end
-            y = y - FORM_ROW
-
-            -- Backdrop settings
-            local backdropCheck = GUI:CreateFormCheckbox(tabContent, "Show Backdrop", "showBackdrop", combatTimerDB, function(val)
-                if _G.SuaviUI_RefreshCombatTimer then _G.SuaviUI_RefreshCombatTimer() end
-            end)
-            backdropCheck:SetPoint("TOPLEFT", PADDING, y)
-            backdropCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local backdropColorPicker = GUI:CreateFormColorPicker(tabContent, "Backdrop Color", "backdropColor", combatTimerDB, function()
-                if _G.SuaviUI_RefreshCombatTimer then _G.SuaviUI_RefreshCombatTimer() end
-            end)
-            backdropColorPicker:SetPoint("TOPLEFT", PADDING, y)
-            backdropColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            -- Border settings
-            -- Forward declare border controls so hide toggle can reference them
-            local borderSizeSlider, borderTextureDropdown, useClassColorCheck, borderColorPicker
-
-            -- Helper to update all border control states
-            local function UpdateBorderControlsEnabled(enabled)
-                if borderSizeSlider and borderSizeSlider.SetEnabled then borderSizeSlider:SetEnabled(enabled) end
-                if borderTextureDropdown and borderTextureDropdown.SetEnabled then borderTextureDropdown:SetEnabled(enabled) end
-                if useClassColorCheck and useClassColorCheck.SetEnabled then useClassColorCheck:SetEnabled(enabled) end
-                -- Border color picker is enabled if borders are shown AND class color is not used
-                if borderColorPicker and borderColorPicker.SetEnabled then 
-                    borderColorPicker:SetEnabled(enabled and not combatTimerDB.useClassColorBorder)
-                end
-            end
-
-            -- Hide Border toggle
-            local hideBorderCheck = GUI:CreateFormCheckbox(tabContent, "Hide Border", "hideBorder", combatTimerDB, function(val)
-                if _G.SuaviUI_RefreshCombatTimer then _G.SuaviUI_RefreshCombatTimer() end
-                UpdateBorderControlsEnabled(not val)
-            end)
-            hideBorderCheck:SetPoint("TOPLEFT", PADDING, y)
-            hideBorderCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            borderSizeSlider = GUI:CreateFormSlider(tabContent, "Border Size", 0, 5, 1, "borderSize", combatTimerDB, function()
-                if _G.SuaviUI_RefreshCombatTimer then _G.SuaviUI_RefreshCombatTimer() end
-            end)
-            borderSizeSlider:SetPoint("TOPLEFT", PADDING, y)
-            borderSizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            local borderList = GetBorderList()
-            borderTextureDropdown = GUI:CreateFormDropdown(tabContent, "Border Texture", borderList, "borderTexture", combatTimerDB, function()
-                if _G.SuaviUI_RefreshCombatTimer then _G.SuaviUI_RefreshCombatTimer() end
-            end)
-            borderTextureDropdown:SetPoint("TOPLEFT", PADDING, y)
-            borderTextureDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            -- Class color border toggle
-            useClassColorCheck = GUI:CreateFormCheckbox(tabContent, "Use Class Color for Border", "useClassColorBorder", combatTimerDB, function(val)
-                if _G.SuaviUI_RefreshCombatTimer then _G.SuaviUI_RefreshCombatTimer() end
-                -- Enable/disable border color picker based on toggle (only if borders are shown)
-                if borderColorPicker and borderColorPicker.SetEnabled then
-                    borderColorPicker:SetEnabled(not val and not combatTimerDB.hideBorder)
-                end
-            end)
-            useClassColorCheck:SetPoint("TOPLEFT", PADDING, y)
-            useClassColorCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            borderColorPicker = GUI:CreateFormColorPicker(tabContent, "Border Color", "borderColor", combatTimerDB, function()
-                if _G.SuaviUI_RefreshCombatTimer then _G.SuaviUI_RefreshCombatTimer() end
-            end)
-            borderColorPicker:SetPoint("TOPLEFT", PADDING, y)
-            borderColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            y = y - FORM_ROW
-
-            -- Set initial enabled states based on current settings
-            local bordersVisible = not combatTimerDB.hideBorder
-            UpdateBorderControlsEnabled(bordersVisible)
+            combatTimerEditModeBtn:SetPoint("TOPLEFT", PADDING, y)
+            y = y - 38
         end
 
         y = y - 10
@@ -8734,7 +8562,7 @@ local function CreateUnitFrameBuilders()
             y = y - debuffHeader.gap
 
             local debuffInfo = GUI:CreateLabel(tabContent,
-                "Show/Hide, Anchor, Size, Grow, Offset, and Spacing settings are in the Edit Mode sidepanel.",
+                "All debuff icon and stack/duration text settings are in the Edit Mode sidepanel.",
                 11, C.textMuted)
             debuffInfo:SetPoint("TOPLEFT", PAD, y)
             debuffInfo:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -8797,9 +8625,9 @@ local function CreateUnitFrameBuilders()
             end)
             y = y - FORM_ROW
 
-            -- Debuff-specific text customization (stack and duration)
+            -- Debuff stack/duration text settings moved to the Edit Mode sidepanel
+            -- (Debuff Icons category). Keep defaults initialized for older profiles.
             if unitKey == "target" or unitKey == "player" or unitKey == "focus" or unitKey == "targettarget" or unitKey == "boss" then
-                -- Initialize debuff-specific defaults
                 if auraDB.debuffSpacing == nil then auraDB.debuffSpacing = 2 end
                 if auraDB.debuffShowStack == nil then auraDB.debuffShowStack = true end
                 if auraDB.debuffStackSize == nil then auraDB.debuffStackSize = 10 end
@@ -8807,74 +8635,12 @@ local function CreateUnitFrameBuilders()
                 if auraDB.debuffStackOffsetX == nil then auraDB.debuffStackOffsetX = -1 end
                 if auraDB.debuffStackOffsetY == nil then auraDB.debuffStackOffsetY = 1 end
                 if auraDB.debuffStackColor == nil then auraDB.debuffStackColor = {1, 1, 1, 1} end
-                -- Duration defaults
                 if auraDB.debuffShowDuration == nil then auraDB.debuffShowDuration = true end
                 if auraDB.debuffDurationSize == nil then auraDB.debuffDurationSize = 12 end
                 if auraDB.debuffDurationAnchor == nil then auraDB.debuffDurationAnchor = "CENTER" end
                 if auraDB.debuffDurationOffsetX == nil then auraDB.debuffDurationOffsetX = 0 end
                 if auraDB.debuffDurationOffsetY == nil then auraDB.debuffDurationOffsetY = 0 end
                 if auraDB.debuffDurationColor == nil then auraDB.debuffDurationColor = {1, 1, 1, 1} end
-
-                local debuffShowStackCheck = GUI:CreateFormCheckbox(tabContent, "Stack Show", "debuffShowStack", auraDB, RefreshAuras)
-                debuffShowStackCheck:SetPoint("TOPLEFT", PAD, y)
-                debuffShowStackCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local debuffStackSizeSlider = GUI:CreateFormSlider(tabContent, "Stack Size", 8, 40, 1, "debuffStackSize", auraDB, RefreshAuras)
-                debuffStackSizeSlider:SetPoint("TOPLEFT", PAD, y)
-                debuffStackSizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local debuffStackAnchorDD = GUI:CreateFormDropdown(tabContent, "Stack Anchor", ninePointAnchorOptions, "debuffStackAnchor", auraDB, RefreshAuras)
-                debuffStackAnchorDD:SetPoint("TOPLEFT", PAD, y)
-                debuffStackAnchorDD:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local debuffStackXSlider = GUI:CreateFormSlider(tabContent, "Stack X Offset", -20, 20, 1, "debuffStackOffsetX", auraDB, RefreshAuras)
-                debuffStackXSlider:SetPoint("TOPLEFT", PAD, y)
-                debuffStackXSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local debuffStackYSlider = GUI:CreateFormSlider(tabContent, "Stack Y Offset", -20, 20, 1, "debuffStackOffsetY", auraDB, RefreshAuras)
-                debuffStackYSlider:SetPoint("TOPLEFT", PAD, y)
-                debuffStackYSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local debuffStackColorPicker = GUI:CreateFormColorPicker(tabContent, "Stack Color", "debuffStackColor", auraDB, RefreshAuras)
-                debuffStackColorPicker:SetPoint("TOPLEFT", PAD, y)
-                debuffStackColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                -- Duration text settings
-                local debuffShowDurationCheck = GUI:CreateFormCheckbox(tabContent, "Duration Show", "debuffShowDuration", auraDB, RefreshAuras)
-                debuffShowDurationCheck:SetPoint("TOPLEFT", PAD, y)
-                debuffShowDurationCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local debuffDurationSizeSlider = GUI:CreateFormSlider(tabContent, "Duration Size", 8, 40, 1, "debuffDurationSize", auraDB, RefreshAuras)
-                debuffDurationSizeSlider:SetPoint("TOPLEFT", PAD, y)
-                debuffDurationSizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local debuffDurationAnchorDD = GUI:CreateFormDropdown(tabContent, "Duration Anchor", ninePointAnchorOptions, "debuffDurationAnchor", auraDB, RefreshAuras)
-                debuffDurationAnchorDD:SetPoint("TOPLEFT", PAD, y)
-                debuffDurationAnchorDD:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local debuffDurationXSlider = GUI:CreateFormSlider(tabContent, "Duration X Offset", -20, 20, 1, "debuffDurationOffsetX", auraDB, RefreshAuras)
-                debuffDurationXSlider:SetPoint("TOPLEFT", PAD, y)
-                debuffDurationXSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local debuffDurationYSlider = GUI:CreateFormSlider(tabContent, "Duration Y Offset", -20, 20, 1, "debuffDurationOffsetY", auraDB, RefreshAuras)
-                debuffDurationYSlider:SetPoint("TOPLEFT", PAD, y)
-                debuffDurationYSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local debuffDurationColorPicker = GUI:CreateFormColorPicker(tabContent, "Duration Color", "debuffDurationColor", auraDB, RefreshAuras)
-                debuffDurationColorPicker:SetPoint("TOPLEFT", PAD, y)
-                debuffDurationColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
             end
 
             -- === BUFF ICONS SECTION ===
@@ -8883,7 +8649,7 @@ local function CreateUnitFrameBuilders()
             y = y - buffHeader.gap
 
             local buffInfo = GUI:CreateLabel(tabContent,
-                "Show/Hide, Anchor, Size, Grow, Offset, and Spacing settings are in the Edit Mode sidepanel.",
+                "All buff icon and stack/duration text settings are in the Edit Mode sidepanel.",
                 11, C.textMuted)
             buffInfo:SetPoint("TOPLEFT", PAD, y)
             buffInfo:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -8946,9 +8712,9 @@ local function CreateUnitFrameBuilders()
             end)
             y = y - FORM_ROW
 
-            -- Buff-specific text customization (stack and duration)
+            -- Buff stack/duration text settings moved to the Edit Mode sidepanel
+            -- (Buff Icons category). Keep defaults initialized for older profiles.
             if unitKey == "target" or unitKey == "player" or unitKey == "focus" or unitKey == "targettarget" or unitKey == "boss" then
-                -- Initialize buff-specific defaults
                 if auraDB.buffSpacing == nil then auraDB.buffSpacing = 2 end
                 if auraDB.buffShowStack == nil then auraDB.buffShowStack = true end
                 if auraDB.buffStackSize == nil then auraDB.buffStackSize = 10 end
@@ -8956,74 +8722,12 @@ local function CreateUnitFrameBuilders()
                 if auraDB.buffStackOffsetX == nil then auraDB.buffStackOffsetX = -1 end
                 if auraDB.buffStackOffsetY == nil then auraDB.buffStackOffsetY = 1 end
                 if auraDB.buffStackColor == nil then auraDB.buffStackColor = {1, 1, 1, 1} end
-                -- Duration defaults
                 if auraDB.buffShowDuration == nil then auraDB.buffShowDuration = true end
                 if auraDB.buffDurationSize == nil then auraDB.buffDurationSize = 12 end
                 if auraDB.buffDurationAnchor == nil then auraDB.buffDurationAnchor = "CENTER" end
                 if auraDB.buffDurationOffsetX == nil then auraDB.buffDurationOffsetX = 0 end
                 if auraDB.buffDurationOffsetY == nil then auraDB.buffDurationOffsetY = 0 end
                 if auraDB.buffDurationColor == nil then auraDB.buffDurationColor = {1, 1, 1, 1} end
-
-                local buffShowStackCheck = GUI:CreateFormCheckbox(tabContent, "Stack Show", "buffShowStack", auraDB, RefreshAuras)
-                buffShowStackCheck:SetPoint("TOPLEFT", PAD, y)
-                buffShowStackCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local buffStackSizeSlider = GUI:CreateFormSlider(tabContent, "Stack Size", 8, 40, 1, "buffStackSize", auraDB, RefreshAuras)
-                buffStackSizeSlider:SetPoint("TOPLEFT", PAD, y)
-                buffStackSizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local buffStackAnchorDD = GUI:CreateFormDropdown(tabContent, "Stack Anchor", ninePointAnchorOptions, "buffStackAnchor", auraDB, RefreshAuras)
-                buffStackAnchorDD:SetPoint("TOPLEFT", PAD, y)
-                buffStackAnchorDD:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local buffStackXSlider = GUI:CreateFormSlider(tabContent, "Stack X Offset", -20, 20, 1, "buffStackOffsetX", auraDB, RefreshAuras)
-                buffStackXSlider:SetPoint("TOPLEFT", PAD, y)
-                buffStackXSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local buffStackYSlider = GUI:CreateFormSlider(tabContent, "Stack Y Offset", -20, 20, 1, "buffStackOffsetY", auraDB, RefreshAuras)
-                buffStackYSlider:SetPoint("TOPLEFT", PAD, y)
-                buffStackYSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local buffStackColorPicker = GUI:CreateFormColorPicker(tabContent, "Stack Color", "buffStackColor", auraDB, RefreshAuras)
-                buffStackColorPicker:SetPoint("TOPLEFT", PAD, y)
-                buffStackColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                -- Duration text settings
-                local buffShowDurationCheck = GUI:CreateFormCheckbox(tabContent, "Duration Show", "buffShowDuration", auraDB, RefreshAuras)
-                buffShowDurationCheck:SetPoint("TOPLEFT", PAD, y)
-                buffShowDurationCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local buffDurationSizeSlider = GUI:CreateFormSlider(tabContent, "Duration Size", 8, 40, 1, "buffDurationSize", auraDB, RefreshAuras)
-                buffDurationSizeSlider:SetPoint("TOPLEFT", PAD, y)
-                buffDurationSizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local buffDurationAnchorDD = GUI:CreateFormDropdown(tabContent, "Duration Anchor", ninePointAnchorOptions, "buffDurationAnchor", auraDB, RefreshAuras)
-                buffDurationAnchorDD:SetPoint("TOPLEFT", PAD, y)
-                buffDurationAnchorDD:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local buffDurationXSlider = GUI:CreateFormSlider(tabContent, "Duration X Offset", -20, 20, 1, "buffDurationOffsetX", auraDB, RefreshAuras)
-                buffDurationXSlider:SetPoint("TOPLEFT", PAD, y)
-                buffDurationXSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local buffDurationYSlider = GUI:CreateFormSlider(tabContent, "Duration Y Offset", -20, 20, 1, "buffDurationOffsetY", auraDB, RefreshAuras)
-                buffDurationYSlider:SetPoint("TOPLEFT", PAD, y)
-                buffDurationYSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
-
-                local buffDurationColorPicker = GUI:CreateFormColorPicker(tabContent, "Duration Color", "buffDurationColor", auraDB, RefreshAuras)
-                buffDurationColorPicker:SetPoint("TOPLEFT", PAD, y)
-                buffDurationColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-                y = y - FORM_ROW
             end
         end
 
@@ -9186,45 +8890,25 @@ local function CreateUnitFrameBuilders()
         end
 
         -- TARGET MARKER section (all unit frames)
+        -- Controls moved to the Edit Mode sidepanel (Target Marker category).
         local markerHeader = GUI:CreateSectionHeader(tabContent, "Target Marker")
         markerHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - markerHeader.gap
 
-        -- Ensure targetMarker table exists
+        -- Ensure targetMarker table exists (older profiles)
         if not unitDB.targetMarker then
             unitDB.targetMarker = { enabled = false, size = 20, anchor = "TOP", xOffset = 0, yOffset = 8 }
         end
 
-        local markerDesc = GUI:CreateLabel(tabContent, "Shows raid target markers (skull, cross, diamond, etc.) on the unit frame.", 11, C.textMuted)
+        local markerDesc = GUI:CreateLabel(tabContent,
+            "Raid target marker (skull, cross, etc.) settings are in the Edit Mode sidepanel.",
+            11, C.textMuted)
         markerDesc:SetPoint("TOPLEFT", PAD, y)
         markerDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         markerDesc:SetJustifyH("LEFT")
-        y = y - 20
-
-        local markerCheck = GUI:CreateFormCheckbox(tabContent, "Show Target Marker", "enabled", unitDB.targetMarker, RefreshUnit)
-        markerCheck:SetPoint("TOPLEFT", PAD, y)
-        markerCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local markerSizeSlider = GUI:CreateFormSlider(tabContent, "Marker Size", 8, 48, 1, "size", unitDB.targetMarker, RefreshUnit)
-        markerSizeSlider:SetPoint("TOPLEFT", PAD, y)
-        markerSizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local markerAnchorDrop = GUI:CreateFormDropdown(tabContent, "Anchor To", anchorOptions, "anchor", unitDB.targetMarker, RefreshUnit)
-        markerAnchorDrop:SetPoint("TOPLEFT", PAD, y)
-        markerAnchorDrop:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local markerXSlider = GUI:CreateFormSlider(tabContent, "X Offset", -100, 100, 1, "xOffset", unitDB.targetMarker, RefreshUnit)
-        markerXSlider:SetPoint("TOPLEFT", PAD, y)
-        markerXSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
-
-        local markerYSlider = GUI:CreateFormSlider(tabContent, "Y Offset", -100, 100, 1, "yOffset", unitDB.targetMarker, RefreshUnit)
-        markerYSlider:SetPoint("TOPLEFT", PAD, y)
-        markerYSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - FORM_ROW
+        markerDesc:SetWordWrap(true)
+        markerDesc:SetHeight(20)
+        y = y - 24
 
         -- LEADER ICON section (player, target, focus only)
         if unitKey == "player" or unitKey == "target" or unitKey == "focus" then

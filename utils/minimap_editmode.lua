@@ -664,15 +664,25 @@ local function BuildMinimapSettings()
         get = function(layoutName)
             local mm = GetMinimapDB()
             local c = mm and mm.clockConfig and mm.clockConfig.color or {1, 1, 1, 1}
-            return c[1], c[2], c[3], c[4] or 1
+            -- Self-heal: older LEM versions wrote {table, nil, nil, 1} format.
+            if type(c[1]) == "table" then
+                local t = c[1]
+                return t.r or 1, t.g or 1, t.b or 1, t.a or 1
+            end
+            return c[1] or 1, c[2] or 1, c[3] or 1, c[4] or 1
         end,
         set = function(layoutName, r, g, b, a)
             local mm = GetMinimapDB()
-            if mm then
-                if not mm.clockConfig then mm.clockConfig = {} end
-                mm.clockConfig.color = {r, g, b, a or 1}
-                RefreshMinimap()
+            if not mm then return end
+            if not mm.clockConfig then mm.clockConfig = {} end
+            -- LEM's color picker passes either four numbers or a `{r=,g=,b=,a=}`
+            -- table depending on version. Sanitize to flat array on write.
+            if type(r) == "table" then
+                mm.clockConfig.color = { r.r or 1, r.g or 1, r.b or 1, r.a or 1 }
+            else
+                mm.clockConfig.color = { r or 1, g or 1, b or 1, a or 1 }
             end
+            RefreshMinimap()
         end,
     })
     order = order + 1
@@ -869,15 +879,22 @@ local function BuildMinimapSettings()
         get = function(layoutName)
             local mm = GetMinimapDB()
             local c = mm and mm.coordsConfig and mm.coordsConfig.color or {1, 1, 1, 1}
-            return c[1], c[2], c[3], c[4] or 1
+            if type(c[1]) == "table" then
+                local t = c[1]
+                return t.r or 1, t.g or 1, t.b or 1, t.a or 1
+            end
+            return c[1] or 1, c[2] or 1, c[3] or 1, c[4] or 1
         end,
         set = function(layoutName, r, g, b, a)
             local mm = GetMinimapDB()
-            if mm then
-                if not mm.coordsConfig then mm.coordsConfig = {} end
-                mm.coordsConfig.color = {r, g, b, a or 1}
-                RefreshMinimap()
+            if not mm then return end
+            if not mm.coordsConfig then mm.coordsConfig = {} end
+            if type(r) == "table" then
+                mm.coordsConfig.color = { r.r or 1, r.g or 1, r.b or 1, r.a or 1 }
+            else
+                mm.coordsConfig.color = { r or 1, g or 1, b or 1, a or 1 }
             end
+            RefreshMinimap()
         end,
     })
     order = order + 1

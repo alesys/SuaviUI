@@ -1050,18 +1050,31 @@ local function BuildUnitFrameSettings(unitKey)
         name = "Font Size",
         kind = LEM.SettingType.Slider,
         default = 12,
-        minValue = 1,
+        minValue = 8,
         maxValue = 20,
         valueStep = 1,
         formatter = function(value) return string.format("%d", value) end,
+        -- IMPORTANT: the unit frames renderer reads `healthFontSize` (see
+        -- sui_unitframes.lua:1654, :2009, :3553, :3861). This slider used to
+        -- write `healthTextSize`, which was a dead key — changes never showed
+        -- up in game. Now wired to the real render key. Legacy
+        -- `healthTextSize` is silently migrated on read.
         get = function(layoutName, layoutIndex)
             local s = GetUnitSettings(unitKey)
-            return s and s.healthTextSize or 12
+            if not s then return 12 end
+            if s.healthFontSize then return s.healthFontSize end
+            if s.healthTextSize then
+                s.healthFontSize = s.healthTextSize
+                s.healthTextSize = nil
+                return s.healthFontSize
+            end
+            return 12
         end,
         set = function(layoutName, value, layoutIndex)
             local s = GetUnitSettings(unitKey)
             if s then
-                s.healthTextSize = value
+                s.healthFontSize = value
+                s.healthTextSize = nil
                 RefreshUnitFrame(unitKey)
             end
         end,
@@ -1973,6 +1986,247 @@ local function BuildUnitFrameSettings(unitKey)
         end,
     })
     order = order + 1
+
+    ---------------------------------------------------------------------------
+    -- AURA STACK/DURATION TEXT (migrated from the options panel)
+    ---------------------------------------------------------------------------
+    -- Compact builders — same entry shapes as the handwritten settings above.
+    -- Aura text changes must also re-render active auras/previews, matching the
+    -- panel's RefreshAuras behavior.
+    local function RefreshAuras()
+        RefreshUnitFrame(unitKey)
+        local SUI_UF = ns.SUI_UnitFrames
+        if SUI_UF and SUI_UF.auraPreviewMode and _G.SuaviUI_ShowAuraPreview then
+            if SUI_UF.auraPreviewMode[unitKey .. "_debuff"] then
+                _G.SuaviUI_ShowAuraPreview(unitKey, "debuff")
+            end
+            if SUI_UF.auraPreviewMode[unitKey .. "_buff"] then
+                _G.SuaviUI_ShowAuraPreview(unitKey, "buff")
+            end
+        end
+        if _G.SuaviUI_RefreshAuras then
+            _G.SuaviUI_RefreshAuras(unitKey)
+        end
+    end
+
+    local function GetAuras()
+        local s = GetUnitSettings(unitKey)
+        if not s then return nil end
+        if not s.auras then s.auras = {} end
+        return s.auras
+    end
+
+    local function AddAuraCheckbox(parentId, name, key, default)
+        table.insert(settings, {
+            parentId = parentId, order = order, name = name,
+            kind = LEM.SettingType.Checkbox, default = default,
+            get = function()
+                local s = GetUnitSettings(unitKey)
+                local v = s and s.auras and s.auras[key]
+                if v == nil then return default end
+                return v
+            end,
+            set = function(layoutName, value)
+                local auras = GetAuras()
+                if auras then
+                    auras[key] = value
+                    RefreshAuras()
+                end
+            end,
+        })
+        order = order + 1
+    end
+
+    local function AddAuraSlider(parentId, name, key, default, minV, maxV)
+        table.insert(settings, {
+            parentId = parentId, order = order, name = name,
+            kind = LEM.SettingType.Slider, default = default,
+            minValue = minV, maxValue = maxV, valueStep = 1,
+            formatter = function(value) return string.format("%d", value) end,
+            get = function()
+                local s = GetUnitSettings(unitKey)
+                local v = s and s.auras and s.auras[key]
+                if v == nil then return default end
+                return v
+            end,
+            set = function(layoutName, value)
+                local auras = GetAuras()
+                if auras then
+                    auras[key] = value
+                    RefreshAuras()
+                end
+            end,
+        })
+        order = order + 1
+    end
+
+    local function AddAuraAnchor(parentId, name, key, default)
+        table.insert(settings, {
+            parentId = parentId, order = order, name = name,
+            kind = LEM.SettingType.Dropdown, useOldStyle = true,
+            default = anchor9ValueToText[default] or default,
+            values = anchorOptions,
+            get = function()
+                local s = GetUnitSettings(unitKey)
+                local v = (s and s.auras and s.auras[key]) or default
+                return anchor9ValueToText[v] or v
+            end,
+            set = function(layoutName, value)
+                local auras = GetAuras()
+                if auras then
+                    auras[key] = anchor9TextToValue[value] or value
+                    RefreshAuras()
+                end
+            end,
+        })
+        order = order + 1
+    end
+
+    local function AddAuraColor(parentId, name, key)
+        table.insert(settings, {
+            parentId = parentId, order = order, name = name,
+            kind = LEM.SettingType.Color,
+            default = { r = 1, g = 1, b = 1, a = 1 },
+            hasOpacity = true,
+            get = function()
+                local s = GetUnitSettings(unitKey)
+                local c = s and s.auras and s.auras[key]
+                if c then
+                    return { r = c[1] or 1, g = c[2] or 1, b = c[3] or 1, a = c[4] or 1 }
+                end
+                return { r = 1, g = 1, b = 1, a = 1 }
+            end,
+            set = function(layoutName, value)
+                local auras = GetAuras()
+                if auras then
+                    auras[key] = { value.r, value.g, value.b, value.a or 1 }
+                    RefreshAuras()
+                end
+            end,
+        })
+        order = order + 1
+    end
+
+    local DEBUFF_CAT = "CATEGORY_DEBUFFS_" .. unitKey
+    AddAuraCheckbox(DEBUFF_CAT, "Show Stack Text", "debuffShowStack", true)
+    AddAuraSlider(DEBUFF_CAT, "Stack Size", "debuffStackSize", 10, 8, 40)
+    AddAuraAnchor(DEBUFF_CAT, "Stack Anchor", "debuffStackAnchor", "BOTTOMRIGHT")
+    AddAuraSlider(DEBUFF_CAT, "Stack X Offset", "debuffStackOffsetX", -1, -20, 20)
+    AddAuraSlider(DEBUFF_CAT, "Stack Y Offset", "debuffStackOffsetY", 1, -20, 20)
+    AddAuraColor(DEBUFF_CAT, "Stack Color", "debuffStackColor")
+    AddAuraCheckbox(DEBUFF_CAT, "Show Duration Text", "debuffShowDuration", true)
+    AddAuraSlider(DEBUFF_CAT, "Duration Size", "debuffDurationSize", 12, 8, 40)
+    AddAuraAnchor(DEBUFF_CAT, "Duration Anchor", "debuffDurationAnchor", "CENTER")
+    AddAuraSlider(DEBUFF_CAT, "Duration X Offset", "debuffDurationOffsetX", 0, -20, 20)
+    AddAuraSlider(DEBUFF_CAT, "Duration Y Offset", "debuffDurationOffsetY", 0, -20, 20)
+    AddAuraColor(DEBUFF_CAT, "Duration Color", "debuffDurationColor")
+
+    local BUFF_CAT = "CATEGORY_BUFFS_" .. unitKey
+    AddAuraCheckbox(BUFF_CAT, "Show Stack Text", "buffShowStack", true)
+    AddAuraSlider(BUFF_CAT, "Stack Size", "buffStackSize", 10, 8, 40)
+    AddAuraAnchor(BUFF_CAT, "Stack Anchor", "buffStackAnchor", "BOTTOMRIGHT")
+    AddAuraSlider(BUFF_CAT, "Stack X Offset", "buffStackOffsetX", -1, -20, 20)
+    AddAuraSlider(BUFF_CAT, "Stack Y Offset", "buffStackOffsetY", 1, -20, 20)
+    AddAuraColor(BUFF_CAT, "Stack Color", "buffStackColor")
+    AddAuraCheckbox(BUFF_CAT, "Show Duration Text", "buffShowDuration", true)
+    AddAuraSlider(BUFF_CAT, "Duration Size", "buffDurationSize", 12, 8, 40)
+    AddAuraAnchor(BUFF_CAT, "Duration Anchor", "buffDurationAnchor", "CENTER")
+    AddAuraSlider(BUFF_CAT, "Duration X Offset", "buffDurationOffsetX", 0, -20, 20)
+    AddAuraSlider(BUFF_CAT, "Duration Y Offset", "buffDurationOffsetY", 0, -20, 20)
+    AddAuraColor(BUFF_CAT, "Duration Color", "buffDurationColor")
+
+    ---------------------------------------------------------------------------
+    -- TARGET MARKER (raid icons — migrated from the options panel)
+    ---------------------------------------------------------------------------
+    table.insert(settings, {
+        order = order,
+        name = "Target Marker",
+        kind = LEM.SettingType.Collapsible,
+        id = "CATEGORY_MARKER_" .. unitKey,
+        defaultCollapsed = true,
+    })
+    order = order + 1
+
+    local function GetMarker()
+        local s = GetUnitSettings(unitKey)
+        if not s then return nil end
+        if not s.targetMarker then
+            s.targetMarker = { enabled = false, size = 20, anchor = "TOP", xOffset = 0, yOffset = 8 }
+        end
+        return s.targetMarker
+    end
+
+    local function AddMarkerSlider(name, key, default, minV, maxV)
+        table.insert(settings, {
+            parentId = "CATEGORY_MARKER_" .. unitKey,
+            order = order, name = name,
+            kind = LEM.SettingType.Slider, default = default,
+            minValue = minV, maxValue = maxV, valueStep = 1,
+            formatter = function(value) return string.format("%d", value) end,
+            get = function()
+                local s = GetUnitSettings(unitKey)
+                local v = s and s.targetMarker and s.targetMarker[key]
+                if v == nil then return default end
+                return v
+            end,
+            set = function(layoutName, value)
+                local marker = GetMarker()
+                if marker then
+                    marker[key] = value
+                    RefreshUnitFrame(unitKey)
+                end
+            end,
+        })
+        order = order + 1
+    end
+
+    table.insert(settings, {
+        parentId = "CATEGORY_MARKER_" .. unitKey,
+        order = order,
+        name = "Show Target Marker",
+        kind = LEM.SettingType.Checkbox,
+        default = false,
+        get = function()
+            local s = GetUnitSettings(unitKey)
+            return (s and s.targetMarker and s.targetMarker.enabled) == true
+        end,
+        set = function(layoutName, value)
+            local marker = GetMarker()
+            if marker then
+                marker.enabled = value
+                RefreshUnitFrame(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+
+    AddMarkerSlider("Marker Size", "size", 20, 8, 48)
+
+    table.insert(settings, {
+        parentId = "CATEGORY_MARKER_" .. unitKey,
+        order = order,
+        name = "Anchor To",
+        kind = LEM.SettingType.Dropdown,
+        useOldStyle = true,
+        default = anchor9ValueToText["TOP"] or "TOP",
+        values = anchorOptions,
+        get = function()
+            local s = GetUnitSettings(unitKey)
+            local v = (s and s.targetMarker and s.targetMarker.anchor) or "TOP"
+            return anchor9ValueToText[v] or v
+        end,
+        set = function(layoutName, value)
+            local marker = GetMarker()
+            if marker then
+                marker.anchor = anchor9TextToValue[value] or value
+                RefreshUnitFrame(unitKey)
+            end
+        end,
+    })
+    order = order + 1
+
+    AddMarkerSlider("X Offset", "xOffset", 0, -100, 100)
+    AddMarkerSlider("Y Offset", "yOffset", 8, -100, 100)
 
     return settings
 end

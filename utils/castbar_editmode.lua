@@ -28,6 +28,32 @@ end
 local CB_EditMode = {}
 ns.CB_EditMode = CB_EditMode
 
+---------------------------------------------------------------------------
+-- LEM RADIO-DROPDOWN GENERATOR
+---------------------------------------------------------------------------
+-- LEM's `values = {{value=, text=}}` shortcut persists option.text instead
+-- of option.value. The library's own `generator` slot expects a callback
+-- with signature `(owner, rootDescription, data)` that uses
+-- `rootDescription:CreateRadio(text, isSelectedFn, onSelectFn)` to populate
+-- the menu. This helper wraps an option list into that callback so
+-- dropdowns persist option.value correctly.
+local function MakeRadioGenerator(options)
+    return function(owner, rootDescription, data)
+        for _, opt in ipairs(options) do
+            local optValue = opt.value
+            rootDescription:CreateRadio(
+                opt.text,
+                function()
+                    return data.get(LEM:GetActiveLayoutName(), LEM:GetActiveLayoutIndex()) == optValue
+                end,
+                function()
+                    data.set(LEM:GetActiveLayoutName(), optValue, LEM:GetActiveLayoutIndex())
+                end
+            )
+        end
+    end
+end
+
 CB_EditMode.registeredFrames = {}
 CB_EditMode.allOverlaysHidden = false  -- Track global "hide all overlays" state
 
@@ -72,6 +98,12 @@ local function RefreshCastbar(unitKey)
             -- Use mixin's in-place update methods
             castbar._castbarMixin:ApplyLayout(nil, true)
             castbar._castbarMixin:ApplySettings(nil, true)
+            -- In-place refresh never recreates the bar — reconcile the preview
+            -- simulation (outside Edit Mode this is what makes the Preview Mode
+            -- checkbox actually start/stop the animation)
+            if SUI_Castbar.UpdatePreview then
+                SUI_Castbar:UpdatePreview(castbar, unitKey)
+            end
             return
         end
     end
@@ -341,7 +373,10 @@ local function BuildCastbarSettings(unitKey)
         default = true,
         get = function(layoutName)
             local s = GetCastSettings(unitKey)
-            return s and s.enabled ~= false
+            -- Match the render-side gate (SUI_Castbar:CreateCastbar/CreateBossCastbar),
+            -- which treats a nil `enabled` as disabled. Using `~= false` here would show
+            -- the checkbox as checked while the castbar silently fails to render.
+            return s and s.enabled == true
         end,
         set = function(layoutName, value)
             local s = GetCastSettings(unitKey)
@@ -899,7 +934,7 @@ local function BuildCastbarSettings(unitKey)
         order = order,
         name = "Icon Anchor",
         kind = LEM.SettingType.Dropdown,
-        values = NINE_POINT_ANCHOR_OPTIONS,
+        generator = MakeRadioGenerator(NINE_POINT_ANCHOR_OPTIONS),
         default = "LEFT",
         useOldStyle = true,
         get = function(layoutName)
@@ -1059,7 +1094,7 @@ local function BuildCastbarSettings(unitKey)
         order = order,
         name = "Spell Text Anchor",
         kind = LEM.SettingType.Dropdown,
-        values = NINE_POINT_ANCHOR_OPTIONS,
+        generator = MakeRadioGenerator(NINE_POINT_ANCHOR_OPTIONS),
         default = "LEFT",
         useOldStyle = true,
         get = function(layoutName)
@@ -1153,7 +1188,7 @@ local function BuildCastbarSettings(unitKey)
         order = order,
         name = "Time Text Anchor",
         kind = LEM.SettingType.Dropdown,
-        values = NINE_POINT_ANCHOR_OPTIONS,
+        generator = MakeRadioGenerator(NINE_POINT_ANCHOR_OPTIONS),
         default = "RIGHT",
         useOldStyle = true,
         get = function(layoutName)
@@ -1283,7 +1318,7 @@ local function BuildCastbarSettings(unitKey)
             order = order,
             name = "Level Text Anchor",
             kind = LEM.SettingType.Dropdown,
-            values = NINE_POINT_ANCHOR_OPTIONS,
+            generator = MakeRadioGenerator(NINE_POINT_ANCHOR_OPTIONS),
             default = "CENTER",
             useOldStyle = true,
             get = function(layoutName)
@@ -1377,11 +1412,15 @@ local function BuildCastbarSettings(unitKey)
                 end,
                 set = function(layoutName, r, g, b, a)
                     local s = GetCastSettings(unitKey)
-                    if s then
-                        if not s.empoweredStageColors then s.empoweredStageColors = {} end
-                        s.empoweredStageColors[i] = {r, g, b, a or 1}
-                        RefreshCastbar(unitKey)
+                    if not s then return end
+                    if not s.empoweredStageColors then s.empoweredStageColors = {} end
+                    -- LEM passes either {r=,g=,b=,a=} table or four numbers.
+                    if type(r) == "table" then
+                        s.empoweredStageColors[i] = { r.r or 1, r.g or 1, r.b or 1, r.a or 1 }
+                    else
+                        s.empoweredStageColors[i] = { r or 1, g or 1, b or 1, a or 1 }
                     end
+                    RefreshCastbar(unitKey)
                 end,
             })
             order = order + 1
@@ -1412,11 +1451,14 @@ local function BuildCastbarSettings(unitKey)
                 end,
                 set = function(layoutName, r, g, b, a)
                     local s = GetCastSettings(unitKey)
-                    if s then
-                        if not s.empoweredFillColors then s.empoweredFillColors = {} end
-                        s.empoweredFillColors[i] = {r, g, b, a or 1}
-                        RefreshCastbar(unitKey)
+                    if not s then return end
+                    if not s.empoweredFillColors then s.empoweredFillColors = {} end
+                    if type(r) == "table" then
+                        s.empoweredFillColors[i] = { r.r or 1, r.g or 1, r.b or 1, r.a or 1 }
+                    else
+                        s.empoweredFillColors[i] = { r or 1, g or 1, b or 1, a or 1 }
                     end
+                    RefreshCastbar(unitKey)
                 end,
             })
             order = order + 1
@@ -1670,7 +1712,12 @@ function CB_EditMode:Initialize()
                     local settings = GetCastSettings(bossKey)
                     if settings and settings.enabled ~= false then
                         if not SUI_UF.castbars[bossKey] then
-                            SUI_Castbar:CreateBossCastbar(SUI_UF.frames.boss1, "boss" .. i, i)
+                            -- Anchor each castbar to ITS boss frame and store it in the
+                            -- castbars table — discarding the return value meant boss2-5
+                            -- were never registered/previewed and leaked a new orphan
+                            -- frame on every Edit Mode enter.
+                            local bossFrame = SUI_UF.frames[bossKey] or SUI_UF.frames.boss1
+                            SUI_UF.castbars[bossKey] = SUI_Castbar:CreateBossCastbar(bossFrame, "boss" .. i, i)
                             newlyCreated[bossKey] = true
                             CB_EditMode:LogDebug("EditMode enter: Created castbar for " .. bossKey)
                         end
@@ -1781,6 +1828,13 @@ function CB_EditMode:Initialize()
                             if not UnitCastingInfo(castbar.unit) and not UnitChannelInfo(castbar.unit) then
                                 castbar:Hide()
                             end
+                        end
+                        -- Resume the options-panel preview simulation if its
+                        -- previewMode is still enabled (StopPreviewMode cleared
+                        -- the OnUpdate, which used to leave the bar frozen/hidden)
+                        local SUI_Castbar = ns.SUI_Castbar
+                        if SUI_Castbar and SUI_Castbar.UpdatePreview then
+                            SUI_Castbar:UpdatePreview(castbar, unitKey)
                         end
                     end
                 end

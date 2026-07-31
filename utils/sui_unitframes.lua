@@ -3612,12 +3612,14 @@ function SUI_UF:RefreshFrame(unitKey)
                     UpdateFrame(frame)
                 end
                 
-                -- Refresh boss castbar if it exists (delegate to castbar module)
+                -- Refresh boss castbar if it exists, OR create if newly enabled
                 local castbar = self.castbars[bossKey]
-                if castbar and SUI_Castbar and SUI_Castbar.RefreshBossCastbar then
-                    local castSettings = settings.castbar
-                    if castSettings then
+                local castSettings = settings.castbar
+                if castSettings and castSettings.enabled then
+                    if castbar and SUI_Castbar and SUI_Castbar.RefreshBossCastbar then
                         SUI_Castbar:RefreshBossCastbar(castbar, bossKey, castSettings, frame)
+                    elseif not castbar and SUI_Castbar and SUI_Castbar.CreateBossCastbar then
+                        self.castbars[bossKey] = SUI_Castbar:CreateBossCastbar(frame, "boss" .. i, i)
                     end
                 end
             end

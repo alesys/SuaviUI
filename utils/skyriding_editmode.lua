@@ -32,6 +32,31 @@ SkyridingEditMode.registeredFrame = nil
 SkyridingEditMode.previewActive = false
 
 ---------------------------------------------------------------------------
+-- LEM RADIO-DROPDOWN GENERATOR
+---------------------------------------------------------------------------
+-- See castbar_editmode.lua for the full rationale: LEM's `values=` shortcut
+-- persists option.text, so any dropdown with distinct value/text breaks
+-- silently. The `generator` slot expects a callback that uses
+-- rootDescription:CreateRadio to populate the menu — this helper wraps an
+-- option list into that callback.
+local function MakeRadioGenerator(options)
+    return function(owner, rootDescription, data)
+        for _, opt in ipairs(options) do
+            local optValue = opt.value
+            rootDescription:CreateRadio(
+                opt.text,
+                function()
+                    return data.get(LEM:GetActiveLayoutName(), LEM:GetActiveLayoutIndex()) == optValue
+                end,
+                function()
+                    data.set(LEM:GetActiveLayoutName(), optValue, LEM:GetActiveLayoutIndex())
+                end
+            )
+        end
+    end
+end
+
+---------------------------------------------------------------------------
 -- DATABASE HELPERS
 ---------------------------------------------------------------------------
 local function GetDB()
@@ -454,11 +479,11 @@ local function BuildVigorBarSettings()
         kind = LEM.SettingType.Dropdown,
         default = "FRACTION",
         useOldStyle = true,
-        values = {
+        generator = MakeRadioGenerator({
             {value = "FRACTION", text = "Current / Max (3/6)"},
             {value = "CURRENT", text = "Current Only (3)"},
             {value = "PERCENT", text = "Percentage (50%)"},
-        },
+        }),
         get = function(layoutName)
             local s = GetSkyridingSettings()
             return s and s.vigorTextFormat or "FRACTION"
@@ -502,10 +527,10 @@ local function BuildVigorBarSettings()
         kind = LEM.SettingType.Dropdown,
         default = "PERCENT",
         useOldStyle = true,
-        values = {
+        generator = MakeRadioGenerator({
             {value = "PERCENT", text = "Percentage (125%)"},
             {value = "MULTIPLIER", text = "Multiplier (1.25x)"},
-        },
+        }),
         get = function(layoutName)
             local s = GetSkyridingSettings()
             return s and s.speedFormat or "PERCENT"
