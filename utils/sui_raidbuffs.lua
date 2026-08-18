@@ -257,9 +257,13 @@ local function UnitHasBuff(unit, spellId, spellName)
     if not exists then return false end
 
     -- Method 1: AuraUtil.ForEachAura (most reliable)
+    -- Must be pcall'd: it walks GetAuraSlots/GetAuraDataBySlot, both guarded by
+    -- RequiresUnitAuraAccess, whose FailureMode is Error - a secret aura HARD
+    -- ERRORS for tainted callers instead of returning a secret value.
+    -- Methods 2 and 3 below are the fallback when that happens.
     if AuraUtil and AuraUtil.ForEachAura then
         local found = false
-        AuraUtil.ForEachAura(unit, "HELPFUL", nil, function(auraData)
+        pcall(AuraUtil.ForEachAura, unit, "HELPFUL", nil, function(auraData)
             if auraData then
                 -- Use safe field access for Midnight Beta (12.x) secret values
                 local auraSpellId = SafeGetAuraField(auraData, "spellId")

@@ -94,8 +94,10 @@ command -v git &>/dev/null || error "git not found. Install git first."
 command -v gh &>/dev/null || error "gh CLI not found. Install from https://cli.github.com/"
 command -v powershell.exe &>/dev/null || error "powershell.exe not found (required for ZIP creation on Windows)."
 
-# Verify gh authentication
-if ! gh auth status &>/dev/null 2>&1; then
+# Verify gh authentication.
+# NOTE: plain `gh auth status` exits non-zero if ANY stored account has a stale
+# token, even when the active one is fine. Check only the active account.
+if ! gh auth status --active &>/dev/null 2>&1; then
     error "GitHub CLI not authenticated. Run: gh auth login"
 fi
 info "gh authenticated"
@@ -216,7 +218,7 @@ if [[ "$SKIP_COMMIT" == false ]]; then
     git commit -m "$(cat <<EOF
 Release ${TAG}: ${EDITION}
 
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
 )"
     info "Commit created: $(git log --oneline -1)"

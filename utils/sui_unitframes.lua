@@ -338,6 +338,80 @@ local function GetAbsorbTexturePath(textureName)
 end
 
 ---------------------------------------------------------------------------
+-- HELPER: class token -> r, g, b (secret-safe)
+--
+-- UnitClass() returns a SECRET string for units whose identity is restricted
+-- (targettarget, nameplates, non-party players...). Two traps:
+--   * type(secretString) still returns "string" and `if class then` is a boolean
+--     test on a secret - so neither guard protects anything here.
+--   * RAID_CLASS_COLORS[secret] throws
+--     "attempted to index a table that cannot be indexed with secret keys".
+-- C_ClassColor.GetClassColor is declared SecretArguments = "AllowedWhenTainted",
+-- so it is the one lookup that legally takes a secret class token. The r/g/b it
+-- returns may themselves be secret, which is fine: they only ever get fed to
+-- widget setters (SetStatusBarColor / SetTextColor / SetBackdropBorderColor),
+-- and those accept secrets. The bar keeps the CORRECT class color.
+--
+-- Returns hasColor, r, g, b. The flag is deliberately a plain boolean: r/g/b may
+-- be secret numbers, and `if r then` on one of those is itself an error.
+---------------------------------------------------------------------------
+local function GetClassColorRGB(class)
+    if class == nil then return false end
+
+    if C_ClassColor and C_ClassColor.GetClassColor then
+        local ok, color = pcall(C_ClassColor.GetClassColor, class)
+        if ok and color then
+            return true, color.r, color.g, color.b
+        end
+    end
+
+    -- Fallback for non-secret tokens only; indexing with a secret key errors.
+    if not IsSecretValue(class) then
+        local color = RAID_CLASS_COLORS[class]
+        if color then
+            return true, color.r, color.g, color.b
+        end
+    end
+
+    return false
+end
+
+---------------------------------------------------------------------------
+-- HELPER: r,g,b -> "|cffRRGGBB" escape (secret-safe)
+--
+-- Class/reaction colors are now REAL values (see GetClassColorRGB), which means
+-- they can be SECRET numbers. Widget setters swallow those happily, but an
+-- inline |cff escape does not: it needs string.format over r*255, and both the
+-- arithmetic and the formatting reject secrets. There is no way to render a
+-- secret color as literal text, so fall back to white.
+---------------------------------------------------------------------------
+local function ColorToHex(r, g, b)
+    if r == nil or g == nil or b == nil then return "|cffffffff" end
+    if IsSecretValue(r) or IsSecretValue(g) or IsSecretValue(b) then
+        return "|cffffffff"
+    end
+
+    local ok, hex = pcall(string.format, "|cff%02x%02x%02x", r * 255, g * 255, b * 255)
+    if ok then return hex end
+    return "|cffffffff"
+end
+
+---------------------------------------------------------------------------
+-- HELPER: glue name fragments together (secret-safe)
+--
+-- UnitName() on a restricted unit ("targettarget", nameplates...) returns a
+-- SECRET string, and the `..` operator is not a documented sink for secrets.
+-- string.format with %s IS proven to swallow them - TruncateName already relies
+-- on it - so build the composite through format and keep the plain name as the
+-- fallback if the client ever refuses.
+---------------------------------------------------------------------------
+local function JoinName(...)
+    local ok, joined = pcall(string.format, string.rep("%s", select("#", ...)), ...)
+    if ok then return joined end
+    return (...)
+end
+
+---------------------------------------------------------------------------
 -- HELPER: Get class color for a unit
 ---------------------------------------------------------------------------
 local function GetUnitClassColor(unit)
@@ -353,13 +427,10 @@ local function GetUnitClassColor(unit)
         -- Only use class color for actual players
         local isPlayer = UnitIsPlayer(unit)
         if isPlayer then
-            local _, class = UnitClass(unit)
-            if class then
-                local color = RAID_CLASS_COLORS[class]
-                if color then
-                    result = { r = color.r, g = color.g, b = color.b, a = 1 }
-                    return
-                end
+            local hasColor, r, g, b = GetClassColorRGB(select(2, UnitClass(unit)))
+            if hasColor then
+                result = { r = r, g = g, b = b, a = 1 }
+                return
             end
         end
 
@@ -596,7 +667,7 @@ end
 
 ---------------------------------------------------------------------------
 -- HELPER: Get health bar color based on settings
--- Logic: 
+-- Logic:
 --   1. If ClassColor enabled AND unit is a player -> use class color
 --   2. If HostilityColor enabled -> use reaction color (for NPCs or all units)
 --   3. Otherwise -> use custom color
@@ -622,12 +693,9 @@ local function GetHealthBarColor(unit, settings)
         local isPlayer = UnitIsPlayer(unit)
         if type(isPlayer) == "boolean" and isPlayer then
             -- Unit is a player - use their class color
-            local _, class = UnitClass(unit)
-            if type(class) == "string" then
-                local color = RAID_CLASS_COLORS[class]
-                if color then
-                    return color.r, color.g, color.b, 1
-                end
+            local hasColor, r, g, b = GetClassColorRGB(select(2, UnitClass(unit)))
+            if hasColor then
+                return r, g, b, 1
             end
         else
             -- Unit is not a player (pet, NPC, etc.) - use owner's class color for pets
@@ -640,12 +708,9 @@ local function GetHealthBarColor(unit, settings)
             local isPet = (not IsSecretValue(petCheck) and petCheck == true) or (not IsSecretValue(playerPetCheck) and playerPetCheck == true)
             if isPet then
                 -- Pet: use player's class color
-                local _, class = UnitClass("player")
-                if type(class) == "string" then
-                    local color = RAID_CLASS_COLORS[class]
-                    if color then
-                        return color.r, color.g, color.b, 1
-                    end
+                local hasColor, r, g, b = GetClassColorRGB(select(2, UnitClass("player")))
+                if hasColor then
+                    return r, g, b, 1
                 end
             end
         end
@@ -1218,6 +1283,25 @@ local function UpdateStance(frame)
 end
 
 ---------------------------------------------------------------------------
+-- SECRET-VALUE HELPERS (WoW 12.x "Midnight")
+-- Unit APIs called from tainted addon code hand back "secret values". Any
+-- boolean test, comparison or arithmetic on one throws
+-- "attempt to perform boolean test on a secret boolean value".
+-- Widget setters DO accept secret values, so state that comes back secret has
+-- to be piped straight into SetShown instead of being branched on.
+---------------------------------------------------------------------------
+local function IsSecret(value)
+    return issecretvalue and issecretvalue(value)
+end
+
+local function SetShownSecretSafe(region, value)
+    if not region then return end
+    if not pcall(region.SetShown, region, value) then
+        region:Hide()
+    end
+end
+
+---------------------------------------------------------------------------
 -- UPDATE: Target Marker (raid icons like skull, cross, diamond, etc.)
 ---------------------------------------------------------------------------
 local function UpdateTargetMarker(frame)
@@ -1229,6 +1313,13 @@ local function UpdateTargetMarker(frame)
     end
 
     local index = GetRaidTargetIndex(frame.unit)
+    -- A secret index cannot be tested or fed to SetRaidTargetIconTexture (it
+    -- does arithmetic on it), so degrade to hidden instead of erroring.
+    if IsSecret(index) then
+        frame.targetMarker:Hide()
+        return
+    end
+
     if index then
         SetRaidTargetIconTexture(frame.targetMarker, index)
         frame.targetMarker:Show()
@@ -1245,25 +1336,24 @@ local function UpdateLeaderIcon(frame)
     local settings = GetUnitSettings(frame.unitKey)
     if not settings or not settings.leaderIcon or not settings.leaderIcon.enabled then
         frame.leaderIcon:Hide()
+        if frame.assistantIcon then frame.assistantIcon:Hide() end
         return
     end
 
     -- Only show in group
     if not IsInGroup() then
         frame.leaderIcon:Hide()
+        if frame.assistantIcon then frame.assistantIcon:Hide() end
         return
     end
 
-    -- Check if unit is leader or assistant
-    -- Note: Assistants only exist in raids, not parties
-    if UnitIsGroupLeader(frame.unit) then
-        frame.leaderIcon:SetTexture([[Interface\GroupFrame\UI-Group-LeaderIcon]])
-        frame.leaderIcon:Show()
-    elseif IsInRaid() and UnitIsGroupAssistant(frame.unit) then
-        frame.leaderIcon:SetTexture([[Interface\GroupFrame\UI-Group-AssistantIcon]])
-        frame.leaderIcon:Show()
-    else
-        frame.leaderIcon:Hide()
+    -- Leader/assistant status is a secret value on non-player units in 12.x, so
+    -- it must never be branched on. Each state owns its own texture and the
+    -- (possibly secret) boolean goes straight into SetShown.
+    -- Note: Assistants only exist in raids, not parties.
+    SetShownSecretSafe(frame.leaderIcon, UnitIsGroupLeader(frame.unit))
+    if frame.assistantIcon then
+        SetShownSecretSafe(frame.assistantIcon, IsInRaid() and UnitIsGroupAssistant(frame.unit))
     end
 end
 
@@ -1334,11 +1424,11 @@ local function UpdateName(frame)
             if settings.totDividerUseClassColor then
                 -- Class/reaction color for divider
                 local dR, dG, dB = GetUnitClassColor(totUnit)
-                dividerColorHex = string.format("|cff%02x%02x%02x", dR * 255, dG * 255, dB * 255)
+                dividerColorHex = ColorToHex(dR, dG, dB)
             elseif settings.totDividerColor then
                 -- Custom divider color
                 local c = settings.totDividerColor
-                dividerColorHex = string.format("|cff%02x%02x%02x", c[1] * 255, c[2] * 255, c[3] * 255)
+                dividerColorHex = ColorToHex(c[1], c[2], c[3])
             else
                 -- Default white
                 dividerColorHex = "|cFFFFFFFF"
@@ -1349,16 +1439,16 @@ local function UpdateName(frame)
             if general and general.masterColorToTText then
                 -- MASTER OVERRIDE: Color ToT name only
                 local totR, totG, totB = GetUnitClassColor(totUnit)
-                local totColorHex = string.format("|cff%02x%02x%02x", totR * 255, totG * 255, totB * 255)
-                name = name .. dividerColorHex .. separator .. "|r" .. totColorHex .. totName .. "|r"
+                local totColorHex = ColorToHex(totR, totG, totB)
+                name = JoinName(name, dividerColorHex, separator, "|r", totColorHex, totName, "|r")
             elseif settings.totUseClassColor then
                 -- Per-unit: ToT name colored
                 local totR, totG, totB = GetUnitClassColor(totUnit)
-                local totColorHex = string.format("|cff%02x%02x%02x", totR * 255, totG * 255, totB * 255)
-                name = name .. dividerColorHex .. separator .. "|r" .. totColorHex .. totName .. "|r"
+                local totColorHex = ColorToHex(totR, totG, totB)
+                name = JoinName(name, dividerColorHex, separator, "|r", totColorHex, totName, "|r")
             else
                 -- Default: Divider colored, ToT name uncolored
-                name = name .. dividerColorHex .. separator .. "|r" .. totName
+                name = JoinName(name, dividerColorHex, separator, "|r", totName)
             end
         end
     end
@@ -1961,12 +2051,9 @@ local function CreateUnitFrame(unit, unitKey)
         -- Determine border color
         local borderR, borderG, borderB = 0, 0, 0
         if settings.portraitBorderUseClassColor then
-            local _, class = UnitClass(unit)
-            if class then
-                local classColor = RAID_CLASS_COLORS[class]
-                if classColor then
-                    borderR, borderG, borderB = classColor.r, classColor.g, classColor.b
-                end
+            local hasColor, r, g, b = GetClassColorRGB(select(2, UnitClass(unit)))
+            if hasColor then
+                borderR, borderG, borderB = r, g, b
             end
         elseif settings.portraitBorderColor then
             borderR = settings.portraitBorderColor[1] or 0
@@ -2120,12 +2207,24 @@ local function CreateUnitFrame(unit, unitKey)
         end
 
         local leader = settings.leaderIcon
-        local leaderIcon = frame.indicatorFrame:CreateTexture(nil, "OVERLAY")
-        leaderIcon:SetSize(leader.size or 16, leader.size or 16)
         local anchorInfo = GetTextAnchorInfo(leader.anchor or "TOPLEFT")
+
+        -- Two separate textures (crown / flag) instead of one texture whose
+        -- SetTexture is swapped at update time: leader and assistant status are
+        -- secret values in 12.x and cannot be branched on, only fed to SetShown.
+        local leaderIcon = frame.indicatorFrame:CreateTexture(nil, "OVERLAY")
+        leaderIcon:SetTexture([[Interface\GroupFrame\UI-Group-LeaderIcon]])
+        leaderIcon:SetSize(leader.size or 16, leader.size or 16)
         leaderIcon:SetPoint(anchorInfo.point, frame, anchorInfo.point, leader.xOffset or -8, leader.yOffset or 8)
         leaderIcon:Hide()
         frame.leaderIcon = leaderIcon
+
+        local assistantIcon = frame.indicatorFrame:CreateTexture(nil, "OVERLAY")
+        assistantIcon:SetTexture([[Interface\GroupFrame\UI-Group-AssistantIcon]])
+        assistantIcon:SetSize(leader.size or 16, leader.size or 16)
+        assistantIcon:SetPoint(anchorInfo.point, frame, anchorInfo.point, leader.xOffset or -8, leader.yOffset or 8)
+        assistantIcon:Hide()
+        frame.assistantIcon = assistantIcon
     end
 
     -- Event handling - STATE EVENTS ONLY (not frequent value updates)
@@ -2502,6 +2601,42 @@ local function GetAuraIcon(container, index, parent, size, auraSettings, isDebuf
     return icon
 end
 
+---------------------------------------------------------------------------
+-- SECRET-SAFE AURA READ (WoW 12.x)
+--
+-- C_UnitAuras.GetAuraDataByIndex is guarded by the RequiresUnitAuraAccess
+-- predicate, whose FailureMode is "Error": calling it from tainted addon code
+-- for an aura the client considers secret HARD ERRORS with
+--   "Auras cannot be accessed when secret while tainted by 'SuaviUI'"
+-- rather than just returning a secret value. pcall alone is not enough - the
+-- ticker would still burn an error every pass - so ask C_Secrets first, which
+-- is safe to call while tainted and returns a plain, branchable boolean.
+--
+-- A secret aura simply cannot be read or drawn by an addon. Skip it and keep
+-- scanning: later indices may still be readable (spells can be individually
+-- flagged never-secret).
+---------------------------------------------------------------------------
+local AURA_SCAN_LIMIT = 40  -- Upper bound so a run of secret auras can't loop forever
+
+-- Returns auraData, isSecret
+local function GetAuraDataSecretSafe(unit, index, filter)
+    if C_Secrets and C_Secrets.ShouldUnitAuraIndexBeSecret then
+        local ok, isSecret = pcall(C_Secrets.ShouldUnitAuraIndexBeSecret, unit, index, filter)
+        if not ok or isSecret then
+            return nil, true
+        end
+    end
+
+    local ok, auraData = pcall(C_UnitAuras.GetAuraDataByIndex, unit, index, filter)
+    if not ok then
+        -- Client disagreed with the pre-check (or C_Secrets is missing on this
+        -- build); treat it as unreadable instead of propagating the error.
+        return nil, true
+    end
+
+    return auraData, false
+end
+
 UpdateAuras = function(frame, forceNoThrottle)
     if not frame or not frame.unit then return end
     local unit = frame.unit
@@ -2675,64 +2810,67 @@ UpdateAuras = function(frame, forceNoThrottle)
         debuffFilter = "HARMFUL|PLAYER"
     end
     if showDebuffs and not debuffPreviewActive then
-        while debuffCount < debuffMaxIcons do
-            local auraData = C_UnitAuras.GetAuraDataByIndex(unit, debuffIndex, debuffFilter)
-            if not auraData then break end
-            
-            debuffCount = debuffCount + 1
-
-            local icon = GetAuraIcon(frame.debuffIcons, debuffCount, frame, iconSize, auraSettings, true)
-
-            -- Store aura data for tooltip
-            icon.unit = unit
-            icon.auraInstanceID = auraData.auraInstanceID
-            icon.filter = debuffFilter
-
-            -- Safely set texture (icon field is always safe)
-            if auraData.icon then
-                icon.icon:SetTexture(auraData.icon)
-            end
-
-            -- Red border for debuffs
-            if icon.border then
-                icon.border:SetColorTexture(0.8, 0.2, 0.2, 1)
-            end
-
-            -- Cooldown (safely handles secret values via duration object API)
-            if SafeSetCooldown(icon.cooldown, auraData, unit) then
-                icon.cooldown:Show()
-            else
-                icon.cooldown:Hide()
-            end
-
-            -- Stack count (using combat-safe API, no comparisons on result)
-            if icon._showStack then
-                DisplayStackCount(icon.count, unit, auraData.auraInstanceID)
-                icon.count:Show()
-            else
-                icon.count:Hide()
-            end
-
-            -- Calculate position based on anchor and single grow direction
-            local idx = debuffCount - 1
-            local xPos, yPos = debuffOffsetX, debuffOffsetY
-            if debuffGrow == "RIGHT" then
-                xPos = xPos + idx * (iconSize + debuffSpacing)
-            elseif debuffGrow == "LEFT" then
-                xPos = xPos - idx * (iconSize + debuffSpacing)
-            elseif debuffGrow == "UP" then
-                yPos = yPos + idx * (iconSize + debuffSpacing)
-            elseif debuffGrow == "DOWN" then
-                yPos = yPos - idx * (iconSize + debuffSpacing)
-            end
-            
-            local iconPoint, framePoint, borderOffsetX = GetAuraAnchorPoints(debuffAnchor)
-
-            icon:ClearAllPoints()
-            icon:SetPoint(iconPoint, frame, framePoint, xPos + borderOffsetX, yPos)
-            icon:Show()
-
+        while debuffCount < debuffMaxIcons and debuffIndex <= AURA_SCAN_LIMIT do
+            local auraData, isSecret = GetAuraDataSecretSafe(unit, debuffIndex, debuffFilter)
+            -- End of the aura list only when the slot is readable AND empty; a
+            -- secret slot tells us nothing about what comes after it.
+            if not auraData and not isSecret then break end
             debuffIndex = debuffIndex + 1
+
+            if auraData then
+                debuffCount = debuffCount + 1
+
+                local icon = GetAuraIcon(frame.debuffIcons, debuffCount, frame, iconSize, auraSettings, true)
+
+                -- Store aura data for tooltip
+                icon.unit = unit
+                icon.auraInstanceID = auraData.auraInstanceID
+                icon.filter = debuffFilter
+
+                -- Safely set texture (icon field is always safe)
+                if auraData.icon then
+                    icon.icon:SetTexture(auraData.icon)
+                end
+
+                -- Red border for debuffs
+                if icon.border then
+                    icon.border:SetColorTexture(0.8, 0.2, 0.2, 1)
+                end
+
+                -- Cooldown (safely handles secret values via duration object API)
+                if SafeSetCooldown(icon.cooldown, auraData, unit) then
+                    icon.cooldown:Show()
+                else
+                    icon.cooldown:Hide()
+                end
+
+                -- Stack count (using combat-safe API, no comparisons on result)
+                if icon._showStack then
+                    DisplayStackCount(icon.count, unit, auraData.auraInstanceID)
+                    icon.count:Show()
+                else
+                    icon.count:Hide()
+                end
+
+                -- Calculate position based on anchor and single grow direction
+                local idx = debuffCount - 1
+                local xPos, yPos = debuffOffsetX, debuffOffsetY
+                if debuffGrow == "RIGHT" then
+                    xPos = xPos + idx * (iconSize + debuffSpacing)
+                elseif debuffGrow == "LEFT" then
+                    xPos = xPos - idx * (iconSize + debuffSpacing)
+                elseif debuffGrow == "UP" then
+                    yPos = yPos + idx * (iconSize + debuffSpacing)
+                elseif debuffGrow == "DOWN" then
+                    yPos = yPos - idx * (iconSize + debuffSpacing)
+                end
+
+                local iconPoint, framePoint, borderOffsetX = GetAuraAnchorPoints(debuffAnchor)
+
+                icon:ClearAllPoints()
+                icon:SetPoint(iconPoint, frame, framePoint, xPos + borderOffsetX, yPos)
+                icon:Show()
+            end
         end
     end
     
@@ -2740,64 +2878,67 @@ UpdateAuras = function(frame, forceNoThrottle)
     local buffCount = 0
     local buffIndex = 1
     if showBuffs and not buffPreviewActive then
-        while buffCount < buffMaxIcons do
-            local auraData = C_UnitAuras.GetAuraDataByIndex(unit, buffIndex, "HELPFUL")
-            if not auraData then break end
-            
-            buffCount = buffCount + 1
-
-            local icon = GetAuraIcon(frame.buffIcons, buffCount, frame, buffIconSize, auraSettings, false)
-
-            -- Store aura data for tooltip
-            icon.unit = unit
-            icon.auraInstanceID = auraData.auraInstanceID
-            icon.filter = "HELPFUL"
-
-            -- Safely set texture
-            if auraData.icon then
-                icon.icon:SetTexture(auraData.icon)
-            end
-
-            -- Default black border for buffs
-            if icon.border then
-                icon.border:SetColorTexture(0, 0, 0, 1)
-            end
-
-            -- Cooldown (safely handles secret values via duration object API)
-            if SafeSetCooldown(icon.cooldown, auraData, unit) then
-                icon.cooldown:Show()
-            else
-                icon.cooldown:Hide()
-            end
-
-            -- Stack count (using combat-safe API, no comparisons on result)
-            if icon._showStack then
-                DisplayStackCount(icon.count, unit, auraData.auraInstanceID)
-                icon.count:Show()
-            else
-                icon.count:Hide()
-            end
-
-            -- Calculate position based on anchor and single grow direction
-            local idx = buffCount - 1
-            local xPos, yPos = buffOffsetX, buffOffsetY
-            if buffGrow == "RIGHT" then
-                xPos = xPos + idx * (buffIconSize + buffSpacing)
-            elseif buffGrow == "LEFT" then
-                xPos = xPos - idx * (buffIconSize + buffSpacing)
-            elseif buffGrow == "UP" then
-                yPos = yPos + idx * (buffIconSize + buffSpacing)
-            elseif buffGrow == "DOWN" then
-                yPos = yPos - idx * (buffIconSize + buffSpacing)
-            end
-
-            local iconPoint, framePoint, borderOffsetX = GetAuraAnchorPoints(buffAnchor)
-
-            icon:ClearAllPoints()
-            icon:SetPoint(iconPoint, frame, framePoint, xPos + borderOffsetX, yPos)
-            icon:Show()
-
+        while buffCount < buffMaxIcons and buffIndex <= AURA_SCAN_LIMIT do
+            local auraData, isSecret = GetAuraDataSecretSafe(unit, buffIndex, "HELPFUL")
+            -- End of the aura list only when the slot is readable AND empty; a
+            -- secret slot tells us nothing about what comes after it.
+            if not auraData and not isSecret then break end
             buffIndex = buffIndex + 1
+
+            if auraData then
+                buffCount = buffCount + 1
+
+                local icon = GetAuraIcon(frame.buffIcons, buffCount, frame, buffIconSize, auraSettings, false)
+
+                -- Store aura data for tooltip
+                icon.unit = unit
+                icon.auraInstanceID = auraData.auraInstanceID
+                icon.filter = "HELPFUL"
+
+                -- Safely set texture
+                if auraData.icon then
+                    icon.icon:SetTexture(auraData.icon)
+                end
+
+                -- Default black border for buffs
+                if icon.border then
+                    icon.border:SetColorTexture(0, 0, 0, 1)
+                end
+
+                -- Cooldown (safely handles secret values via duration object API)
+                if SafeSetCooldown(icon.cooldown, auraData, unit) then
+                    icon.cooldown:Show()
+                else
+                    icon.cooldown:Hide()
+                end
+
+                -- Stack count (using combat-safe API, no comparisons on result)
+                if icon._showStack then
+                    DisplayStackCount(icon.count, unit, auraData.auraInstanceID)
+                    icon.count:Show()
+                else
+                    icon.count:Hide()
+                end
+
+                -- Calculate position based on anchor and single grow direction
+                local idx = buffCount - 1
+                local xPos, yPos = buffOffsetX, buffOffsetY
+                if buffGrow == "RIGHT" then
+                    xPos = xPos + idx * (buffIconSize + buffSpacing)
+                elseif buffGrow == "LEFT" then
+                    xPos = xPos - idx * (buffIconSize + buffSpacing)
+                elseif buffGrow == "UP" then
+                    yPos = yPos + idx * (buffIconSize + buffSpacing)
+                elseif buffGrow == "DOWN" then
+                    yPos = yPos - idx * (buffIconSize + buffSpacing)
+                end
+
+                local iconPoint, framePoint, borderOffsetX = GetAuraAnchorPoints(buffAnchor)
+
+                icon:ClearAllPoints()
+                icon:SetPoint(iconPoint, frame, framePoint, xPos + borderOffsetX, yPos)
+                icon:Show()
+            end
         end
     end
 
@@ -3806,12 +3947,9 @@ function SUI_UF:RefreshFrame(unitKey)
         -- Determine border color first (needed for both styles)
         local borderR, borderG, borderB = 0, 0, 0
         if settings.portraitBorderUseClassColor then
-            local _, class = UnitClass(frame.unit)
-            if class then
-                local classColor = RAID_CLASS_COLORS[class]
-                if classColor then
-                    borderR, borderG, borderB = classColor.r, classColor.g, classColor.b
-                end
+            local hasColor, r, g, b = GetClassColorRGB(select(2, UnitClass(frame.unit)))
+            if hasColor then
+                borderR, borderG, borderB = r, g, b
             end
         elseif settings.portraitBorderColor then
             borderR = settings.portraitBorderColor[1] or 0
@@ -3956,21 +4094,33 @@ function SUI_UF:RefreshFrame(unitKey)
                     frame.indicatorFrame = indicatorFrame
                 end
                 local leaderIcon = frame.indicatorFrame:CreateTexture(nil, "OVERLAY")
+                leaderIcon:SetTexture([[Interface\GroupFrame\UI-Group-LeaderIcon]])
                 leaderIcon:Hide()
                 frame.leaderIcon = leaderIcon
                 -- Register events if not already registered
                 frame:RegisterEvent("PARTY_LEADER_CHANGED")
                 frame:RegisterEvent("GROUP_ROSTER_UPDATE")
             end
+            -- Separate assistant texture: status is a secret value in 12.x, so it
+            -- can only drive SetShown, never a SetTexture branch.
+            if not frame.assistantIcon then
+                local assistantIcon = frame.indicatorFrame:CreateTexture(nil, "OVERLAY")
+                assistantIcon:SetTexture([[Interface\GroupFrame\UI-Group-AssistantIcon]])
+                assistantIcon:Hide()
+                frame.assistantIcon = assistantIcon
+            end
             -- Update size and position
-            frame.leaderIcon:SetSize(leader.size or 16, leader.size or 16)
-            frame.leaderIcon:ClearAllPoints()
             local anchorInfo = GetTextAnchorInfo(leader.anchor or "TOPLEFT")
-            frame.leaderIcon:SetPoint(anchorInfo.point, frame, anchorInfo.point, leader.xOffset or -8, leader.yOffset or 8)
+            for _, icon in ipairs({ frame.leaderIcon, frame.assistantIcon }) do
+                icon:SetSize(leader.size or 16, leader.size or 16)
+                icon:ClearAllPoints()
+                icon:SetPoint(anchorInfo.point, frame, anchorInfo.point, leader.xOffset or -8, leader.yOffset or 8)
+            end
             UpdateLeaderIcon(frame)
-        elseif frame.leaderIcon then
-            -- Feature disabled - hide the icon
-            frame.leaderIcon:Hide()
+        else
+            -- Feature disabled - hide the icons
+            if frame.leaderIcon then frame.leaderIcon:Hide() end
+            if frame.assistantIcon then frame.assistantIcon:Hide() end
         end
     end
 

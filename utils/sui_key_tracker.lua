@@ -361,9 +361,13 @@ local function UpdateButton(button, keystoneInfo, unitName, unit, isLeader)
     end
 
     -- Leader icon
-    if isLeader and not IsInRaid() then
-        button.leaderIcon:Show()
-    else
+    -- isLeader comes from UnitIsGroupLeader(unitId) and is a secret value on
+    -- non-player units in 12.x, so it can only be fed to SetShown - branching
+    -- on it throws "boolean test on a secret boolean value". Test IsInRaid()
+    -- first since that one is always a plain boolean.
+    if IsInRaid() then
+        button.leaderIcon:Hide()
+    elseif not pcall(button.leaderIcon.SetShown, button.leaderIcon, isLeader) then
         button.leaderIcon:Hide()
     end
 

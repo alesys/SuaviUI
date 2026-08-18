@@ -1,19 +1,36 @@
-## 🎮 SuaviUI v0.3.24 - Omnium Folio Edition
+## 🎮 SuaviUI v0.3.25 - Secret Values Edition
 
-Full support for Midnight's Omnium Folio (the Runes of Power tree on the expansion landing page).
+A round of Midnight compatibility fixes. In 12.x the client hides more and more
+information from addons ("secret values"), and several SuaviUI features were either
+erroring thousands of times per session or silently falling back to grey. This
+release makes them play by Midnight's rules — and, where the game allows it, get the
+*correct* data back instead of a fallback.
 
-### ✨ Major Features
+### 🔧 Fixes
 
-- **Omnium datatext**: new datatext showing unspent Omnium Folio points, turning gold whenever there is actually something you can buy. Tooltip breaks down unspent points, spent points and your Omnium balance; left click opens the folio. Add it to any datapanel slot from the Character category.
-- **Omnium Folio skinning**: the folio frame now wears the SuaviUI look — the ornate Midnight frame is replaced with the standard 1px SuaviUI border, and the header title and Omnium counter use your configured font. The tree artwork is left intact so the nodes still read correctly. Toggle it in Options → General & QoL → Omnium Folio.
-- **Spendable Omnium alert**: an optional pulsing glow on the landing page minimap button whenever you have points ready to spend, with class color or a custom color, plus an optional chat notice. Blizzard only nudges you with a tutorial HelpTip, so this keeps working for players who disable tutorials. The glow clears as soon as you open the folio.
-- **Landing page minimap button controls**: scale and X/Y offset for the expansion landing page button, configurable in the Edit Mode minimap panel. Previously it was pinned to a fixed spot.
+- **Cursor ring is back.** The GCD ring that follows your mouse was completely broken
+  in Midnight — it errored on every single frame and never moved. It now tracks the
+  cursor again, and its global cooldown sweep no longer errors in combat.
+- **Buff and debuff icons on unit frames** no longer flood your error log inside
+  dungeons, raids and rated PvP. Auras the client refuses to hand over are skipped
+  cleanly, and the ones it does allow keep showing normally — previously a single
+  hidden aura also hid every aura after it.
+- **Leader and assistant icons** (crown / flag) on the target and focus frames work
+  again instead of erroring whenever you were in a group.
+- **Class colors are correct in instances again.** Target, target-of-target, pets and
+  portrait borders were falling back to grey inside restricted content. They now show
+  the real class color. Where the game genuinely will not allow it — the inline
+  target-of-target text, which has to be written as coloured text rather than drawn —
+  it falls back to white instead of breaking the name.
+- **Raid buff checks** no longer error while scanning group members' buffs.
+- **Mythic+ key list**: the party leader crown no longer errors.
 
-### 🔧 Fixes & Improvements
+### ℹ️ Known limitation (not a bug)
 
-- **The landing page minimap button is now shown by default**. In Midnight it is the entry point to the Omnium Folio, and hiding it by default left players with no obvious way in. If you prefer it hidden, turn off "Show Progress Report (Missions)" in the Edit Mode minimap panel.
-- Detecting whether Omnium is actually spendable uses Blizzard's own rule: having unspent points is not enough, an affordable and purchasable node must exist. The alert no longer sticks on once your tree is maxed.
-- All Omnium code is guarded for pre-Midnight clients, so nothing errors if the system is unavailable on your character.
+Inside dungeons, raids and rated PvP, Midnight marks some auras as secret and no addon
+can read or display them. If a buff or debuff icon is missing there, that is the game
+hiding it, not SuaviUI dropping it. Blizzard's own frames still show them because
+Blizzard's code is not subject to the same restriction.
 
 ### 📦 Package
 

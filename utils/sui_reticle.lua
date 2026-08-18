@@ -9,7 +9,7 @@ ns.SUI = SUI
 -- Locals
 local UIParent = UIParent
 local CreateFrame = CreateFrame
-local GetScaledCursorPosition = GetScaledCursorPosition
+local GetCursorPosition = GetCursorPosition
 local InCombatLockdown = InCombatLockdown
 local UnitClass = UnitClass
 local C_ClassColor = C_ClassColor
@@ -17,6 +17,21 @@ local C_Spell = C_Spell
 local GetTime = GetTime
 local pcall = pcall
 local type = type
+
+-- 12.x removed the in-game GetScaledCursorPosition() global - it now only exists
+-- in the glue (login screen) environment, so capturing it as an upvalue at load
+-- time yielded nil and blew up once per OnUpdate frame. Blizzard's in-game
+-- replacement is InputUtil.GetCursorPosition(C_UI.GetUIParent()); the manual
+-- scale divide is the same math, kept as a fallback.
+local function GetScaledCursorPosition()
+    if InputUtil and InputUtil.GetCursorPosition then
+        return InputUtil.GetCursorPosition(C_UI and C_UI.GetUIParent() or UIParent)
+    end
+
+    local x, y = GetCursorPosition()
+    local scale = UIParent:GetEffectiveScale()
+    return x / scale, y / scale
+end
 
 -- Frame references
 local ringFrame, ringTexture, reticleTexture, gcdCooldown
@@ -282,11 +297,10 @@ local function UpdateGCDCooldown()
 
     if IsCooldownActive(start, duration) then
         gcdCooldown:Show()
-        if modRate then
-            gcdCooldown:SetCooldown(start, duration, modRate)
-        else
-            gcdCooldown:SetCooldown(start, duration)
-        end
+        -- SetCooldown rejects secret arguments from tainted code, and modRate can
+        -- itself be secret so it cannot be boolean-tested either. Pass it through
+        -- (nil is a valid optional arg) inside a pcall.
+        pcall(gcdCooldown.SetCooldown, gcdCooldown, start, duration, modRate)
     else
         gcdCooldown:Hide()
     end
