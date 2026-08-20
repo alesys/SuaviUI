@@ -663,6 +663,17 @@ function SUI_Anchoring_Options:CreateMultiAnchorPopover(anchorButton, settingsDB
         end
     end)
     popover.clickFrame = clickFrame
+
+    -- SAFETY NET: clickFrame is parented to UIParent, not to the popover, so it
+    -- does NOT inherit the popover's visibility. Any route that hides the popover
+    -- without going through popover.Hide() below (parent hidden, a stored
+    -- reference to the original Hide, a UI state change) would strand a
+    -- full-screen, invisible, mouse-enabled frame at FULLSCREEN_DIALOG:499 --
+    -- i.e. the entire screen silently stops accepting clicks.
+    -- OnHide fires no matter HOW the popover became hidden, so this cannot leak.
+    popover:SetScript("OnHide", function()
+        clickFrame:Hide()
+    end)
     
     -- ESC key to close
     popover:SetScript("OnKeyDown", function(self, key)

@@ -1,36 +1,34 @@
-## 🎮 SuaviUI v0.3.25 - Secret Values Edition
+## 🎮 SuaviUI v0.3.26 - Click Blocker Edition
 
-A round of Midnight compatibility fixes. In 12.x the client hides more and more
-information from addons ("secret values"), and several SuaviUI features were either
-erroring thousands of times per session or silently falling back to grey. This
-release makes them play by Midnight's rules — and, where the game allows it, get the
-*correct* data back instead of a fallback.
+Hunts down the "something invisible is eating my clicks" problem — a frame left shown
+and mouse-enabled while drawing nothing still swallows every click over its rectangle.
 
 ### 🔧 Fixes
 
-- **Cursor ring is back.** The GCD ring that follows your mouse was completely broken
-  in Midnight — it errored on every single frame and never moved. It now tracks the
-  cursor again, and its global cooldown sweep no longer errors in combat.
-- **Buff and debuff icons on unit frames** no longer flood your error log inside
-  dungeons, raids and rated PvP. Auras the client refuses to hand over are skipped
-  cleanly, and the ones it does allow keep showing normally — previously a single
-  hidden aura also hid every aura after it.
-- **Leader and assistant icons** (crown / flag) on the target and focus frames work
-  again instead of erroring whenever you were in a group.
-- **Class colors are correct in instances again.** Target, target-of-target, pets and
-  portrait borders were falling back to grey inside restricted content. They now show
-  the real class color. Where the game genuinely will not allow it — the inline
-  target-of-target text, which has to be written as coloured text rather than drawn —
-  it falls back to white instead of breaking the name.
-- **Raid buff checks** no longer error while scanning group members' buffs.
-- **Mythic+ key list**: the party leader crown no longer errors.
+- **Anchoring options popover could leave the whole screen unclickable.** Its
+  "click outside to close" catcher is a full-screen, invisible, mouse-enabled frame,
+  and it was parented to the screen rather than to the popover — so it did not
+  inherit the popover's visibility. If the popover was ever closed by any route
+  other than its own close path, the catcher stayed up and silently ate every click
+  on your entire UI. It now hides no matter how the popover goes away.
 
-### ℹ️ Known limitation (not a bug)
+### ✨ New: mouse blocker diagnostic
 
-Inside dungeons, raids and rated PvP, Midnight marks some auras as secret and no addon
-can read or display them. If a buff or debuff icon is missing there, that is the game
-hiding it, not SuaviUI dropping it. Blizzard's own frames still show them because
-Blizzard's code is not subject to the same restriction.
+If clicks ever die on you again, you can now find the culprit yourself instead of
+disabling addons one by one:
+
+- **`/suimouse`** — lists every region under the cursor right now, topmost first,
+  with its transparency, whether it accepts clicks, its layer and its size. Anything
+  invisible but still clickable is flagged in red.
+- **`/suimouse 3`** — the same, sampled 3 seconds from now, so you can park the
+  cursor on the dead spot first.
+- **`/suimouse scan`** — sweeps every frame in the game and reports two kinds of
+  blocker: frames drawn at zero opacity that still take clicks, and frames covering
+  more than a quarter of the screen with clicks enabled. Sorted biggest first.
+
+It only reports — it never disables anything, since silently switching off a frame's
+mouse can break working UI or taint protected frames. Works on any addon's frames,
+not just SuaviUI's.
 
 ### 📦 Package
 
