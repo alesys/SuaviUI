@@ -1,34 +1,28 @@
-## 🎮 SuaviUI v0.3.26 - Click Blocker Edition
+## 🎮 SuaviUI v0.3.27 - Tracker Taint Edition
 
-Hunts down the "something invisible is eating my clicks" problem — a frame left shown
-and mouse-enabled while drawing nothing still swallows every click over its rectangle.
+Fixes an error storm — nearly 43,000 in a single session — coming out of the Objective
+Tracker during scenarios, delves and Mythic+.
 
 ### 🔧 Fixes
 
-- **Anchoring options popover could leave the whole screen unclickable.** Its
-  "click outside to close" catcher is a full-screen, invisible, mouse-enabled frame,
-  and it was parented to the screen rather than to the popover — so it did not
-  inherit the popover's visibility. If the popover was ever closed by any route
-  other than its own close path, the catcher stayed up and silently ate every click
-  on your entire UI. It now hides no matter how the popover goes away.
+- **Objective Tracker no longer taints Blizzard's own code.** SuaviUI was attaching a
+  script hook directly to the Objective Tracker frame in order to apply your global
+  font to it. In Midnight that marks the frame as addon-touched, so Blizzard's own
+  tracker code then runs in a restricted context — and Blizzard's scenario tracker
+  asks the game for your player auras on every layout pass without checking whether
+  it is allowed to. The result was a flood of errors blamed on SuaviUI from a call
+  stack that contained no SuaviUI code at all. The font is now applied from a frame
+  SuaviUI owns, with identical timing and no side effects on Blizzard's frames.
+- Two more hooks of the same kind removed from the Objective Tracker skin, which
+  would have caused the same storm for anyone with tracker skinning enabled. One of
+  them was redundant anyway — it was watching a button whose action SuaviUI already
+  tracked safely elsewhere.
 
-### ✨ New: mouse blocker diagnostic
+### ℹ️ Who this affected
 
-If clicks ever die on you again, you can now find the culprit yourself instead of
-disabling addons one by one:
-
-- **`/suimouse`** — lists every region under the cursor right now, topmost first,
-  with its transparency, whether it accepts clicks, its layer and its size. Anything
-  invisible but still clickable is flagged in red.
-- **`/suimouse 3`** — the same, sampled 3 seconds from now, so you can park the
-  cursor on the dead spot first.
-- **`/suimouse scan`** — sweeps every frame in the game and reports two kinds of
-  blocker: frames drawn at zero opacity that still take clicks, and frames covering
-  more than a quarter of the screen with clicks enabled. Sorted biggest first.
-
-It only reports — it never disables anything, since silently switching off a frame's
-mouse can break working UI or taint protected frames. Works on any addon's frames,
-not just SuaviUI's.
+Anyone running scenarios, delves, Torghast or Mythic+ with the global font option on
+— which is the default. If your error log was filling up with aura-related messages
+naming SuaviUI, this is why.
 
 ### 📦 Package
 

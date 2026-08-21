@@ -270,6 +270,10 @@ local function ApplyMaxWidth(settings)
 end
 
 -- Update backdrop to match content, respecting max height setting
+-- Addon-owned frame used to watch the tracker's size (see the TAINT-FIX below).
+-- Kept as a file local rather than a field on the Blizzard frame.
+local sizeWatcher
+
 local function UpdateBackdropAnchors()
     local TrackerFrame = _G.ObjectiveTrackerFrame
     if not TrackerFrame or not TrackerFrame.suiBackdrop then return end
@@ -650,10 +654,10 @@ local function SkinObjectiveTracker()
     for _, trackerName in ipairs(trackerModules) do
         local tracker = _G[trackerName]
         if tracker and not tracker.quiCollapseHooked then
-            -- Hook the header's minimize button click
-            if tracker.Header and tracker.Header.MinimizeButton then
-                tracker.Header.MinimizeButton:HookScript("OnClick", ScheduleBackdropUpdate)
-            end
+            -- NOTE: the header's MinimizeButton is deliberately NOT HookScript'd.
+            -- HookScript taints the Blizzard frame, and it was redundant anyway:
+            -- its OnClick runs ObjectiveTrackerModuleMixin:OnToggle, which calls
+            -- SetCollapsed -- already hooked taint-safely just below.
 
             -- Hook SetCollapsed on the module itself
             if tracker.SetCollapsed then
@@ -675,10 +679,24 @@ local function SkinObjectiveTracker()
         end
     end
 
-    -- Also update on size changes (with guard to prevent multiple hooks)
-    if not TrackerFrame.quiSizeChangedHooked then
-        TrackerFrame:HookScript("OnSizeChanged", UpdateBackdropAnchors)
-        TrackerFrame.quiSizeChangedHooked = true
+    -- Also update on size changes.
+    -- TAINT-FIX: HookScript on a Blizzard frame taints that frame, and the
+    -- ObjectiveTracker's own update chain then runs tainted. That is how a call
+    -- stack containing ZERO SuaviUI frames still dies with
+    --   GetAuraDataByIndex(): Auras cannot be accessed when secret while
+    --   tainted by 'SuaviUI'
+    -- via ScenarioObjectiveTracker:LayoutContents -> ShouldShowMawBuffs, which
+    -- queries player auras unguarded. Same defect class already fixed for the
+    -- CDM viewers in v0.3.15 ("removed HookScript OnSizeChanged").
+    -- Instead, watch the size from an ADDON-OWNED frame anchored to the tracker:
+    -- it resizes with its anchor, so OnSizeChanged fires on OUR frame and taints
+    -- nothing. The local also replaces the quiSizeChangedHooked field, which was
+    -- one more write onto a Blizzard table.
+    if not sizeWatcher then
+        sizeWatcher = CreateFrame("Frame", nil, TrackerFrame)
+        sizeWatcher:SetAllPoints(TrackerFrame)
+        sizeWatcher:EnableMouse(false)
+        sizeWatcher:SetScript("OnSizeChanged", UpdateBackdropAnchors)
     end
 
     -- Hook ObjectiveTrackerManager.SetOpacity to catch when edit mode loads saved settings

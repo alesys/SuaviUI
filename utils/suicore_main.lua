@@ -5474,11 +5474,30 @@ function SUICore:ApplyGlobalFont()
                     ApplyFontToFrameRecursive(ObjectiveTrackerFrame, fp)
                 end)
             else
-                -- Fallback: hook frame's OnShow for expansion versions without ObjectiveTracker_Update
-                ObjectiveTrackerFrame:HookScript("OnShow", function(self)
+                -- Fallback for clients without ObjectiveTracker_Update (which is
+                -- ALL of retail 12.x -- the global only exists in Classic, so this
+                -- branch is the live one).
+                --
+                -- TAINT-FIX: this used to be
+                --     ObjectiveTrackerFrame:HookScript("OnShow", ...)
+                -- HookScript taints the Blizzard frame, and the tracker's own
+                -- update chain then runs tainted -- producing
+                --   GetAuraDataByIndex(): Auras cannot be accessed when secret
+                --   while tainted by 'SuaviUI'
+                -- from a call stack with zero SuaviUI frames in it
+                -- (ScenarioObjectiveTracker:LayoutContents -> ShouldShowMawBuffs).
+                --
+                -- An addon-owned child frame gives identical timing: a child's
+                -- OnShow fires when the parent becomes visible, and scripts on OUR
+                -- frame taint nothing.
+                local fontWatcher = CreateFrame("Frame", nil, ObjectiveTrackerFrame)
+                fontWatcher:SetSize(1, 1)
+                fontWatcher:SetPoint("TOPLEFT")
+                fontWatcher:EnableMouse(false)
+                fontWatcher:SetScript("OnShow", function()
                     if not SUICore.db.profile.general.applyGlobalFontToBlizzard then return end
                     local fp = GetGlobalFontPath()
-                    ApplyFontToFrameRecursive(self, fp)
+                    ApplyFontToFrameRecursive(ObjectiveTrackerFrame, fp)
                 end)
             end
         end
