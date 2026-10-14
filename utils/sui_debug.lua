@@ -434,3 +434,96 @@ SlashCmdList["SUIMOUSE"] = function(msg)
 
     ReportUnderCursor()
 end
+
+---------------------------------------------------------------------------
+-- TAINT AUDIT
+--
+-- When a pure-Blizzard call stack dies with "tainted by 'SuaviUI'", the taint
+-- is persistent state on a frame, not an addon on the call stack -- so the
+-- traceback tells you nothing about the cause. issecurevariable() does: it
+-- reports, per field, whether it is secure and WHICH addon dirtied it.
+--
+-- Run this while the error is actively firing (i.e. inside the M+/scenario),
+-- because taint is cleared on reload.
+---------------------------------------------------------------------------
+local TAINT_TARGETS = {
+    "ObjectiveTrackerFrame",
+    "ScenarioObjectiveTracker",
+    "QuestObjectiveTracker",
+    "CampaignQuestObjectiveTracker",
+    "AchievementObjectiveTracker",
+    "BonusObjectiveTracker",
+    "WorldQuestObjectiveTracker",
+    "ProfessionsRecipeTracker",
+    "MonthlyActivitiesObjectiveTracker",
+    "AdventureObjectiveTracker",
+    "ObjectiveTrackerManager",
+    "ObjectiveTrackerBlockMixin",
+}
+
+local function AuditObject(name)
+    local obj = _G[name]
+    if obj == nil then return nil end
+
+    local findings = {}
+
+    -- The global binding itself
+    local ok, secure, culprit = pcall(issecurevariable, name)
+    if ok and secure == false then
+        findings[#findings + 1] = { "<global binding>", culprit or "?" }
+    end
+
+    -- Every field directly set on the object
+    if type(obj) == "table" then
+        for k in pairs(obj) do
+            if type(k) == "string" then
+                local ok2, sec, who = pcall(issecurevariable, obj, k)
+                if ok2 and sec == false then
+                    findings[#findings + 1] = { k, who or "?" }
+                end
+            end
+        end
+    end
+
+    return findings
+end
+
+SLASH_SUITAINT1 = "/suitaint"
+SlashCmdList["SUITAINT"] = function()
+    if type(issecurevariable) ~= "function" then
+        print(PREFIX .. "|cFFFF0000issecurevariable unavailable on this client.|r")
+        return
+    end
+
+    print(PREFIX .. "|cFF30D1FFTaint audit — Objective Tracker chain|r")
+    local anything = false
+
+    for _, name in ipairs(TAINT_TARGETS) do
+        local findings = AuditObject(name)
+        if findings == nil then
+            print(PREFIX .. "|cFF888888" .. name .. " — not loaded|r")
+        elseif #findings == 0 then
+            print(PREFIX .. "|cFF00FF00" .. name .. " — clean|r")
+        else
+            anything = true
+            print(PREFIX .. "|cFFFF0000" .. name .. " — " .. #findings .. " tainted field(s):|r")
+            -- Group by culprit so the guilty addon is obvious at a glance
+            local byAddon = {}
+            for _, f in ipairs(findings) do
+                local who = f[2]
+                byAddon[who] = byAddon[who] or {}
+                table.insert(byAddon[who], f[1])
+            end
+            for who, fields in pairs(byAddon) do
+                local list = table.concat(fields, ", ")
+                if #list > 160 then list = list:sub(1, 160) .. "..." end
+                print(string.format("    |cFFFFFF00%s|r  |cFF888888(%d)|r  %s",
+                    tostring(who), #fields, list))
+            end
+        end
+    end
+
+    if not anything then
+        print(PREFIX .. "|cFF00FF00Nothing tainted right now.|r Run this WHILE the error is firing — taint resets on /reload.")
+    end
+end

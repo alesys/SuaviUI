@@ -11,6 +11,10 @@ local tinsert, tremove = tinsert, tremove
 
 -- Module reference
 local Loot = {}
+
+-- Remembers GroupLootContainer's original mouse state so re-enabling Blizzard's
+-- roll frames restores it exactly (see the click-blocker fix in DisableBlizzardLoot).
+local lootContainerMouseWasEnabled
 SUICore.Loot = Loot
 
 -- Helper to get theme colors from SUI skin system
@@ -80,11 +84,11 @@ local function IsUncollectedTransmog(itemLink)
     if not C_TransmogCollection or not C_TransmogCollection.PlayerHasTransmogItemModifiedAppearance then
         return false
     end
-    local itemID = GetItemInfoInstant(itemLink)
+    local itemID = C_Item.GetItemInfoInstant(itemLink)
     if not itemID then return false end
 
     -- Check if it's equipment
-    local _, _, _, _, _, classID = GetItemInfoInstant(itemLink)
+    local _, _, _, _, _, classID = C_Item.GetItemInfoInstant(itemLink)
     if classID ~= 2 and classID ~= 4 then return false end  -- Weapon or Armor
 
     -- Check if we can learn it
@@ -285,7 +289,7 @@ local function OnLootOpened(autoLoot)
             slot.name:SetText(name or "")
 
             -- Quality color
-            local r, g, b = GetItemQualityColor(quality or 1)
+            local r, g, b = C_Item.GetItemQualityColor(quality or 1)
             slot.iconBorder:SetBackdropBorderColor(r, g, b, 1)
             slot.name:SetTextColor(r, g, b)
 
@@ -619,7 +623,7 @@ StartRoll = function(rollID, rollTime, lootHandle)
     frame.name:SetText(name or "")
 
     -- Quality color
-    local r, g, b = GetItemQualityColor(quality or 1)
+    local r, g, b = C_Item.GetItemQualityColor(quality or 1)
     frame.iconBorder:SetBackdropBorderColor(r, g, b, 1)
     frame.name:SetTextColor(r, g, b)
 
@@ -995,7 +999,25 @@ local function DisableBlizzardLoot()
         -- Instead, only hide the individual roll dialogs (GroupLootFrame1-4)
         -- that have visible content we want to replace with our custom UI.
 
-        -- Hide individual roll frames as they're created
+        -- CLICK-BLOCKER FIX: a bare self:Hide() here leaked a container slot on
+        -- EVERY loot roll, growing an invisible 256px-wide wall that ate clicks.
+        --
+        -- Blizzard's bookkeeping: GroupLootContainer_AddFrame() parks the frame in
+        -- self.rollFrames[idx] and then calls frame:Show(). The slot is only ever
+        -- reclaimed by GroupLootFrame_Remove(), which is guarded by
+        -- `if self:IsShown()`. Hiding the frame the instant it is shown makes that
+        -- guard permanently false, so the slot is never freed. The next roll finds
+        -- every frame "not shown", reuses it, and AddFrame hands out a BRAND NEW
+        -- index -- so maxIndex climbs forever and GroupLootContainer_Update does
+        --     self:SetHeight(self.reservedSize * lastIdx)   -- reservedSize = 100
+        --     self:Show()
+        -- Blizzard ships this container as 256x1 and hidden; it had grown to
+        -- 256x800 (eight leaked slots) with mouse enabled and nothing drawn.
+        --
+        -- Fix: hide immediately (no flash), then hand the slot back through
+        -- Blizzard's own GroupLootContainer_RemoveFrame, which frees the index,
+        -- recalculates maxIndex and re-hides the container once it is empty.
+        -- Deferred by a frame so we do not re-enter AddFrame from inside itself.
         local numRollFrames = NUM_GROUP_LOOT_FRAMES or 4
         for i = 1, numRollFrames do
             local frame = _G["GroupLootFrame"..i]
@@ -1005,10 +1027,25 @@ local function DisableBlizzardLoot()
                 if not frame._quiHooked then
                     hooksecurefunc(frame, "Show", function(self)
                         self:Hide()
+                        C_Timer.After(0, function()
+                            if GroupLootContainer and GroupLootContainer_RemoveFrame then
+                                pcall(GroupLootContainer_RemoveFrame, GroupLootContainer, self)
+                            end
+                        end)
                     end)
                     frame._quiHooked = true
                 end
             end
+        end
+
+        -- Belt and braces: the container is a pure positioning anchor with no
+        -- visual or interactive content of its own, so it never needs the mouse.
+        -- Even if the height ever grows again it cannot swallow a click.
+        if GroupLootContainer and GroupLootContainer.EnableMouse then
+            if lootContainerMouseWasEnabled == nil and GroupLootContainer.IsMouseEnabled then
+                lootContainerMouseWasEnabled = GroupLootContainer:IsMouseEnabled()
+            end
+            GroupLootContainer:EnableMouse(false)
         end
     end
 end
@@ -1025,6 +1062,10 @@ local function EnableBlizzardLoot()
     UIParent:RegisterEvent("CANCEL_LOOT_ROLL")
     if GroupLootContainer then
         GroupLootContainer:SetAlpha(1)
+        -- Put the mouse back exactly as we found it (see the click-blocker fix above)
+        if lootContainerMouseWasEnabled ~= nil and GroupLootContainer.EnableMouse then
+            GroupLootContainer:EnableMouse(lootContainerMouseWasEnabled)
+        end
     end
 end
 
@@ -1254,7 +1295,7 @@ function Loot:ShowLootPreview()
         slot.slotIndex = nil  -- Not real loot
         slot.icon:SetTexture(item.texture)
         slot.name:SetText(item.name)
-        local r, g, b = GetItemQualityColor(item.quality)
+        local r, g, b = C_Item.GetItemQualityColor(item.quality)
         slot.iconBorder:SetBackdropBorderColor(r, g, b, 1)
         slot.name:SetTextColor(r, g, b)
         if item.count and item.count > 1 then
@@ -1354,7 +1395,7 @@ function Loot:ShowRollPreview()
         frame.rollID = nil  -- Not a real roll
         frame.icon:SetTexture(item.texture)
         frame.name:SetText(item.name)
-        local r, g, b = GetItemQualityColor(item.quality)
+        local r, g, b = C_Item.GetItemQualityColor(item.quality)
         frame.iconBorder:SetBackdropBorderColor(r, g, b, 1)
         frame.name:SetTextColor(r, g, b)
 

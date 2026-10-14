@@ -4,6 +4,11 @@
 
 local _, SUI = ...
 
+-- TAINT-FIX: never write fields onto Blizzard frames (ObjectiveTrackerFrame etc.);
+-- a tainted key on the frame table taints every Blizzard update that touches it.
+-- Track which frames we already hooked in an addon-owned table instead.
+local showHooked = {}
+
 -- Get settings from AceDB
 local function GetSettings()
     local SUICore = _G.SuaviUI and _G.SuaviUI.SUICore
@@ -181,8 +186,8 @@ local function ApplyHideSettings()
             ObjectiveTrackerFrame:Hide()
             ObjectiveTrackerFrame:EnableMouse(false)  -- Prevent hidden frame from blocking clicks
             -- Hook Show() to prevent Blizzard from showing it again (quest updates, boss fights, etc.)
-            if not ObjectiveTrackerFrame._SUI_ShowHooked then
-                ObjectiveTrackerFrame._SUI_ShowHooked = true
+            if not showHooked[ObjectiveTrackerFrame] then
+                showHooked[ObjectiveTrackerFrame] = true
                 pcall(hooksecurefunc, ObjectiveTrackerFrame, "Show", function(self)
                     local s = GetSettings()
                     if s then
@@ -237,8 +242,8 @@ local function ApplyHideSettings()
             GameTimeFrame:Show()
         end
         -- Hook Show() to prevent Blizzard from re-showing when hidden
-        if not GameTimeFrame._SUI_ShowHooked then
-            GameTimeFrame._SUI_ShowHooked = true
+        if not showHooked[GameTimeFrame] then
+            showHooked[GameTimeFrame] = true
             pcall(hooksecurefunc, GameTimeFrame, "Show", function(self)
                 local s = GetSettings()
                 if s and s.hideGameTime then
@@ -371,8 +376,8 @@ end
             DisableTalkingHeadMouse()
 
             -- Hook Show() to keep it hidden
-            if not TalkingHeadFrame._SUI_ShowHooked then
-                TalkingHeadFrame._SUI_ShowHooked = true
+            if not showHooked[TalkingHeadFrame] then
+                showHooked[TalkingHeadFrame] = true
                 pcall(hooksecurefunc, TalkingHeadFrame, "Show", function(self)
                     local s = GetSettings()
                     if s and s.hideTalkingHead then
@@ -466,8 +471,8 @@ end
         if hideXP and hideRep then
             StatusTrackingBarManager:Hide()
 
-            if not StatusTrackingBarManager._SUI_ShowHooked then
-                StatusTrackingBarManager._SUI_ShowHooked = true
+            if not showHooked[StatusTrackingBarManager] then
+                showHooked[StatusTrackingBarManager] = true
                 pcall(hooksecurefunc, StatusTrackingBarManager, "Show", function(self)
                     local s = GetSettings()
                     if s and s.hideExperienceBar and s.hideReputationBar then

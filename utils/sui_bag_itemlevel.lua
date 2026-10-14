@@ -336,19 +336,19 @@ local function GetItemLevelFromBag(bagID, slotID)
     if not itemID then return nil end
 
     -- Only show item level on equippable items
-    local _, _, _, _, _, _, _, _, invType = GetItemInfo(itemLink)
+    local _, _, _, _, _, _, _, _, invType = C_Item.GetItemInfo(itemLink)
     if not invType or not EQUIPPABLE_SLOTS[invType] then
         return nil
     end
 
     -- GetDetailedItemLevelInfo gives the actual scaled/upgraded level from the link
-    local actualLevel, isScaled, baseLevel = GetDetailedItemLevelInfo(itemLink)
+    local actualLevel, isScaled, baseLevel = C_Item.GetDetailedItemLevelInfo(itemLink)
     if actualLevel and actualLevel > 0 then
         return actualLevel
     end
 
     -- Fallback: GetItemInfo base level
-    local _, _, _, ilvl = GetItemInfo(itemLink)
+    local _, _, _, ilvl = C_Item.GetItemInfo(itemLink)
     if ilvl and ilvl > 0 then
         return ilvl
     end
@@ -405,9 +405,9 @@ local function CreateOrUpdateOverlay(itemButton)
     local itemLink = C_Container.GetContainerItemLink(bagID, slotID)
     if itemLink then
         if useQualityColor then
-            local _, _, quality = GetItemInfo(itemLink)
+            local _, _, quality = C_Item.GetItemInfo(itemLink)
             if quality then
-                tr, tg, tb = GetItemQualityColor(quality)
+                tr, tg, tb = C_Item.GetItemQualityColor(quality)
                 ta = 1
             end
         else

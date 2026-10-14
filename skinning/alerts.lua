@@ -256,7 +256,7 @@ local function SkinLootWonAlert(frame)
     if hyperlink then
         local quality = C_Item.GetItemQualityByID(hyperlink)
         if quality and quality >= 1 then
-            local r, g, b = GetItemQualityColor(quality)
+            local r, g, b = C_Item.GetItemQualityColor(quality)
             qualityColor = { r = r, g = g, b = b }
         end
     end
@@ -307,7 +307,7 @@ local function SkinLootUpgradeAlert(frame)
     if hyperlink then
         local quality = C_Item.GetItemQualityByID(hyperlink)
         if quality and quality >= 1 then
-            local r, g, b = GetItemQualityColor(quality)
+            local r, g, b = C_Item.GetItemQualityColor(quality)
             qualityColor = { r = r, g = g, b = b }
         end
     end
@@ -576,7 +576,7 @@ local function SkinLegendaryItemAlert(frame, itemLink)
         if itemLink then
             local quality = C_Item.GetItemQualityByID(itemLink)
             if quality then
-                local r, g, b = GetItemQualityColor(quality)
+                local r, g, b = C_Item.GetItemQualityColor(quality)
                 border:SetBackdropBorderColor(r, g, b, 1)
             end
         end

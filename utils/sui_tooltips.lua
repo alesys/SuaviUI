@@ -399,15 +399,24 @@ local function SetupTooltipHook()
         local mouseFrame = GetTopMouseFrame()
         if not mouseFrame then return end
 
-        -- Check if mouse is over owner or child of owner
+        -- Check if mouse is over owner or child of owner.
+        -- The cursor can sit over a FORBIDDEN frame (PingListenerFrame is the one
+        -- that caught us): calling GetParent on it from tainted code throws
+        -- "Attempt to access forbidden object". Stop the walk there instead --
+        -- a forbidden frame is never our tooltip's owner anyway.
         local isOverOwner = false
         local checkFrame = mouseFrame
-        while checkFrame do
+        local guard = 0
+        while checkFrame and guard < 64 do
             if checkFrame == owner then
                 isOverOwner = true
                 break
             end
-            checkFrame = checkFrame:GetParent()
+            if checkFrame.IsForbidden and checkFrame:IsForbidden() then break end
+            local ok, parent = pcall(checkFrame.GetParent, checkFrame)
+            if not ok then break end
+            checkFrame = parent
+            guard = guard + 1
         end
 
         -- If mouse moved away from owner, hide stuck tooltip

@@ -1,4 +1,4 @@
-## Interface: 120000, 120001
+## Interface: 120105
 ## Title: |cFF30D1FFSuaviUI (Midnight)|r
 ## IconTexture: Interface\AddOns\SuaviUI\assets\suaviLogo
 ## AddonCompartmentFunc: SuaviUI_CompartmentClick
@@ -6,7 +6,7 @@
 ## AddonCompartmentFuncOnLeave: SuaviUI_CompartmentOnLeave
 ## Notes: Complete |cFF30D1FFUI|r customization suite with configurable frames and widgets
 ## Author: Suavicremas
-## Version: 0.3.27
+## Version: 0.3.28
 ## DefaultState: Enabled
 ## LoadOnDemand: 0
 ## OptionalDeps: SenseiClassResourceBar

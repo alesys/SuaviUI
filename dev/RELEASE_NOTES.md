@@ -1,34 +1,37 @@
-## 🎮 SuaviUI v0.3.27 - Tracker Taint Edition
+## 🎮 SuaviUI v0.3.28 - Patch 12.1.5 Edition
 
-Fixes an error storm — nearly 43,000 in a single session — coming out of the Objective
-Tracker during scenarios, delves and Mythic+.
+Patch 12.1.5 removed Blizzard's deprecated item API aliases. Without this release the
+character panel, bag item levels, loot frames and alerts throw "attempt to call a nil
+value" the moment you open them.
 
 ### 🔧 Fixes
 
-- **Objective Tracker no longer taints Blizzard's own code.** SuaviUI was attaching a
-  script hook directly to the Objective Tracker frame in order to apply your global
-  font to it. In Midnight that marks the frame as addon-touched, so Blizzard's own
-  tracker code then runs in a restricted context — and Blizzard's scenario tracker
-  asks the game for your player auras on every layout pass without checking whether
-  it is allowed to. The result was a flood of errors blamed on SuaviUI from a call
-  stack that contained no SuaviUI code at all. The font is now applied from a frame
-  SuaviUI owns, with identical timing and no side effects on Blizzard's frames.
-- Two more hooks of the same kind removed from the Objective Tracker skin, which
-  would have caused the same storm for anyone with tracker skinning enabled. One of
-  them was redundant anyway — it was watching a button whose action SuaviUI already
-  tracked safely elsewhere.
+- **12.1.5 compatibility.** Every remaining call to the retired globals
+  (`GetItemInfo`, `GetDetailedItemLevelInfo`, `GetItemInfoInstant`,
+  `GetItemQualityColor`, `GetItemGem`) now goes through the `C_Item` namespace.
+  Affected: character panel item names and item levels, equipment flyout, bag item
+  levels, loot roll frames, loot/alert quality colors, datatext quality colors.
+- **Interface version bumped to 120105** so the addon no longer shows as out of date.
+- **Objective Tracker taint, round two.** The UI Hider was writing a bookkeeping flag
+  directly onto Blizzard's `ObjectiveTrackerFrame` (and onto `GameTimeFrame`,
+  `TalkingHeadFrame` and `StatusTrackingBarManager`). In Midnight a tainted key on a
+  Blizzard frame table is enough to make its whole update chain run restricted, which
+  kept the "Auras cannot be accessed when secret" storm alive for anyone hiding the
+  tracker. The flags now live in an addon-owned table.
+- **Loot roll click blocker.** Hiding Blizzard's roll frames leaked a container slot on
+  every roll, growing an invisible 256px-wide wall that ate clicks. The slot is now
+  handed back through Blizzard's own `GroupLootContainer_RemoveFrame`, and the container
+  no longer accepts mouse input (it draws nothing).
+- **Tooltip forbidden-frame crash.** Walking a frame's parents could hit a forbidden
+  frame (`PingListenerFrame`) and die with "Attempt to access forbidden object". The walk
+  now stops at forbidden frames.
+
+### 🛠️ New
+
+- `/suitaint` — audits the Objective Tracker chain with `issecurevariable()` and names
+  which field is tainted and by whom. Run it inside the scenario while the error fires;
+  taint clears on reload.
 
 ### ℹ️ Who this affected
 
-Anyone running scenarios, delves, Torghast or Mythic+ with the global font option on
-— which is the default. If your error log was filling up with aura-related messages
-naming SuaviUI, this is why.
-
-### 📦 Package
-
-- Clean release with only runtime files (no docs/, dev/, spec/)
-- Compatible with Midnight (Interface 120000-120001)
-
-### 🙏 Credits
-
-Special thanks to our testers: Vela, Pataz, and Ñora for their feedback and testing!
+Everyone on 12.1.5. Update before opening the character panel or your bags.

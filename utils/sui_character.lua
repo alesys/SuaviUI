@@ -213,7 +213,7 @@ end
 ---------------------------------------------------------------------------
 local function GetItemQualityColorRGB(quality)
     if quality and quality >= 0 then
-        local r, g, b = GetItemQualityColor(quality)
+        local r, g, b = C_Item.GetItemQualityColor(quality)
         return r, g, b
     end
     return 1, 1, 1  -- White fallback
@@ -330,7 +330,7 @@ local function GetEnchantText(unit, slotId)
 
     -- OffHand: only enchantable if it's a weapon (dual-wield), not shield/held-in-off-hand
     if slotId == INVSLOT_OFFHAND then
-        local invType = select(4, GetItemInfoInstant(itemLink))
+        local invType = select(4, C_Item.GetItemInfoInstant(itemLink))
         if invType == "INVTYPE_WEAPON" or invType == "INVTYPE_WEAPONOFFHAND" then
             enchantableSlots[INVSLOT_OFFHAND] = true
         end
@@ -450,16 +450,16 @@ local function GetGemInfo(unit, slotId)
     local filledCount = 0
     for i = 1, 4 do
         -- GetItemGem returns TWO values: gemName, gemLink (we need the link for icon lookup)
-        local gemName, gemLink = GetItemGem(itemLink, i)
+        local gemName, gemLink = C_Item.GetItemGem(itemLink, i)
 
         if gemLink then
             filledCount = filledCount + 1
             -- Get gem icon texture from item info (icon is the 10th return value)
-            local _, _, _, _, _, _, gemSubType, _, _, gemIcon = GetItemInfo(gemLink)
+            local _, _, _, _, _, _, gemSubType, _, _, gemIcon = C_Item.GetItemInfo(gemLink)
 
             -- If GetItemInfo didn't return icon yet (item not cached), try C_Item API
             if not gemIcon and C_Item and C_Item.GetItemIconByID then
-                local itemID = GetItemInfoInstant(gemLink)
+                local itemID = C_Item.GetItemInfoInstant(gemLink)
                 if itemID then
                     gemIcon = C_Item.GetItemIconByID(itemID)
                 end
@@ -742,7 +742,7 @@ local function UpdateSlotOverlay(overlay, unit)
     overlay:Show()
 
     -- Get item info for name and quality
-    local itemName = GetItemInfo(itemLink)
+    local itemName = C_Item.GetItemInfo(itemLink)
     local quality = GetSlotItemQuality(unit, slotId)
     local r, g, b = GetItemQualityColorRGB(quality)
 
@@ -2736,7 +2736,7 @@ local function GetFlyoutButtonIlvl(button)
     if not link then return nil end
 
     -- GetDetailedItemLevelInfo returns effective ilvl (considers upgrades, bonus IDs)
-    local ilvl = GetDetailedItemLevelInfo(link)
+    local ilvl = C_Item.GetDetailedItemLevelInfo(link)
     if ilvl and ilvl > 0 then return ilvl end
 
     return nil
