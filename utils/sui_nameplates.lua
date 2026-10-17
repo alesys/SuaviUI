@@ -12,11 +12,19 @@
         already acquired its UnitFrame when we decide what to do with it.
       * Blizzard's UnitFrame is never hidden, re-anchored or unregistered:
         it is only faded to alpha 0 (it must stay visible for the client's
-        click/stacking logic) and its mouse-enabled aura list is parked on a
-        hidden holder. Both are restored when the pooled UnitFrame is later
-        reused for a unit we leave to Blizzard, or when the module is
-        disabled. No field is ever written on a Blizzard frame; bookkeeping
-        lives in weak tables keyed by frame (same rule as suicore_main.lua).
+        click/stacking logic). Exactly what we touch on Blizzard objects:
+          - uf:SetAlpha(0) plus a hooksecurefunc on uf.SetAlpha that re-applies
+            0 while we own the frame (Blizzard code fades plates itself);
+          - uf.selectionHighlight:SetAlpha(0) (it ignores parent alpha);
+          - uf.AurasFrame:SetParent(hidden holder) (its buttons are
+            mouse-enabled, an alpha-0 copy would be a tooltip trap);
+          - uf.SoftTargetFrame:SetIgnoreParentAlpha(true) so the soft-target
+            icon stays visible.
+        All of that is restored when the pooled UnitFrame is later reused for
+        a unit we leave to Blizzard, or when the module is disabled. We call
+        methods only: no Lua field is ever written on a Blizzard frame;
+        bookkeeping lives in weak tables keyed by frame (same rule as
+        suicore_main.lua).
       * Forbidden plates (e.g. friendly plates inside instances) are invisible
         to insecure code: C_NamePlate.GetNamePlateForUnit returns nil and we
         simply skip them.
@@ -235,12 +243,14 @@ local dirtyAuras = {}    -- [plate] = true, flushed next frame
 -- Blizzard UnitFrame bookkeeping (weak, never written onto the frames)
 local ownedUF = setmetatable({}, { __mode = "k" })       -- [uf] = true while suppressed
 local alphaHooked = setmetatable({}, { __mode = "k" })   -- [uf] = true once SetAlpha is hooked
+local softIgnored = setmetatable({}, { __mode = "k" })   -- [uf] = true while SoftTargetFrame ignores parent alpha
 local parkedAuras = setmetatable({}, { __mode = "k" })   -- [uf] = original parent of uf.AurasFrame
 local savedHLAlpha = setmetatable({}, { __mode = "k" })  -- [uf] = selectionHighlight alpha
 
 local auraHolder = CreateFrame("Frame")
 auraHolder:Hide()
 
+local layoutVersion = 1
 local playerRole = "DAMAGER"
 local groupTanks = {}
 local kickSpell = nil
@@ -270,6 +280,13 @@ local function SuppressBlizzard(uf)
     uf:SetAlpha(0)
     alphaGuard = false
 
+    -- The soft-target icon is a child of the UnitFrame; keep it visible.
+    local st = uf.SoftTargetFrame
+    if st and not softIgnored[uf] and st.SetIgnoreParentAlpha and not st:IsForbidden() then
+        st:SetIgnoreParentAlpha(true)
+        softIgnored[uf] = true
+    end
+
     -- selectionHighlight ignores parent alpha (Classic style only); mute it.
     local hl = uf.selectionHighlight
     if hl and savedHLAlpha[uf] == nil then
@@ -293,6 +310,12 @@ local function RestoreBlizzard(uf)
     alphaGuard = true
     uf:SetAlpha(1)
     alphaGuard = false
+
+    local st = uf.SoftTargetFrame
+    if st and softIgnored[uf] and st.SetIgnoreParentAlpha and not st:IsForbidden() then
+        st:SetIgnoreParentAlpha(false)
+    end
+    softIgnored[uf] = nil
 
     local hl = uf.selectionHighlight
     if hl and savedHLAlpha[uf] ~= nil then
@@ -425,8 +448,21 @@ end
 local function GetThreatColor(db, unit)
     if not db.threatColoring then return nil end
     local ok, status = pcall(UnitThreatSituation, "player", unit)
-    if not ok or IsSecret(status) or type(status) ~= "number" then return nil end
+    if not ok or IsSecret(status) then return nil end
     local c = db.colors
+    if status == nil then
+        -- Not on the threat table: for a tank that is a loose mob, but only
+        -- once the mob is actually in combat (idle mobs stay reaction-colored).
+        if playerRole == "TANK" then
+            local okc, inCombat = pcall(UnitAffectingCombat, unit)
+            if okc and PlainTrue(inCombat) then
+                if OtherTankHolds(unit) then return c.offTank end
+                return c.tankLost
+            end
+        end
+        return nil
+    end
+    if type(status) ~= "number" then return nil end
     if playerRole == "TANK" then
         if status == 3 then return c.tankSecure end
         if status == 2 or status == 1 then return c.tankLosing end
@@ -484,16 +520,24 @@ local UpdateAuras -- forward
 
 local flusher = CreateFrame("Frame")
 flusher:Hide()
+local AURA_MIN_INTERVAL = 0.15
 flusher:SetScript("OnUpdate", function(self)
     self:Hide()
     for p in pairs(dirtyColor) do
         if p.unit then UpdateHealthColor(p) end
     end
     wipe(dirtyColor)
+    local now = GetTime()
     for p in pairs(dirtyAuras) do
-        if p.unit then UpdateAuras(p) end
+        if not p.unit then
+            dirtyAuras[p] = nil
+        elseif now - (p.auraLast or 0) >= AURA_MIN_INTERVAL then
+            dirtyAuras[p] = nil
+            UpdateAuras(p)   -- stamps p.auraLast
+        else
+            self:Show()      -- too soon: retry next frame
+        end
     end
-    wipe(dirtyAuras)
 end)
 
 local function MarkColor(p)
@@ -504,6 +548,29 @@ end
 local function MarkAuras(p)
     dirtyAuras[p] = true
     flusher:Show()
+end
+
+-- Cheap relevance test for a UNIT_AURA payload. True = must update.
+-- Conservative: anything unexpected or secret means "update".
+local function AuraEventRelevant(p, updateInfo)
+    if type(updateInfo) ~= "table" or IsSecret(updateInfo) then return true end
+    if updateInfo.isFullUpdate then return true end
+    local added = updateInfo.addedAuras
+    if IsSecret(added) then return true end
+    if added and #added > 0 then return true end
+    local shown = p.shownAuraIDs
+    if not shown or p.shownAuraSecret then return true end
+    for _, key in ipairs({ "removedAuraInstanceIDs", "updatedAuraInstanceIDs" }) do
+        local list = updateInfo[key]
+        if IsSecret(list) then return true end
+        if list then
+            for i = 1, #list do
+                local id = list[i]
+                if IsSecret(id) or shown[id] then return true end
+            end
+        end
+    end
+    return false
 end
 
 local function MarkAllColors()
@@ -597,7 +664,8 @@ local function UpdateSelection(p)
     if not p.unit then return end
     local db = GetDB()
     local isTarget = PlainTrue(UnitIsUnit(p.unit, "target"))
-    local isFocus = PlainTrue(UnitIsUnit(p.unit, "focus"))
+    local focusBase = C_NamePlate.GetNamePlateForUnit("focus")
+    local isFocus = focusBase ~= nil and focusBase == p.base
     p.isTarget = isTarget
 
     if p.kind ~= "enemy" then
@@ -972,6 +1040,10 @@ UpdateAuras = function(p)
     local db = GetDB()
     local unit = p.unit
     local shownDebuffs, shownBuffs = 0, 0
+    local shownIDs = p.shownAuraIDs
+    if shownIDs then wipe(shownIDs) else shownIDs = {}; p.shownAuraIDs = shownIDs end
+    local sawSecretID = false
+    p.auraLast = GetTime()
 
     if unit and p.kind == "enemy" then
         local fontPath, outline
@@ -992,6 +1064,8 @@ UpdateAuras = function(p)
                     end
                     ApplyAura(icon, unit, list[i], false)
                     icon:Show()
+                    local aid = list[i].auraInstanceID
+                    if IsSecret(aid) or aid == nil then sawSecretID = true else shownIDs[aid] = true end
                 end
             end
         end
@@ -1023,6 +1097,7 @@ UpdateAuras = function(p)
                             end
                             ApplyAura(icon, unit, aura, true)
                             icon:Show()
+                            if plainID then shownIDs[plainID] = true else sawSecretID = true end
                         end
                     end
                 end
@@ -1033,12 +1108,27 @@ UpdateAuras = function(p)
     for i = shownDebuffs + 1, #p.debuffIcons do p.debuffIcons[i]:Hide() end
     for i = shownBuffs + 1, #p.buffIcons do p.buffIcons[i]:Hide() end
 
+    p.shownAuraSecret = sawSecretID
+
+    -- Only re-anchor when the shown count or layout inputs changed.
+    local nameH = (db.showName and (db.nameFontSize or 10) + 3) or 0
     if shownDebuffs > 0 then
-        local nameH = (db.showName and (db.nameFontSize or 10) + 3) or 0
-        LayoutAuraRow(p.debuffIcons, shownDebuffs, p.health, "BOTTOMLEFT", "TOPLEFT", 0, 3 + nameH, "RIGHT")
+        local key = shownDebuffs .. ":" .. nameH .. ":" .. layoutVersion
+        if p.debuffLayoutKey ~= key then
+            LayoutAuraRow(p.debuffIcons, shownDebuffs, p.health, "BOTTOMLEFT", "TOPLEFT", 0, 3 + nameH, "RIGHT")
+            p.debuffLayoutKey = key
+        end
+    else
+        p.debuffLayoutKey = nil
     end
     if shownBuffs > 0 then
-        LayoutAuraRow(p.buffIcons, shownBuffs, p.health, "LEFT", "RIGHT", 4, 0, "RIGHT")
+        local key = shownBuffs .. ":" .. layoutVersion
+        if p.buffLayoutKey ~= key then
+            LayoutAuraRow(p.buffIcons, shownBuffs, p.health, "LEFT", "RIGHT", 4, 0, "RIGHT")
+            p.buffLayoutKey = key
+        end
+    else
+        p.buffLayoutKey = nil
     end
 end
 
@@ -1252,14 +1342,14 @@ end
 ---------------------------------------------------------------------------
 local PLATE_EVENTS_ENEMY = {
     "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_THREAT_LIST_UPDATE", "UNIT_AURA",
-    "UNIT_NAME_UPDATE", "UNIT_FACTION", "UNIT_LEVEL", "UNIT_CLASSIFICATION_CHANGED", "UNIT_FLAGS",
+    "UNIT_NAME_UPDATE", "UNIT_LEVEL", "UNIT_CLASSIFICATION_CHANGED", "UNIT_FLAGS",
     "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_FAILED",
     "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_DELAYED",
     "UNIT_SPELLCAST_CHANNEL_START", "UNIT_SPELLCAST_CHANNEL_UPDATE", "UNIT_SPELLCAST_CHANNEL_STOP",
     "UNIT_SPELLCAST_EMPOWER_START", "UNIT_SPELLCAST_EMPOWER_UPDATE", "UNIT_SPELLCAST_EMPOWER_STOP",
     "UNIT_SPELLCAST_INTERRUPTIBLE", "UNIT_SPELLCAST_NOT_INTERRUPTIBLE",
 }
-local PLATE_EVENTS_FRIENDLY = { "UNIT_NAME_UPDATE", "UNIT_FACTION" }
+local PLATE_EVENTS_FRIENDLY = { "UNIT_NAME_UPDATE" }
 
 local function RegisterPlateEvents(p)
     local ev = p.ev
@@ -1270,7 +1360,7 @@ local function RegisterPlateEvents(p)
     end
 end
 
-PlateOnEvent = function(self, event, unit)
+PlateOnEvent = function(self, event, unit, updateInfo)
     local p = self.plate
     if not p.unit then return end
 
@@ -1279,7 +1369,7 @@ PlateOnEvent = function(self, event, unit)
     elseif event == "UNIT_THREAT_LIST_UPDATE" or event == "UNIT_FLAGS" then
         MarkColor(p)
     elseif event == "UNIT_AURA" then
-        MarkAuras(p)
+        if AuraEventRelevant(p, updateInfo) then MarkAuras(p) end
     elseif event == "UNIT_SPELLCAST_START" or event == "UNIT_SPELLCAST_DELAYED" then
         StartCast(p, false)
     elseif event == "UNIT_SPELLCAST_CHANNEL_START" or event == "UNIT_SPELLCAST_CHANNEL_UPDATE"
@@ -1287,8 +1377,11 @@ PlateOnEvent = function(self, event, unit)
         StartCast(p, true)
     elseif event == "UNIT_SPELLCAST_INTERRUPTED" then
         FlashInterrupted(p)
-    elseif event == "UNIT_SPELLCAST_STOP" or event == "UNIT_SPELLCAST_FAILED"
-        or event == "UNIT_SPELLCAST_CHANNEL_STOP" or event == "UNIT_SPELLCAST_EMPOWER_STOP" then
+    elseif event == "UNIT_SPELLCAST_STOP" or event == "UNIT_SPELLCAST_FAILED" then
+        -- A newer cast/channel may still be running; RefreshCast hides the
+        -- bar itself when nothing is casting.
+        if not p.castFlashing then RefreshCast(p) end
+    elseif event == "UNIT_SPELLCAST_CHANNEL_STOP" or event == "UNIT_SPELLCAST_EMPOWER_STOP" then
         if not p.castFlashing then HideCast(p) end
     elseif event == "UNIT_SPELLCAST_INTERRUPTIBLE" then
         if activeCasts[p] then p.castNotInt = false; ApplyCastColor(p) end
@@ -1298,9 +1391,6 @@ PlateOnEvent = function(self, event, unit)
         UpdateName(p)
     elseif event == "UNIT_LEVEL" or event == "UNIT_CLASSIFICATION_CHANGED" then
         UpdateLevel(p)
-    elseif event == "UNIT_FACTION" then
-        -- Hostility can flip (e.g. quest NPCs); re-decide ownership.
-        SUI_NP:AttachUnit(p.unit, p.base)
     end
 end
 
@@ -1344,8 +1434,6 @@ local function DetachPlate(p)
     p.unit = nil
     p.kind = nil
 end
-
-local layoutVersion = 1
 
 local function FullUpdate(p)
     local db = GetDB()
@@ -1446,6 +1534,7 @@ end
 ---------------------------------------------------------------------------
 local driver = CreateFrame("Frame")
 local driverHooked = false
+local cdRecolorPending = false
 local hooksInstalled = false
 
 local GLOBAL_EVENTS = {
@@ -1478,6 +1567,13 @@ driver:SetScript("OnEvent", function(_, event, arg1)
         SUI_NP:DetachUnit(arg1)
     elseif event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_FOCUS_CHANGED" then
         for _, p in pairs(unitPlates) do UpdateSelection(p) end
+    elseif event == "UNIT_FACTION" then
+        -- Hostility can flip (quest NPCs, mind control). Handled at module
+        -- level so plates left to Blizzard (kind == nil) are re-decided too.
+        if type(arg1) == "string" and not IsSecret(arg1) and arg1:find("^nameplate") then
+            local base = C_NamePlate.GetNamePlateForUnit(arg1)
+            if base then SUI_NP:AttachUnit(arg1, base) end
+        end
     elseif event == "RAID_TARGET_UPDATE" then
         for _, p in pairs(unitPlates) do UpdateRaidIcon(p) end
     elseif event == "UNIT_THREAT_SITUATION_UPDATE" or event == "PLAYER_REGEN_ENABLED" or event == "PLAYER_REGEN_DISABLED" then
@@ -1493,8 +1589,15 @@ driver:SetScript("OnEvent", function(_, event, arg1)
     elseif event == "SPELLS_CHANGED" or event == "UNIT_PET" then
         RefreshKickSpell()
     elseif event == "SPELL_UPDATE_COOLDOWN" then
-        if kickSpell and GetDB().kickTint then
-            for p in pairs(activeCasts) do ApplyCastColor(p) end
+        -- Debounced: at most one recolor per 0.2 s (trailing edge kept).
+        if kickSpell and GetDB().kickTint and not cdRecolorPending then
+            cdRecolorPending = true
+            C_Timer.After(0.2, function()
+                cdRecolorPending = false
+                if SUI_NP.enabled and kickSpell and GetDB().kickTint then
+                    for p in pairs(activeCasts) do ApplyCastColor(p) end
+                end
+            end)
         end
     elseif event == "PLAYER_ENTERING_WORLD" then
         RefreshPlayerRole()
@@ -1511,7 +1614,8 @@ function SUI_NP:Enable()
 
     for _, event in ipairs(GLOBAL_EVENTS) do driver:RegisterEvent(event) end
     driver:RegisterUnitEvent("UNIT_THREAT_SITUATION_UPDATE", "player")
-    driver:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+    driver:RegisterUnitEvent("PLAYER_SPECIALIZATION_CHANGED", "player")
+    driver:RegisterEvent("UNIT_FACTION")
     driver:RegisterUnitEvent("UNIT_PET", "player")
     if not driverHooked then
         driver:RegisterEvent("NAME_PLATE_UNIT_ADDED")
@@ -1557,6 +1661,25 @@ function SUI_NP:Refresh()
     -- friendly-mode changes in one pass.
     layoutVersion = layoutVersion + 1
     ForEachLivePlate(function(unit, base) SUI_NP:AttachUnit(unit, base) end)
+end
+
+-- Color-only refresh (options color pickers): no layout rebuild.
+function SUI_NP:RefreshColors()
+    if not self.enabled then return end
+    local db = GetDB()
+    if not db then return end
+    for _, p in pairs(unitPlates) do
+        if p.kind == "enemy" then
+            SetColor(p.healthBG, db.colors.background)
+            if p.glowing and LCG then
+                LCG.PixelGlow_Stop(p.health, GLOW_KEY)
+                p.glowing = nil   -- UpdateSelection restarts it with the new color
+            end
+            UpdateSelection(p)
+            if activeCasts[p] then ApplyCastColor(p) end
+        end
+    end
+    MarkAllColors()
 end
 
 local loader = CreateFrame("Frame")

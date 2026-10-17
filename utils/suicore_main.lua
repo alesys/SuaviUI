@@ -3852,6 +3852,9 @@ function SUICore:OnProfileChanged(event, db, profileKey)
         -- Castbars (all units)
         safeCall(_G.SuaviUI_RefreshCastbars)
 
+        -- Nameplates (enable/disable follows the new profile)
+        safeCall(_G.SuaviUI_RefreshNameplates)
+
         -- Combat HUD & helpers
         safeCall(_G.SuaviUI_RefreshCastHistory)
         safeCall(_G.SuaviUI_RefreshCombatText)

@@ -113,8 +113,12 @@ local function BuildNameplatesPage(parent)
         return Row(GUI:CreateFormDropdown(content, label, options, key, db, Refresh))
     end
 
+    local function RefreshColors()
+        if NP and NP.RefreshColors then NP:RefreshColors() end
+    end
+
     local function Color(label, key)
-        return Row(GUI:CreateFormColorPicker(content, label, key, colors, Refresh))
+        return Row(GUI:CreateFormColorPicker(content, label, key, colors, RefreshColors))
     end
 
     -- General -------------------------------------------------------------
