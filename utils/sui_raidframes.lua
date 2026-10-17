@@ -522,6 +522,7 @@ local function BuildVisuals(owner, isPreview)
     d.healthText = over:CreateFontString(nil, "OVERLAY")
     d.statusText = over:CreateFontString(nil, "OVERLAY")
     d.afkText = over:CreateFontString(nil, "OVERLAY")
+    d.afkText:SetFont(GetFontPath(), 9, GetFontOutline())
     d.afkText:SetText("AFK")
     d.afkText:SetTextColor(1, 0.8, 0.2)
 
@@ -789,7 +790,8 @@ local function UpdateName(d, unit)
     end
     local maxLen = st.nameLength or 10
     if IsSecret(name) then
-        if not pcall(d.name.SetFormattedText, d.name, "%." .. maxLen .. "s", name) then
+        -- Secret names cannot be measured or cut by characters: show in full
+        if not pcall(d.name.SetText, d.name, name) then
             d.name:SetText("")
         end
     else
@@ -1030,11 +1032,16 @@ local function UpdateRange(d, unit)
         root:SetAlpha(1)
         return
     end
-    if IsSecret(inRange) or IsSecret(checked) then
+    if IsSecret(checked) or IsSecret(inRange) then
+        -- A plain false "checked" means the game could not test range: stay opaque
+        if not IsSecret(checked) and checked == false then
+            root:SetAlpha(1)
+            return
+        end
         if not pcall(root.SetAlphaFromBoolean, root, inRange, 1, oor) then root:SetAlpha(1) end
         return
     end
-    if inRange == nil then
+    if inRange == nil or checked == false then
         root:SetAlpha(1)
         return
     end
@@ -1275,6 +1282,7 @@ local function OnButtonAttributeChanged(btn, name, value)
     if not d then return end
     if d.unit ~= value then
         d.unit = value
+        d.isPlayer = (value == "player") or (value ~= nil and PlainBool(Call(UnitIsUnit, value, "player")) == true)
         unitMapDirty = true
         UpdatePrivateAnchors(d, value)
         if value and btn:IsVisible() then FullUpdate(d) end
@@ -1286,6 +1294,7 @@ local function OnButtonShow(btn)
     if not d then return end
     unitMapDirty = true
     d.unit = btn:GetAttribute("unit")
+    d.isPlayer = (d.unit == "player") or (d.unit ~= nil and PlainBool(Call(UnitIsUnit, d.unit, "player")) == true)
     FullUpdate(d)
 end
 
@@ -1363,12 +1372,46 @@ end
 
 -- Make the header create `count` buttons now (out of combat), so nothing has
 -- to be created or sized later while combat lockdown is active.
+-- Number of units this header will list right now (so pre-creation can ask
+-- for exactly the missing buttons instead of count extra on top of the roster).
+local function HeaderUnitCount(hdr)
+    local filter = hdr:GetAttribute("groupFilter")
+    if hdr:GetAttribute("showParty") then
+        local n = (GetNumSubgroupMembers and GetNumSubgroupMembers() or 0)
+        if hdr:GetAttribute("showPlayer") then n = n + 1 end
+        return n
+    end
+    if not IsInRaid or not IsInRaid() then return 0 end
+    if not filter or not GetRaidRosterInfo then
+        return GetNumGroupMembers and GetNumGroupMembers() or 0
+    end
+    local wanted = {}
+    for g in string.gmatch(filter, "%d+") do wanted[tonumber(g)] = true end
+    local n = 0
+    for i = 1, (GetNumGroupMembers and GetNumGroupMembers() or 0) do
+        local _, _, subgroup = GetRaidRosterInfo(i)
+        if subgroup and not IsSecret(subgroup) and wanted[subgroup] then n = n + 1 end
+    end
+    return n
+end
+
+-- Make the header create `count` buttons now (out of combat), so nothing has
+-- to be created or sized later while combat lockdown is active.
 local function PrecreateButtons(hdr, count)
+    if InCombatLockdown() then return end
     if hdr._suirfPrecreated and hdr._suirfPrecreated >= count then return end
+    if hdr:GetAttribute("child" .. count) then
+        hdr._suirfPrecreated = count
+        return
+    end
     hdr:Show()
-    hdr:SetAttribute("startingIndex", 1 - count)
+    -- The header lists (unitCount - (startingIndex - 1)) buttons: ask only for the missing ones
+    local missing = math.max(0, count - HeaderUnitCount(hdr))
+    if missing > 0 then
+        hdr:SetAttribute("startingIndex", 1 - missing)
+    end
     hdr:SetAttribute("startingIndex", 1)
-    hdr._suirfPrecreated = count
+    if hdr:GetAttribute("child" .. count) then hdr._suirfPrecreated = count end
 end
 
 local function ForEachChild(hdr, fn)
@@ -1389,6 +1432,12 @@ local function ConfigureHeader(hdr, L, opts)
     elseif L.unitGrowth == "RIGHT" then xo = s
     else xo = -s end
 
+    -- Resize existing children first so the header's own update lays them out
+    -- from the new size (otherwise frames shift until the next update).
+    ForEachChild(hdr, function(child)
+        child:SetSize(L.w, L.h)
+    end)
+
     hdr:SetAttribute("suirf-width", L.w)
     hdr:SetAttribute("suirf-height", L.h)
     hdr:SetAttribute("point", HEADER_POINT[L.unitGrowth])
@@ -1404,9 +1453,8 @@ local function ConfigureHeader(hdr, L, opts)
     hdr:SetAttribute("sortMethod", opts.sortMethod or "INDEX")
     if opts.showPlayer ~= nil then hdr:SetAttribute("showPlayer", opts.showPlayer) end
 
-    ForEachChild(hdr, function(child)
-        child:SetSize(L.w, L.h)
-    end)
+    -- Harmless poke: forces one more SecureGroupHeader_Update with everything applied
+    hdr:SetAttribute("suirf-poke", (hdr:GetAttribute("suirf-poke") or 0) + 1)
 end
 
 local ROLE_ORDER = "TANK,HEALER,DAMAGER,NONE"
@@ -1535,6 +1583,7 @@ function RF:ApplyLayout()
         if d then
             d.powerShown = nil
             Restyle(d)
+            UpdatePrivateAnchors(d, d.unit)
         end
     end
     ForAll(function(d) FullUpdate(d) end)
@@ -1854,7 +1903,7 @@ local eventFrame = CreateFrame("Frame")
 local auraDirty = {}
 local auraDirtyAny = false
 local auraElapsed = 0
-local rangeElapsed = 0
+local rangeElapsed = 0 -- range is polled in OnUpdate (single mechanism)
 
 local UNIT_EVENTS = {
     UNIT_HEALTH = function(d, u) UpdateHealth(d, u); UpdatePrediction(d, u) end,
@@ -1869,7 +1918,7 @@ local UNIT_EVENTS = {
     UNIT_CONNECTION = function(d, u) UpdateHealth(d, u); UpdateAFK(d, u) end,
     UNIT_FLAGS = function(d, u) UpdateHealth(d, u); UpdateAFK(d, u) end,
     UNIT_PHASE = function(d, u) UpdateCenterStatus(d, u) end,
-    UNIT_IN_RANGE_UPDATE = function(d, u) UpdateRange(d, u) end,
+    PLAYER_FLAGS_CHANGED = function(d, u) UpdateAFK(d, u) end,
     INCOMING_RESURRECT_CHANGED = function(d, u) UpdateCenterStatus(d, u) end,
     INCOMING_SUMMON_CHANGED = function(d, u) UpdateCenterStatus(d, u) end,
     READY_CHECK_CONFIRM = function(d, u) UpdateReadyCheck(d, u) end,

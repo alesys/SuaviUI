@@ -15,6 +15,7 @@ ns.RF_EditMode = RF_EditMode
 if not LEM then return end
 
 local registered = false
+local registeredKinds = {}  -- per mover, so a partial failure never re-adds one
 
 local function RF() return ns.SUI_RaidFrames end
 
@@ -122,14 +123,18 @@ function RF_EditMode:Register()
     if not rf or not rf.movers.party or not rf.movers.raid then return end
 
     for _, kind in ipairs({ "party", "raid" }) do
-        local mover = rf.movers[kind]
-        local def = rf.DEFAULT_POS[kind]
-        local ok = pcall(function()
-            LEM:AddFrame(mover, OnPositionChanged, { point = def.point, x = def.x, y = def.y })
-            LEM:AddFrameSettings(mover, BuildSettings(kind))
-            LEM:AddFrameSettingsButton(mover, { text = "More Options", click = OpenOptions })
-        end)
-        if not ok then return end
+        if not registeredKinds[kind] then
+            local mover = rf.movers[kind]
+            local def = rf.DEFAULT_POS[kind]
+            -- Mark first: even a half-finished AddFrame must not be repeated
+            registeredKinds[kind] = true
+            local ok = pcall(function()
+                LEM:AddFrame(mover, OnPositionChanged, { point = def.point, x = def.x, y = def.y })
+                LEM:AddFrameSettings(mover, BuildSettings(kind))
+                LEM:AddFrameSettingsButton(mover, { text = "More Options", click = OpenOptions })
+            end)
+            if not ok then return end
+        end
     end
     registered = true
 

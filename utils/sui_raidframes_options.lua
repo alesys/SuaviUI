@@ -266,6 +266,7 @@ local function BuildAuras(content)
     f:Slider("Max Debuffs", 0, 8, 1, "max", st.debuffs)
     f:Slider("Debuff Size", 8, 40, 1, "size", st.debuffs)
     f:Slider("Boss Debuff Size", 8, 48, 1, "bossSize", st.debuffs)
+    f:Note("Bigger boss debuffs may not apply in combat inside instances: the game hides that flag there.")
 
     f:Header("Dispel Highlight")
     f:Check("Highlight Dispellable Debuffs", "enabled", st.dispel)

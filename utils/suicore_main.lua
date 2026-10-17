@@ -3890,6 +3890,7 @@ function SUICore:OnProfileChanged(event, db, profileKey)
         safeCall(_G.SuaviUI_RefreshOverrideActionBarColors)
         safeCall(_G.SuaviUI_RefreshPowerBarAltColors)
         safeCall(_G.SuaviUI_RefreshReadyCheckColors)
+        safeCall(_G.SuaviUI_RefreshRaidFrames)
     end)
 
     -- Refresh Spec Profiles tab if options panel is open
