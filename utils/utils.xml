@@ -72,4 +72,7 @@
     <Script file="sui_raidframes.lua"/>
     <Script file="raidframes_editmode.lua"/>
     <Script file="sui_raidframes_options.lua"/>
+    <!-- Nameplates (module + options page) -->
+    <Script file="sui_nameplates.lua"/>
+    <Script file="sui_nameplates_options.lua"/>
 </Ui>
