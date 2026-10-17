@@ -11446,6 +11446,11 @@ function GUI:InitializeOptions()
     -- Unit Frames (7 sub-pages)
     RegisterBuilders("Unit Frames", CreateUnitFrameBuilders())
 
+    -- Raid & Party Frames (builders live in sui_raidframes_options.lua)
+    if GUI.CreateRaidFrameBuilders then
+        RegisterBuilders("Raid Frames", GUI.CreateRaidFrameBuilders())
+    end
+
     -- Action Bars (4 sub-pages)
     RegisterBuilders("Action Bars", CreateActionBarBuilders())
 
