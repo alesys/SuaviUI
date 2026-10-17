@@ -18,20 +18,30 @@ local qolFrame = CreateFrame("Frame")
 -- MERCHANT: SELL JUNK + AUTO REPAIR
 ---------------------------------------------------------------------------
 
+-- Sells every gray (Poor quality) item in the bags. Shared with the Bags module's
+-- "Sell junk" button (utils/sui_bags.lua) via _G.SuaviUI_SellJunk.
+local function SellJunkItems()
+    local sold = 0
+    for bag = 0, 4 do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) do
+            local info = C_Container.GetContainerItemInfo(bag, slot)
+            if info and info.quality == Enum.ItemQuality.Poor then
+                C_Container.UseContainerItem(bag, slot)
+                sold = sold + 1
+            end
+        end
+    end
+    return sold
+end
+_G.SuaviUI_SellJunk = SellJunkItems
+
 local function OnMerchantShow()
     local settings = GetSettings()
     if not settings then return end
 
     -- Sell gray items
     if settings.sellJunk then
-        for bag = 0, 4 do
-            for slot = 1, C_Container.GetContainerNumSlots(bag) do
-                local info = C_Container.GetContainerItemInfo(bag, slot)
-                if info and info.quality == Enum.ItemQuality.Poor then
-                    C_Container.UseContainerItem(bag, slot)
-                end
-            end
-        end
+        SellJunkItems()
     end
 
     -- Auto repair (dropdown: "off", "personal", "guild")

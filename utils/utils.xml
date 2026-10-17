@@ -75,4 +75,9 @@
     <!-- Nameplates (module + options page) -->
     <Script file="sui_nameplates.lua"/>
     <Script file="sui_nameplates_options.lua"/>
+    <!-- Bags & Bank module (opt-in) -->
+    <Script file="sui_bags_categories.lua"/>
+    <Script file="sui_bags.lua"/>
+    <Script file="sui_bags_bank.lua"/>
+    <Script file="sui_bags_options.lua"/>
 </Ui>
