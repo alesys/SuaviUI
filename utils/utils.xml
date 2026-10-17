@@ -68,4 +68,9 @@
     <Script file="sui_raidbuffs.lua"/>
     <Script file="sui_buffbar.lua"/>
     <Script file="sui_bag_itemlevel.lua"/>
+    <!-- Bags & Bank module (opt-in) -->
+    <Script file="sui_bags_categories.lua"/>
+    <Script file="sui_bags.lua"/>
+    <Script file="sui_bags_bank.lua"/>
+    <Script file="sui_bags_options.lua"/>
 </Ui>

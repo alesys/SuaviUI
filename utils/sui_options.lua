@@ -11456,6 +11456,12 @@ function GUI:InitializeOptions()
     RegisterBuilders("Visibility", CreateAutohideBuilders())
     GUI:AddPage(frame, "Visibility", "HUD Layers", CreateHUDLayeringPage)
 
+    -- Bags & Bank (opt-in module, page builder lives in utils/sui_bags_options.lua)
+    GUI:AddCategory(frame, "Bags")
+    GUI:AddPage(frame, "Bags", "Bags & Bank", function(parent)
+        if ns.BagsOptions then ns.BagsOptions.Build(parent) end
+    end)
+
     -- Resource Bars
     GUI:AddCategory(frame, "Resource Bars")
     GUI:AddPage(frame, "Resource Bars", "Resource Bars", function(tabContent)
