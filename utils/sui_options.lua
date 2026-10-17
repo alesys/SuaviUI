@@ -11545,6 +11545,12 @@ function GUI:InitializeOptions()
         tabContent:SetHeight(math.abs(y) + 20)
     end)
 
+    -- Nameplates (page builder lives in sui_nameplates_options.lua)
+    if ns.NameplatesOptions then
+        GUI:AddCategory(frame, "Nameplates")
+        GUI:AddPage(frame, "Nameplates", "Nameplates", ns.NameplatesOptions.BuildPage)
+    end
+
     -- Profiles (2 sub-pages)
     RegisterBuilders("Profiles", CreateProfileBuilders())
 

@@ -68,4 +68,7 @@
     <Script file="sui_raidbuffs.lua"/>
     <Script file="sui_buffbar.lua"/>
     <Script file="sui_bag_itemlevel.lua"/>
+    <!-- Nameplates (module + options page) -->
+    <Script file="sui_nameplates.lua"/>
+    <Script file="sui_nameplates_options.lua"/>
 </Ui>
