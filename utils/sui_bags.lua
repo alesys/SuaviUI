@@ -2,8 +2,9 @@
 -- SuaviUI Bags: combined bag window (core)
 --
 -- One movable window for backpack + bags + reagent bag, with an optional
--- category view. Item buttons are Blizzard's secure ContainerFrameItemButton
--- template, so use / equip / drag / right-click keep working in combat.
+-- category view. Item buttons use Blizzard's ContainerFrameItemButton template
+-- (a plain ItemButton, not a Secure* template), so use / equip / drag /
+-- right-click keep working in combat.
 --
 -- Design rules (see docs/DEVELOPMENT_PRINCIPLES.md and the Midnight notes):
 --   * Blizzard's container frames are never modified. When the module is on
@@ -11,9 +12,10 @@
 --     state through hooksecurefunc on the stock open/close/toggle functions.
 --   * No field is ever written onto a Blizzard button or its sub-objects; all
 --     of our per-button state lives in a weak side table.
---   * Buttons are only created / moved / shown / hidden out of combat. During
---     combat counts, icons, cooldowns and locks keep updating; the arrangement
---     is queued until PLAYER_REGEN_ENABLED.
+--   * Buttons are only created / moved / shown / hidden out of combat (creating
+--     them in combat is a known taint source, mature bag addons preallocate for
+--     the same reason). During combat counts, icons, cooldowns and locks keep
+--     updating; the arrangement is queued until PLAYER_REGEN_ENABLED.
 --   * Refreshes are batched on BAG_UPDATE_DELAYED (one refresh per frame).
 --
 -- Bank + Warband window: sui_bags_bank.lua. Categories: sui_bags_categories.lua.
@@ -159,9 +161,11 @@ local state = setmetatable({}, { __mode = "k" })
 Bags.state = state
 
 -- Item data that was not cached yet; refreshed on ITEM_DATA_LOAD_RESULT.
-local loadRequested = {}
+local loadRequested = {}   -- itemID -> true while a load is in flight
+local loadAttempts = {}    -- itemID -> completed loads (caps re-requests)
 local function RequestItemData(itemID)
     if not itemID or loadRequested[itemID] then return end
+    if (loadAttempts[itemID] or 0) >= 2 then return end
     loadRequested[itemID] = true
     C_Item.RequestLoadItemDataByID(itemID)
 end
@@ -716,6 +720,8 @@ function Window:SkinButton(btn)
     return st
 end
 
+local CREATE_PER_FRAME = 40
+
 -- Creates (out of combat only) or returns the button for a container slot
 function Window:GetButton(bag, slot, create)
     local row = self.buttons[bag]
@@ -729,6 +735,14 @@ function Window:GetButton(bag, slot, create)
         self.needsRebuild = true
         return nil
     end
+    -- Big windows (the bank) create their buttons over several frames
+    local now = GetTime()
+    if self.budgetT ~= now then self.budgetT, self.budgetN = now, 0 end
+    if self.budgetN >= CREATE_PER_FRAME then
+        self.partial = true
+        return nil
+    end
+    self.budgetN = self.budgetN + 1
     btn = CreateFrame("ItemButton", nil, self:GetBagFrame(bag), "ContainerFrameItemButtonTemplate")
     btn:SetID(slot)
     btn:RegisterForDrag("LeftButton")
@@ -1209,8 +1223,12 @@ function Window:UpdateSlotLock(bag, slot)
     local btn = row and row[slot]
     if not (btn and btn:IsShown()) then return end
     local info = C_Container.GetContainerItemInfo(bag, slot)
+    local locked = info and info.isLocked and true or false
+    -- keep the cached entry current so UpdateVisuals does not undo the lock
+    local e = self.entryCache[bag * 1000 + slot]
+    if e and e.info then e.info.isLocked = locked end
     local icon = btn.icon or btn.Icon
-    if icon then icon:SetDesaturated(info and info.isLocked and true or false) end
+    if icon then icon:SetDesaturated(locked) end
 end
 
 ---------------------------------------------------------------------------
@@ -1257,6 +1275,7 @@ function Window:FullRefresh()
     self:BuildEntries()
     local L = self:BuildLayout()
     self.layout = L
+    self.partial = false
     if InCombatLockdown() then
         -- Buttons are not touched in combat; the arrangement is applied on
         -- PLAYER_REGEN_ENABLED. Counts / icons / locks still update below.
@@ -1269,6 +1288,11 @@ function Window:FullRefresh()
     self:UpdateVisuals()
     self:UpdateFooter()
     self:UpdateScrollBar()
+    -- some buttons were not created this frame: continue on the next one
+    if self.partial and not InCombatLockdown() then
+        self.partial = false
+        self:RequestRefresh()
+    end
 end
 
 -- Coalesce bursts (BAG_UPDATE_DELAYED, item data loads, option changes)
@@ -1347,7 +1371,7 @@ function Window:UpdateBagBar()
     end
 end
 
-function Window:SetBagBarShown(show)
+function Window:SetBagBarShown(show, noRefresh)
     if not self.bagBar then
         if not show then return end
         self:BuildBagBar()
@@ -1355,7 +1379,7 @@ function Window:SetBagBarShown(show)
     self.bagBar:SetShown(show)
     self:RelayoutRows()
     self:UpdateBagBar()
-    if self.frame:IsShown() then self:FullRefresh() end
+    if not noRefresh and self.frame:IsShown() then self:FullRefresh() end
 end
 
 ---------------------------------------------------------------------------
@@ -1484,6 +1508,8 @@ end
 local function HookBagWindowHide()
     bagWindow.frame:HookScript("OnHide", function()
         if Bags.active then ForceCloseBlizzardFlags() end
+        -- closed by hand: the bank must not close them again on the way out
+        if Bags.Bank and not Bags.Bank.closingBags then Bags.Bank.bagsOpenedByBank = false end
     end)
 end
 
@@ -1519,8 +1545,17 @@ handlers.BAG_UPDATE_DELAYED = function()
         if not InCombatLockdown() then bagWindow:Prewarm() end
     end
 end
+-- Only equipment-set membership depends on worn gear, so skip this event
+-- unless that category is on, and coalesce the bursts equipping causes.
+local inventoryQueued = false
 handlers.UNIT_INVENTORY_CHANGED = function(unit)
-    if unit == "player" then handlers.BAG_UPDATE_DELAYED() end
+    if unit ~= "player" or inventoryQueued then return end
+    if GetDB().catEnabled.sets == false then return end
+    inventoryQueued = true
+    C_Timer.After(0.3, function()
+        inventoryQueued = false
+        if Bags.active then handlers.BAG_UPDATE_DELAYED() end
+    end)
 end
 handlers.EQUIPMENT_SETS_CHANGED = handlers.BAG_UPDATE_DELAYED
 handlers.BAG_SLOT_FLAGS_UPDATED = handlers.BAG_UPDATE_DELAYED
@@ -1547,8 +1582,10 @@ handlers.PLAYER_MONEY = function()
     EachWindow(function(w) if w:IsShown() then w:UpdateFooter() end end)
 end
 
-handlers.ITEM_DATA_LOAD_RESULT = function(itemID)
+handlers.ITEM_DATA_LOAD_RESULT = function(itemID, success)
     if itemID and loadRequested[itemID] then
+        loadRequested[itemID] = nil
+        if success then loadAttempts[itemID] = (loadAttempts[itemID] or 0) + 1 end
         EachWindow(function(w) if w:IsShown() then w:RequestRefresh() end end)
     end
 end
@@ -1614,6 +1651,7 @@ function Bags:Enable()
         self.pendingEnable = true
         return
     end
+    self.pendingDisable = false
     self:RefreshStyle()
     self.active = true
     if not bagWindow then
@@ -1637,34 +1675,90 @@ function Bags:Disable()
         self.pendingDisable = true
         return
     end
+    self.pendingEnable = false
     self.active = false
     RegisterActiveEvents(false)
     if bagWindow then bagWindow:Hide() end
     if self.bankWindow then self.bankWindow:Hide() end
+    -- flip the stock frames' shown flags while they are still under the hidden
+    -- parent (no OnHide runs), then hand them back
+    ForceCloseBlizzardFlags()
     RestoreBlizzardBags()
     if self.RestoreBlizzardBank then self:RestoreBlizzardBank() end
 end
 
+-- Turning the module on/off re-parents Blizzard's visible bag and bank frames,
+-- which runs their OnShow/OnHide from addon code. That is only done on a UI
+-- reload (or, for profile changes, when nothing is open).
+local reloadPromptShown = false
+function Bags:PromptReload()
+    if reloadPromptShown then return end
+    local GUI = SUI.GUI
+    if not (GUI and GUI.ShowConfirmation) then
+        print("|cFF30D1FFSuavi UI:|r Bags & Bank change needs a /reload to apply.")
+        return
+    end
+    reloadPromptShown = true
+    GUI:ShowConfirmation({
+        title = "Reload UI required",
+        message = "Turning Bags & Bank on or off needs a UI reload to apply cleanly. Reload now or do it later?",
+        acceptText = "Reload now",
+        cancelText = "Do it later",
+        onAccept = function()
+            reloadPromptShown = false
+            if SUI.SafeReload then SUI:SafeReload() else ReloadUI() end
+        end,
+        onCancel = function() reloadPromptShown = false end,
+    })
+end
+
+-- Safe to flip the module live: nothing of ours or Blizzard's is open
+local function CanToggleLive()
+    if InCombatLockdown() then return false end
+    if bagWindow and bagWindow:IsShown() then return false end
+    if Bags.bankWindow and Bags.bankWindow:IsShown() then return false end
+    if BankFrame and BankFrame:IsShown() then return false end
+    if IsAnyBagOpen and IsAnyBagOpen() then return false end
+    return true
+end
+
+-- Options checkbox: store the setting, apply on reload
 function Bags:SetEnabled(on)
     local db = GetDB()
     db.enabled = on and true or false
-    if on then self:Enable() else self:Disable() end
+    if db.enabled ~= (self.active and true or false) then self:PromptReload() end
+end
+
+-- Re-apply the current profile: reconcile `enabled`, then restyle / relayout.
+-- Called after profile switch / copy / reset / import.
+function Bags:ApplyProfile()
+    self:RefreshStyle()
+    local want = GetDB().enabled and true or false
+    if want ~= (self.active and true or false) then
+        if CanToggleLive() then
+            if want then self:Enable() else self:Disable() end
+        else
+            self:PromptReload()
+        end
+    end
+    if self.active then self:RefreshAll() end
 end
 
 -- Called by the options page after any visual setting changed
 function Bags:RefreshAll()
     self:RefreshStyle()
+    if bagWindow and bagWindow.bagBar then
+        bagWindow:SetBagBarShown(GetDB().showBagBar, true)
+    end
     for _, w in ipairs({ bagWindow, self.bankWindow }) do
         if w then
             ApplyBackdrop(w.frame)
             if w:IsShown() then w:FullRefresh() else w.dirty = true end
         end
     end
-    if bagWindow and bagWindow.bagBar then
-        bagWindow:SetBagBarShown(GetDB().showBagBar)
-    end
 end
 _G.SuaviUI_RefreshBags = function() Bags:RefreshAll() end
+_G.SuaviUI_BagsApplyProfile = function() Bags:ApplyProfile() end
 
 function Bags:IsActive() return self.active and true or false end
 
@@ -1684,11 +1778,16 @@ init:SetScript("OnEvent", function(self)
     Bags:RefreshStyle()
     local core = ns.Addon
     if core and core.db and core.db.RegisterCallback then
+        -- The core refresh list also calls SuaviUI_BagsApplyProfile, but it
+        -- skips same-profile copy/reset and M+; coalesce so a switch applies once.
+        local queued = false
         local function OnProfile()
-            Bags:RefreshStyle()
-            local on = GetDB().enabled
-            if on then Bags:Enable() else Bags:Disable() end
-            if Bags.active then Bags:RefreshAll() end
+            if queued then return end
+            queued = true
+            C_Timer.After(0, function()
+                queued = false
+                Bags:ApplyProfile()
+            end)
         end
         core.db.RegisterCallback(Bags, "OnProfileChanged", OnProfile)
         core.db.RegisterCallback(Bags, "OnProfileCopied", OnProfile)

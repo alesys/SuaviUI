@@ -444,9 +444,16 @@ function Bags:CreateBankWindow()
                 C_Bank.CloseBankFrame()
             end
             Bags:SetBankMode(false)
-            if Bank.bagsOpenedByBank and Bags.bagWindow then
+            if moneyDialog then moneyDialog:Hide() end
+            if Bank.bagsOpenedByBank then
                 Bank.bagsOpenedByBank = false
-                Bags.bagWindow:Hide()
+                -- Blizzard's own close path: clears the "opened by BankFrame"
+                -- marker and the open flags; our hook hides the bag window.
+                Bank.closingBags = true
+                if CloseAllBags then CloseAllBags(BankFrame) end
+                local bw = Bags.bagWindow
+                if bw and bw:IsShown() then bw:Hide() end
+                Bank.closingBags = false
             end
         end,
     })
@@ -465,6 +472,13 @@ function Bags:HideBlizzardBank()
     bankHidden:Hide()
     if not bankOrigParent then bankOrigParent = BankFrame:GetParent() end
     BankFrame:SetParent(bankHidden)
+    -- ContainerFrame anchoring reads BankFrame:GetRight() whenever the frame's
+    -- shown flag is set; a frame that never had points returns nil there.
+    -- Normally the panel manager anchors it as soon as the bank opens; only
+    -- seed a point if it somehow has none (never touch an existing layout).
+    if BankFrame:GetNumPoints() == 0 then
+        BankFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 16, -116)
+    end
 end
 
 function Bags:RestoreBlizzardBank()
@@ -478,7 +492,7 @@ end
 ---------------------------------------------------------------------------
 -- Open / close from the bank interaction
 ---------------------------------------------------------------------------
-local function OpenBank()
+local function DoOpenBank()
     if not Bags.active or not bankWindow then return end
     local warbandOnly = IsWarbandOnly()
     local wasShown = bankWindow:IsShown()
@@ -494,20 +508,41 @@ local function OpenBank()
     end
     Bags:SetBankMode(true)
     bankWindow:Show()
-    -- bags open next to the bank (so items can be deposited)
+    -- bags open next to the bank (so items can be deposited). Go through
+    -- Blizzard's open path so its open flags stay in step; our hook on
+    -- OpenAllBags shows the bag window.
     local bw = Bags.bagWindow
     if bw and not bw:IsShown() then
         Bank.bagsOpenedByBank = true
-        bw:Show()
+        if OpenAllBags then OpenAllBags(BankFrame) end
+        if not bw:IsShown() then bw:Show() end   -- Blizzard declined to open
     end
     bankWindow:RequestRefresh()
     -- slot data of the bank arrives a moment after the open event
-    C_Timer.After(0.3, function()
-        if bankWindow:IsShown() then bankWindow:RequestRefresh() end
+    if not Bank.refreshTimer then
+        Bank.refreshTimer = true
+        C_Timer.After(0.3, function()
+            Bank.refreshTimer = false
+            if bankWindow:IsShown() then bankWindow:RequestRefresh() end
+        end)
+    end
+end
+
+-- BANKFRAME_OPENED and PLAYER_INTERACTION_MANAGER_FRAME_SHOW both announce the
+-- same opening: collapse them into one open on the next frame.
+local openPending = false
+local function OpenBank()
+    if openPending then return end
+    openPending = true
+    C_Timer.After(0, function()
+        if not openPending then return end   -- closed in the meantime
+        openPending = false
+        DoOpenBank()
     end)
 end
 
 local function CloseBank()
+    openPending = false
     if not bankWindow or not bankWindow:IsShown() then return end
     Bank.closingFromEvent = true
     bankWindow:Hide()
