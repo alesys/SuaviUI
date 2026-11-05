@@ -1,37 +1,35 @@
-## 🎮 SuaviUI v0.3.28 - Patch 12.1.5 Edition
+## 🎮 SuaviUI v0.3.29 - New Modules Edition
 
-Patch 12.1.5 removed Blizzard's deprecated item API aliases. Without this release the
-character panel, bag item levels, loot frames and alerts throw "attempt to call a nil
-value" the moment you open them.
-
-### 🔧 Fixes
-
-- **12.1.5 compatibility.** Every remaining call to the retired globals
-  (`GetItemInfo`, `GetDetailedItemLevelInfo`, `GetItemInfoInstant`,
-  `GetItemQualityColor`, `GetItemGem`) now goes through the `C_Item` namespace.
-  Affected: character panel item names and item levels, equipment flyout, bag item
-  levels, loot roll frames, loot/alert quality colors, datatext quality colors.
-- **Interface version bumped to 120105** so the addon no longer shows as out of date.
-- **Objective Tracker taint, round two.** The UI Hider was writing a bookkeeping flag
-  directly onto Blizzard's `ObjectiveTrackerFrame` (and onto `GameTimeFrame`,
-  `TalkingHeadFrame` and `StatusTrackingBarManager`). In Midnight a tainted key on a
-  Blizzard frame table is enough to make its whole update chain run restricted, which
-  kept the "Auras cannot be accessed when secret" storm alive for anyone hiding the
-  tracker. The flags now live in an addon-owned table.
-- **Loot roll click blocker.** Hiding Blizzard's roll frames leaked a container slot on
-  every roll, growing an invisible 256px-wide wall that ate clicks. The slot is now
-  handed back through Blizzard's own `GroupLootContainer_RemoveFrame`, and the container
-  no longer accepts mouse input (it draws nothing).
-- **Tooltip forbidden-frame crash.** Walking a frame's parents could hit a forbidden
-  frame (`PingListenerFrame`) and die with "Attempt to access forbidden object". The walk
-  now stops at forbidden frames.
+Three new modules: nameplates, raid & party frames, and a combined bag window with
+bank support. All three are **off by default**, so nothing changes until you turn them on
+in `/sui` options.
 
 ### 🛠️ New
 
-- `/suitaint` — audits the Objective Tracker chain with `issecurevariable()` and names
-  which field is tainted and by whom. Run it inside the scenario while the error fires;
-  taint clears on reload.
+- **Nameplates.** SuaviUI nameplates drawn on top of Blizzard's plates: health bar with
+  threat and role coloring (tank loose-mob warnings), name, health percent, level/elite,
+  target border, glow and scale, focus marker, raid icon, and a cast bar with
+  interruptible/locked colors, an interrupt-on-cooldown tint and an interrupted flash.
+  Shows your debuffs plus purgeable/important enemy buffs. Friendly plates can be
+  name-only or hidden. Blizzard's frame is only faded, and everything is restored when you
+  disable the module.
+- **Raid & Party Frames.** Secure group headers for party and raid (by group, or one
+  combined frame sorted by role or name). Health and power bars, heal prediction, absorbs
+  and heal absorbs, dispel highlight, debuffs (boss debuffs larger), your own HoTs,
+  private aura anchors, range fade, dead/offline/AFK states, role/leader/marker/ready
+  check/res/summon icons, target highlight and Clique support. Positioned through Edit
+  Mode with per-layout positions and a preview with fake units. Blizzard's party and raid
+  frames are hidden while the module is on.
+- **Bags & Bank.** One combined bag window with categories, plus the bank and the
+  Warband bank. Opens and closes in sync with Blizzard's bag keybinds and the bank NPC.
+  Turning it on or off asks for a reload.
 
-### ℹ️ Who this affected
+### 🔧 Under the hood
 
-Everyone on 12.1.5. Update before opening the character panel or your bags.
+- The sell-junk routine is now shared, so the bag window can use it too.
+- Profile import and profile switch refresh the new modules.
+
+### ℹ️ Who this affects
+
+Everyone can update safely: with the new modules left off, the addon behaves exactly
+like v0.3.28. Turn them on in `/sui` to try them, and report anything odd.
