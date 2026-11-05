@@ -1,5 +1,181 @@
 # SuaviUI Changelog
 
+## [v0.3.29](https://github.com/alesys/SuaviUI/releases/tag/v0.3.29) (2026-11-05)
+
+### New Modules Edition
+
+Three new modules: nameplates, raid & party frames, and a combined bag window with bank support. All three are off by default; nothing changes until you enable them in `/sui`.
+
+- **Nameplates**: SuaviUI plates on top of Blizzard's bases: threat/role-colored health bar, name, health %, level/elite, target border/glow/scale, focus marker, raid icon, cast bar (interruptible/locked colors, interrupt-on-cooldown tint, interrupted flash), your debuffs plus purgeable/important enemy buffs, friendly name-only/hide modes. Blizzard's frame is only faded and fully restored when disabled
+- **Raid & Party Frames**: secure group headers (per group, or one combined frame sorted by role/name), health/power, heal prediction, absorbs and heal absorbs, dispel highlight, debuffs (boss debuffs larger), own HoTs, private aura anchors, range fade, dead/offline/AFK, role/leader/marker/ready check/res/summon icons, target highlight, Clique support. Positioned through Edit Mode with per-layout positions and fake-unit preview
+- **Bags & Bank**: combined bag window with categories, bank and Warband bank, in sync with Blizzard's bag keybinds and the bank NPC. Toggling it asks for a reload
+- **Sell junk**: routine now shared so the bag window can use it
+- **Profiles**: import and profile switch refresh the new modules
+
+---
+
+## [v0.3.28](https://github.com/alesys/SuaviUI/releases/tag/v0.3.28) (2026-10-13)
+
+### Patch 12.1.5 Edition
+
+Patch 12.1.5 removed Blizzard's deprecated item API aliases; without this release the character panel, bags, loot frames and alerts threw "attempt to call a nil value".
+
+- **12.1.5 compatibility**: all calls to `GetItemInfo`, `GetDetailedItemLevelInfo`, `GetItemInfoInstant`, `GetItemQualityColor`, `GetItemGem` moved to `C_Item` (character panel, equipment flyout, bag item levels, loot rolls, loot/alert and datatext quality colors)
+- **Interface 120105**: addon no longer shows as out of date
+- **Objective Tracker taint, round two**: UI Hider bookkeeping flags moved off Blizzard frames (`ObjectiveTrackerFrame`, `GameTimeFrame`, `TalkingHeadFrame`, `StatusTrackingBarManager`) into an addon-owned table
+- **Loot roll click blocker**: hidden roll frames are returned through `GroupLootContainer_RemoveFrame`; the container no longer takes mouse input
+- **Tooltip forbidden-frame crash**: parent walk stops at forbidden frames (`PingListenerFrame`)
+- **New `/suitaint`**: audits the Objective Tracker chain with `issecurevariable()` and names the tainted field and its source
+
+---
+
+## [v0.3.27](https://github.com/alesys/SuaviUI/releases/tag/v0.3.27) (2026-08-21)
+
+### Tracker Taint Edition
+
+Fixes an error storm (~43,000 per session) from the Objective Tracker in scenarios, delves and Mythic+.
+
+- **Objective Tracker taint**: global font is now applied from an addon-owned frame instead of a script hook on the tracker, so Blizzard's scenario tracker no longer runs restricted
+- **Tracker skin**: two more hooks of the same kind removed (one was redundant)
+
+---
+
+## [v0.3.26](https://github.com/alesys/SuaviUI/releases/tag/v0.3.26) (2026-08-20)
+
+### Click Blocker Edition
+
+- **Anchoring popover click catcher**: the full-screen "click outside to close" frame is now tied to the popover's visibility; it could stay up and eat every click on the UI
+- **New `/suimouse`**: lists regions under the cursor (topmost first) and flags invisible-but-clickable ones; `/suimouse 3` samples after a delay; `/suimouse scan` reports zero-alpha mouse-enabled frames and mouse-enabled frames covering >25% of the screen. Report only, never disables anything
+
+---
+
+## [v0.3.25](https://github.com/alesys/SuaviUI/releases/tag/v0.3.25) (2026-08-18)
+
+### Secret Values Edition
+
+Midnight compatibility fixes for secret values.
+
+- **Cursor ring**: tracks the cursor again; GCD sweep no longer errors in combat
+- **Unit frame auras**: secret auras are skipped cleanly instead of erroring and hiding every aura after them
+- **Leader/assistant icons** on target and focus no longer error in groups
+- **Class colors in instances**: target, target-of-target, pets and portrait borders show the real class color instead of grey (inline ToT text falls back to white)
+- **Raid buff checks** and **Mythic+ key list** leader crown no longer error
+- Known limitation: auras Midnight marks as secret cannot be shown by any addon
+
+---
+
+## [v0.3.24](https://github.com/alesys/SuaviUI/releases/tag/v0.3.24) (2026-07-31)
+
+### Omnium Folio Edition
+
+- **Omnium datatext**: unspent Omnium Folio points, gold when something is purchasable; tooltip with unspent/spent points and balance; click opens the folio
+- **Omnium Folio skin**: SuaviUI 1px border and fonts, tree artwork untouched (toggle in General & QoL)
+- **Spendable Omnium alert**: optional pulsing glow on the landing page minimap button plus optional chat notice; clears when the folio opens
+- **Landing page minimap button**: scale and X/Y offset in the Edit Mode minimap panel; now shown by default
+- Spendable detection uses Blizzard's rule (an affordable, purchasable node must exist); all Omnium code guarded for pre-Midnight clients
+
+---
+
+## [v0.3.23](https://github.com/alesys/SuaviUI/releases/tag/v0.3.23) (2026-07-31)
+
+### Midnight Castbars Edition
+
+- **Boss castbars with secret cast timing**: redacted timing is handed to the engine (`SetTimerDuration`), so bars fill/drain correctly
+- **Combat Timer in Edit Mode**: position, size, font, colors and border with live preview; old offsets migrated automatically
+- **Buff/Debuff text** and **Target Marker** settings moved to the Edit Mode sidepanel
+- **Extra Action Button / Zone Ability** movable and scalable again, anchored (never reparented) to stay taint-safe
+- **Spec swap**: every module now refreshes on LibDualSpec profile change
+- **Castbars**: boss bars created when enabled mid-session, casts already in progress are picked up, long casts no longer restart on a concurrent instant cast, preview no longer resets mid-drag
+- **Extra Action Button holder** no longer eats clicks
+- **Minimap clock/coords color** and **Skyriding vigor bar dropdowns** store the right values
+
+---
+
+## [v0.3.22](https://github.com/alesys/SuaviUI/releases/tag/v0.3.22) (2026-05-03)
+
+### Bonus Roll Mover Edition
+
+- **Bonus Roll prompt visible again**: `GroupLootContainer` is no longer hidden, only `GroupLootFrame1-4`
+- **Bonus Roll Edit Mode mover** with placeholder, position saved per profile
+- **Unit frames Edit Mode**: Health Text gains Anchor + X/Y offset; Power Text gains X/Y offset
+- **Minimap border color crash** fixed, with self-healing of corrupted profiles
+
+---
+
+## [v0.3.21](https://github.com/alesys/SuaviUI/releases/tag/v0.3.21) (2026-04-26)
+
+### Live Stats Edition
+
+- **Live Stats frame**: standalone stats HUD with six toggleable sections and per-stat checkboxes, movable in Edit Mode
+- **Live Combat Updates (opt-in)**: keeps Blizzard's character pane logically visible so stats stay current in combat without taint
+- **Stats in combat**: per-stat cache of last good values, hooks on `PaperDollFrame_Set*`, new aura/lifesteal/avoidance/spell power events, player-only events
+- **Rotation Assist icon**: Edit Mode integration; sidebar settings; keybind slot mapping fixed (bars 2/3 swapped, slots 13-24, bars 6/7/8)
+- **Cast History**: moved to the CDM Keybind & Rotation tab; vertical orientations now work
+- **Chat taint fix**: `AddMessage` replacement swapped for `ChatFrame_AddMessageEventFilter`
+- **Extra Abilities**: SuaviUI panel injected into Blizzard's Edit Mode system (scale, hide artwork, fade) instead of reparenting
+
+---
+
+## [v0.3.20](https://github.com/alesys/SuaviUI/releases/tag/v0.3.20) (2026-04-18)
+
+### Cast History Edition
+
+- **Cast History frame** (opt-in): icons of recent casts, configurable flow direction, max icons + timeout, SuaviUI Square or Blizzard Default skin, movable in Edit Mode, channel-tick filter
+- **Cursor ring** renders as a ring again (assets renamed `qui_*` → `sui_*`)
+- **Cast History** icons stay visible after the slide-in; square border drawn above the icon
+- **Global unit frame settings** (dark mode, opacities, text coloring) moved from the Edit Mode sidebar to Options → Unit Frames → General
+
+---
+
+## [v0.3.19](https://github.com/alesys/SuaviUI/releases/tag/v0.3.19) (2026-04-11)
+
+### Character Panel Redesign
+
+- **Character panel**: new header bar (name, spec, item level), styled Stats/Titles/Equip buttons, amber ⚠ for missing enchants, wider stats panel, more room for item names
+- **Unit frame auras**: anchor dropdown works, 9-point anchoring, live preview in Edit Mode
+- **Edit Mode eye button**: hidden overlays no longer reappear on click
+- **Resource Bars options**: "module not loaded" error and reset buttons fixed
+- Random motivational messages and wellness reminders
+
+---
+
+## [v0.3.18](https://github.com/alesys/SuaviUI/releases/tag/v0.3.18) (2026-04-03)
+
+### Hide While Mounted Edition
+
+- **Hide While Mounted/Vehicle** for unit frames, action bars and CDM viewers (includes Druid travel forms)
+- **Collapsible sections** in the Action Bar panel
+- **Resource Bars section** in Options (per-bar enable, center reset)
+- **Spec change**: "Hide Empty Slots" buttons update correctly
+- **Action bar checkboxes**: Show Backdrop / Show Gloss reflect their real state
+- **Enchant checker for Midnight**: Head and Shoulder flagged; Back and Wrist removed; OffHand only for weapons
+- Removed unused Border Overlap checkbox from CDM panels
+
+---
+
+## [v0.3.17](https://github.com/alesys/SuaviUI/releases/tag/v0.3.17) (2026-03-27)
+
+### UpgradeItem Fix Edition
+
+- **Item Upgrade UI unblocked**: removed global function replacements in the tooltip module and `StaticPopup_Hide` from auto-accept invite, which tainted the StaticPopup chain
+- `pcall` guards for Reticle GCD and QuickSalvage; Keystone comm fallback for removed `GetActiveKeystoneLevel`
+- CDM alerts rewritten with `hooksecurefunc`; viewer `SetSize` calls removed
+- **New**: minimap right-click context menu; CDM Enhanced Alerts module (SoundKit, SharedMedia, TTS)
+
+---
+
+## [v0.3.16](https://github.com/alesys/SuaviUI/releases/tag/v0.3.16) (2026-03-20)
+
+### Vertical Tracked Buffs Edition
+
+- **Tracked Buffs** honor the vertical orientation from Edit Mode
+- **ExtraActionBarFrame taint**: protected Show/Hide/EnableMouse replaced with `SetAlpha`
+- **Resource bars** update width/position on spec change with per-character layouts
+- **Auto-delete confirm** disabled to avoid StaticPopup taint
+- CDM taint diagnosis via per-module hook flags (`ns.CDM_HOOKS`)
+
+---
+
 ## [v0.3.15](https://github.com/alesys/SuaviUI/releases/tag/v0.3.15) (2026-03-13)
 
 ### Taint Fix Edition
