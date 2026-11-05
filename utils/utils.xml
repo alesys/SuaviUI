@@ -68,4 +68,16 @@
     <Script file="sui_raidbuffs.lua"/>
     <Script file="sui_buffbar.lua"/>
     <Script file="sui_bag_itemlevel.lua"/>
+    <!-- Raid & Party Frames -->
+    <Script file="sui_raidframes.lua"/>
+    <Script file="raidframes_editmode.lua"/>
+    <Script file="sui_raidframes_options.lua"/>
+    <!-- Nameplates (module + options page) -->
+    <Script file="sui_nameplates.lua"/>
+    <Script file="sui_nameplates_options.lua"/>
+    <!-- Bags & Bank module (opt-in) -->
+    <Script file="sui_bags_categories.lua"/>
+    <Script file="sui_bags.lua"/>
+    <Script file="sui_bags_bank.lua"/>
+    <Script file="sui_bags_options.lua"/>
 </Ui>

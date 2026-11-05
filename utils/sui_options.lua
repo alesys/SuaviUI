@@ -11446,6 +11446,11 @@ function GUI:InitializeOptions()
     -- Unit Frames (7 sub-pages)
     RegisterBuilders("Unit Frames", CreateUnitFrameBuilders())
 
+    -- Raid & Party Frames (builders live in sui_raidframes_options.lua)
+    if GUI.CreateRaidFrameBuilders then
+        RegisterBuilders("Raid Frames", GUI.CreateRaidFrameBuilders())
+    end
+
     -- Action Bars (4 sub-pages)
     RegisterBuilders("Action Bars", CreateActionBarBuilders())
 
@@ -11455,6 +11460,12 @@ function GUI:InitializeOptions()
     -- Visibility
     RegisterBuilders("Visibility", CreateAutohideBuilders())
     GUI:AddPage(frame, "Visibility", "HUD Layers", CreateHUDLayeringPage)
+
+    -- Bags & Bank (opt-in module, page builder lives in utils/sui_bags_options.lua)
+    GUI:AddCategory(frame, "Bags")
+    GUI:AddPage(frame, "Bags", "Bags & Bank", function(parent)
+        if ns.BagsOptions then ns.BagsOptions.Build(parent) end
+    end)
 
     -- Resource Bars
     GUI:AddCategory(frame, "Resource Bars")
@@ -11544,6 +11555,12 @@ function GUI:InitializeOptions()
 
         tabContent:SetHeight(math.abs(y) + 20)
     end)
+
+    -- Nameplates (page builder lives in sui_nameplates_options.lua)
+    if ns.NameplatesOptions then
+        GUI:AddCategory(frame, "Nameplates")
+        GUI:AddPage(frame, "Nameplates", "Nameplates", ns.NameplatesOptions.BuildPage)
+    end
 
     -- Profiles (2 sub-pages)
     RegisterBuilders("Profiles", CreateProfileBuilders())

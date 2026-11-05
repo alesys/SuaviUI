@@ -3852,6 +3852,9 @@ function SUICore:OnProfileChanged(event, db, profileKey)
         -- Castbars (all units)
         safeCall(_G.SuaviUI_RefreshCastbars)
 
+        -- Nameplates (enable/disable follows the new profile)
+        safeCall(_G.SuaviUI_RefreshNameplates)
+
         -- Combat HUD & helpers
         safeCall(_G.SuaviUI_RefreshCastHistory)
         safeCall(_G.SuaviUI_RefreshCombatText)
@@ -3890,6 +3893,8 @@ function SUICore:OnProfileChanged(event, db, profileKey)
         safeCall(_G.SuaviUI_RefreshOverrideActionBarColors)
         safeCall(_G.SuaviUI_RefreshPowerBarAltColors)
         safeCall(_G.SuaviUI_RefreshReadyCheckColors)
+        safeCall(_G.SuaviUI_RefreshRaidFrames)
+        safeCall(_G.SuaviUI_BagsApplyProfile)
     end)
 
     -- Refresh Spec Profiles tab if options panel is open
